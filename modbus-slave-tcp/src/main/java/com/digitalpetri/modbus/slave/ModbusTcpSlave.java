@@ -13,14 +13,10 @@ import com.digitalpetri.modbus.codec.ModbusResponseEncoder;
 import com.digitalpetri.modbus.codec.ModbusTcpCodec;
 import com.digitalpetri.modbus.codec.ModbusTcpPayload;
 import com.digitalpetri.modbus.requests.ModbusRequest;
-import com.digitalpetri.modbus.requests.ReadHoldingRegistersRequest;
 import com.digitalpetri.modbus.responses.ExceptionResponse;
 import com.digitalpetri.modbus.responses.ModbusResponse;
-import com.digitalpetri.modbus.responses.ReadHoldingRegistersResponse;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.buffer.ByteBuf;
 import io.netty.buffer.PooledByteBufAllocator;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
@@ -35,28 +31,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class ModbusTcpSlave {
-
-    public static void main(String[] args) {
-        ModbusTcpSlaveConfig config = new ModbusTcpSlaveConfig.ModbusTcpSlaveConfigBuilder().build();
-        ModbusTcpSlave slave = new ModbusTcpSlave(config);
-
-        slave.setRequestHandler(new ServiceRequestHandler() {
-            @Override
-            public void onReadHoldingRegisters(ServiceRequest<ReadHoldingRegistersRequest, ReadHoldingRegistersResponse> service) {
-                ReadHoldingRegistersRequest request = service.getRequest();
-
-                ByteBuf registers = Unpooled.buffer(request.getQuantity());
-
-                for (int i = 0; i < request.getQuantity(); i++) {
-                    registers.writeByte(i);
-                }
-
-                service.sendResponse(new ReadHoldingRegistersResponse(registers));
-            }
-        });
-
-        slave.bind("localhost", 50200);
-    }
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
 

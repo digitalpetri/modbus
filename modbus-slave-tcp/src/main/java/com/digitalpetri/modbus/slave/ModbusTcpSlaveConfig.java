@@ -41,28 +41,28 @@ public class ModbusTcpSlaveConfig {
         return wheelTimer;
     }
 
-    public static class ModbusTcpSlaveConfigBuilder {
+    public static class Builder {
         private Optional<String> instanceId = Optional.empty();
         private ExecutorService executor;
         private EventLoopGroup eventLoop;
         private HashedWheelTimer wheelTimer;
 
-        public ModbusTcpSlaveConfigBuilder setInstanceId(String instanceId) {
+        public Builder setInstanceId(String instanceId) {
             this.instanceId = Optional.of(instanceId);
             return this;
         }
 
-        public ModbusTcpSlaveConfigBuilder setExecutor(ExecutorService executor) {
+        public Builder setExecutor(ExecutorService executor) {
             this.executor = executor;
             return this;
         }
 
-        public ModbusTcpSlaveConfigBuilder setEventLoop(EventLoopGroup eventLoop) {
+        public Builder setEventLoop(EventLoopGroup eventLoop) {
             this.eventLoop = eventLoop;
             return this;
         }
 
-        public ModbusTcpSlaveConfigBuilder setWheelTimer(HashedWheelTimer wheelTimer) {
+        public Builder setWheelTimer(HashedWheelTimer wheelTimer) {
             this.wheelTimer = wheelTimer;
             return this;
         }

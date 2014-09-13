@@ -1,12 +1,8 @@
 package com.digitalpetri.modbus.master;
 
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -17,19 +13,15 @@ import com.codahale.metrics.MetricSet;
 import com.codahale.metrics.Timer;
 import com.digitalpetri.modbus.ModbusPdu;
 import com.digitalpetri.modbus.ModbusResponseException;
-import com.digitalpetri.modbus.codec.Modbus;
 import com.digitalpetri.modbus.codec.ModbusRequestEncoder;
 import com.digitalpetri.modbus.codec.ModbusResponseDecoder;
 import com.digitalpetri.modbus.codec.ModbusTcpCodec;
 import com.digitalpetri.modbus.codec.ModbusTcpPayload;
-import com.digitalpetri.modbus.master.ModbusTcpMasterConfig.ModbusTcpMasterConfigBuilder;
 import com.digitalpetri.modbus.master.fsm.ConnectionEvent;
 import com.digitalpetri.modbus.master.fsm.StateContext;
 import com.digitalpetri.modbus.requests.ModbusRequest;
-import com.digitalpetri.modbus.requests.ReadHoldingRegistersRequest;
 import com.digitalpetri.modbus.responses.ExceptionResponse;
 import com.digitalpetri.modbus.responses.ModbusResponse;
-import com.digitalpetri.modbus.responses.ReadHoldingRegistersResponse;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.Channel;
@@ -46,61 +38,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class ModbusTcpMaster implements MetricSet {
-
-    public static void main(String[] args) throws InterruptedException {
-//        ResourceLeakDetector.setLevel(Level.PARANOID);
-
-        ModbusTcpMasterConfig config = new ModbusTcpMasterConfigBuilder("localhost")
-                .setPort(50200)
-                .build();
-
-        List<ModbusTcpMaster> masters = new CopyOnWriteArrayList<>();
-
-        new Thread(() -> {
-            while (true) {
-                try {
-                    Thread.sleep(5000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-
-                double mean = 0.0;
-                double oneMinute = 0.0;
-
-                for (ModbusTcpMaster master : masters) {
-                    mean += master.getResponseTimer().getMeanRate();
-                    oneMinute += master.getResponseTimer().getOneMinuteRate();
-                }
-
-                System.out.println("Mean rate: " + mean + " 1m rate: " + oneMinute);
-            }
-        }).start();
-
-        for (int i = 0; i < 100; i++) {
-            ModbusTcpMaster master = new ModbusTcpMaster(config);
-            masters.add(master);
-
-            for (int j = 0; j < 100; j++) {
-                sendAndReceive(master);
-            }
-        }
-    }
-
-    private static final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-
-    private static void sendAndReceive(ModbusTcpMaster master) {
-        CompletableFuture<ReadHoldingRegistersResponse> future =
-                master.sendRequest(new ReadHoldingRegistersRequest(0, 10), 0);
-
-        future.whenCompleteAsync((response, ex) -> {
-            if (response != null) {
-                ReferenceCountUtil.release(response);
-            } else {
-                ex.printStackTrace();
-            }
-            scheduler.schedule(() -> sendAndReceive(master), 1, TimeUnit.SECONDS);
-        }, Modbus.sharedExecutor());
-    }
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
 

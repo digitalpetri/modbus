@@ -69,7 +69,7 @@ public class ModbusTcpMasterConfig {
         return wheelTimer;
     }
 
-    public static class ModbusTcpMasterConfigBuilder {
+    public static class Builder {
 
         private final String address;
 
@@ -81,41 +81,41 @@ public class ModbusTcpMasterConfig {
         private EventLoopGroup eventLoop;
         private HashedWheelTimer wheelTimer;
 
-        public ModbusTcpMasterConfigBuilder(String address) {
+        public Builder(String address) {
             this.address = address;
         }
 
-        public ModbusTcpMasterConfigBuilder setPort(int port) {
+        public Builder setPort(int port) {
             this.port = port;
             return this;
         }
 
-        public ModbusTcpMasterConfigBuilder setTimeout(Duration timeout) {
+        public Builder setTimeout(Duration timeout) {
             this.timeout = timeout;
             return this;
         }
 
-        public ModbusTcpMasterConfigBuilder setAutoConnect(boolean autoConnect) {
+        public Builder setAutoConnect(boolean autoConnect) {
             this.autoConnect = autoConnect;
             return this;
         }
 
-        public ModbusTcpMasterConfigBuilder setInstanceId(String instanceId) {
+        public Builder setInstanceId(String instanceId) {
             this.instanceId = Optional.of(instanceId);
             return this;
         }
 
-        public ModbusTcpMasterConfigBuilder setExecutor(ExecutorService executor) {
+        public Builder setExecutor(ExecutorService executor) {
             this.executor = executor;
             return this;
         }
 
-        public ModbusTcpMasterConfigBuilder setEventLoop(EventLoopGroup eventLoop) {
+        public Builder setEventLoop(EventLoopGroup eventLoop) {
             this.eventLoop = eventLoop;
             return this;
         }
 
-        public ModbusTcpMasterConfigBuilder setWheelTimer(HashedWheelTimer wheelTimer) {
+        public Builder setWheelTimer(HashedWheelTimer wheelTimer) {
             this.wheelTimer = wheelTimer;
             return this;
         }
@@ -125,7 +125,8 @@ public class ModbusTcpMasterConfig {
                     address,
                     port,
                     timeout,
-                    autoConnect, instanceId,
+                    autoConnect,
+                    instanceId,
                     executor != null ? executor : Modbus.sharedExecutor(),
                     eventLoop != null ? eventLoop : Modbus.sharedEventLoop(),
                     wheelTimer != null ? wheelTimer : Modbus.sharedWheelTimer()
