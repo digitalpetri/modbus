@@ -12,8 +12,7 @@ public enum FunctionCode {
     WriteSingleRegister(0x06),
     WriteMultipleCoils(0x0F),
     WriteMultipleRegisters(0x10),
-    MaskWriteRegister(0x16),
-    UnsupportedFunction(0x00);
+    MaskWriteRegister(0x16);
 
     private final int code;
 
@@ -31,11 +30,18 @@ public enum FunctionCode {
             case 0x02: return Optional.of(ReadDiscreteInputs);
             case 0x03: return Optional.of(ReadHoldingRegisters);
             case 0x04: return Optional.of(ReadInputRegisters);
+            case 0x05: return Optional.of(WriteSingleCoil);
+            case 0x06: return Optional.of(WriteSingleRegister);
+            case 0x0F: return Optional.of(WriteMultipleCoils);
+            case 0x10: return Optional.of(WriteMultipleRegisters);
+            case 0x16: return Optional.of(MaskWriteRegister);
         }
+
         return Optional.empty();
     }
 
     public static boolean isExceptionCode(int code) {
         return fromCode(code - 0x80).isPresent();
     }
+
 }

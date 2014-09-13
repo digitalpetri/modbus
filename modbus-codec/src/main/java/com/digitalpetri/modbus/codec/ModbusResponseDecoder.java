@@ -21,7 +21,7 @@ public class ModbusResponseDecoder implements ModbusPduDecoder {
 
     @Override
     public ModbusPdu decode(ByteBuf buffer) throws DecoderException {
-        int code = buffer.readByte();
+        int code = buffer.readUnsignedByte();
 
         if (FunctionCode.isExceptionCode(code)) {
             FunctionCode functionCode = FunctionCode
@@ -39,7 +39,7 @@ public class ModbusResponseDecoder implements ModbusPduDecoder {
     }
 
     private ModbusPdu decodeException(FunctionCode functionCode, ByteBuf buffer) throws DecoderException {
-        int code = buffer.readByte();
+        int code = buffer.readUnsignedByte();
 
         ExceptionCode exceptionCode = ExceptionCode
                 .fromCode(code)

@@ -25,7 +25,19 @@ public enum ExceptionCode {
     }
 
     public static Optional<ExceptionCode> fromCode(int code) {
-        return null;
+        switch (code) {
+            case 0x01: return Optional.of(IllegalFunction);
+            case 0x02: return Optional.of(IllegalDataAddress);
+            case 0x03: return Optional.of(IllegalDataValue);
+            case 0x04: return Optional.of(ServerDeviceFailure);
+            case 0x05: return Optional.of(Acknowledge);
+            case 0x06: return Optional.of(ServerDeviceBusy);
+            case 0x08: return Optional.of(MemoryParityError);
+            case 0x0A: return Optional.of(GatewayPathUnavailable);
+            case 0x0B: return Optional.of(GatewayTargetDeviceFailedToResponse);
+        }
+
+        return Optional.empty();
     }
 
 }
