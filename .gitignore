@@ -1,0 +1,21 @@
+### Java ###
+*.class
+*.jar
+*.war
+*.ear
+hs_err_pid*
+
+### Maven ###
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+release.properties
+
+### Intellij ###
+.idea/
+*.ipr
+*.iws
+*.iml
+
