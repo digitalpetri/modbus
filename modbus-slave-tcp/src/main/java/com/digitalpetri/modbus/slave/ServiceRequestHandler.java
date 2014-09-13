@@ -21,43 +21,53 @@ import com.digitalpetri.modbus.responses.WriteMultipleCoilsResponse;
 import com.digitalpetri.modbus.responses.WriteMultipleRegistersResponse;
 import com.digitalpetri.modbus.responses.WriteSingleCoilResponse;
 import com.digitalpetri.modbus.responses.WriteSingleRegisterResponse;
+import io.netty.util.ReferenceCountUtil;
 
 public interface ServiceRequestHandler {
 
     default void onReadHoldingRegisters(ServiceRequest<ReadHoldingRegistersRequest, ReadHoldingRegistersResponse> service) {
         service.sendException(ExceptionCode.IllegalFunction);
+        ReferenceCountUtil.release(service.getRequest());
     }
 
     default void onReadInputRegisters(ServiceRequest<ReadInputRegistersRequest, ReadInputRegistersResponse> service) {
         service.sendException(ExceptionCode.IllegalFunction);
+        ReferenceCountUtil.release(service.getRequest());
     }
 
     default void onReadCoils(ServiceRequest<ReadCoilsRequest, ReadCoilsResponse> service) {
         service.sendException(ExceptionCode.IllegalFunction);
+        ReferenceCountUtil.release(service.getRequest());
     }
 
     default void onReadDiscreteInputs(ServiceRequest<ReadDiscreteInputsRequest, ReadDiscreteInputsResponse> service) {
         service.sendException(ExceptionCode.IllegalFunction);
+        ReferenceCountUtil.release(service.getRequest());
     }
 
     default void onWriteSingleCoil(ServiceRequest<WriteSingleCoilRequest, WriteSingleCoilResponse> service) {
         service.sendException(ExceptionCode.IllegalFunction);
+        ReferenceCountUtil.release(service.getRequest());
     }
 
     default void onWriteSingleRegister(ServiceRequest<WriteSingleRegisterRequest, WriteSingleRegisterResponse> service) {
         service.sendException(ExceptionCode.IllegalFunction);
+        ReferenceCountUtil.release(service.getRequest());
     }
 
     default void onWriteMultipleCoils(ServiceRequest<WriteMultipleCoilsRequest, WriteMultipleCoilsResponse> service) {
         service.sendException(ExceptionCode.IllegalFunction);
+        ReferenceCountUtil.release(service.getRequest());
     }
 
     default void onWriteMultipleRegisters(ServiceRequest<WriteMultipleRegistersRequest, WriteMultipleRegistersResponse> service) {
         service.sendException(ExceptionCode.IllegalFunction);
+        ReferenceCountUtil.release(service.getRequest());
     }
 
     default void onMaskWriteRegister(ServiceRequest<MaskWriteRegisterRequest, MaskWriteRegisterResponse> service) {
         service.sendException(ExceptionCode.IllegalFunction);
+        ReferenceCountUtil.release(service.getRequest());
     }
 
     public static interface ServiceRequest<Request extends ModbusRequest, Response extends ModbusResponse> {
