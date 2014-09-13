@@ -2,20 +2,29 @@ package com.digitalpetri.modbus.requests;
 
 import com.digitalpetri.modbus.FunctionCode;
 
-public class ReadInputRegistersRequest extends ModbusRequest {
+/**
+ * This function is used to read from 1 to 125 contiguous input registers in a remote device. The Request PDU
+ * specifies the starting register address and the number of registers. In the PDU Registers are addressed starting at
+ * zero. Therefore input registers numbered 1-16 are addressed as 0-15.
+ */
+public class ReadInputRegistersRequest extends SimpleModbusRequest {
 
-    private final int startAddress;
+    private final int address;
     private final int quantity;
 
-    public ReadInputRegistersRequest(int startAddress, int quantity) {
+    /**
+     * @param address  0x0000 to 0xFFFF (0 to 65535)
+     * @param quantity 0x0001 to 0x007D (1 to 125)
+     */
+    public ReadInputRegistersRequest(int address, int quantity) {
         super(FunctionCode.ReadInputRegisters);
 
-        this.startAddress = startAddress;
+        this.address = address;
         this.quantity = quantity;
     }
 
-    public int getStartAddress() {
-        return startAddress;
+    public int getAddress() {
+        return address;
     }
 
     public int getQuantity() {

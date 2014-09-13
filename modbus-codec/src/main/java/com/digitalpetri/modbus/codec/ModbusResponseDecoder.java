@@ -9,6 +9,10 @@ import com.digitalpetri.modbus.responses.ReadCoilsResponse;
 import com.digitalpetri.modbus.responses.ReadDiscreteInputsResponse;
 import com.digitalpetri.modbus.responses.ReadHoldingRegistersResponse;
 import com.digitalpetri.modbus.responses.ReadInputRegistersResponse;
+import com.digitalpetri.modbus.responses.WriteMultipleCoilsResponse;
+import com.digitalpetri.modbus.responses.WriteMultipleRegistersResponse;
+import com.digitalpetri.modbus.responses.WriteSingleCoilResponse;
+import com.digitalpetri.modbus.responses.WriteSingleRegisterResponse;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.DecoderException;
 
@@ -53,6 +57,14 @@ public class ModbusResponseDecoder implements ModbusPduDecoder {
                 return decodeReadHoldingRegisters(buffer);
             case ReadInputRegisters:
                 return decodeReadInputRegisters(buffer);
+            case WriteSingleCoil:
+                return decodeWriteSingleCoil(buffer);
+            case WriteSingleRegister:
+                return decodeWriteSingleRegister(buffer);
+            case WriteMultipleCoils:
+                return decodeWriteMultipleCoils(buffer);
+            case WriteMultipleRegisters:
+                return decodeWriteMultipleRegisters(buffer);
 
             default:
                 return new UnsupportedPdu(functionCode);
@@ -85,6 +97,34 @@ public class ModbusResponseDecoder implements ModbusPduDecoder {
         ByteBuf registers = buffer.readSlice(byteCount).retain();
 
         return new ReadInputRegistersResponse(registers);
+    }
+
+    public WriteSingleCoilResponse decodeWriteSingleCoil(ByteBuf buffer) {
+        int address = buffer.readUnsignedShort();
+        int value = buffer.readUnsignedShort();
+
+        return new WriteSingleCoilResponse(address, value);
+    }
+
+    public WriteSingleRegisterResponse decodeWriteSingleRegister(ByteBuf buffer) {
+        int address = buffer.readUnsignedShort();
+        int value = buffer.readUnsignedShort();
+
+        return new WriteSingleRegisterResponse(address, value);
+    }
+
+    public WriteMultipleCoilsResponse decodeWriteMultipleCoils(ByteBuf buffer) {
+        int address = buffer.readUnsignedShort();
+        int quantity = buffer.readUnsignedShort();
+
+        return new WriteMultipleCoilsResponse(address, quantity);
+    }
+
+    public WriteMultipleRegistersResponse decodeWriteMultipleRegisters(ByteBuf buffer) {
+        int address = buffer.readUnsignedShort();
+        int quantity = buffer.readUnsignedShort();
+
+        return new WriteMultipleRegistersResponse(address, quantity);
     }
 
 }
