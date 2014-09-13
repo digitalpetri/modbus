@@ -18,6 +18,20 @@ future.thenAccept(response -> {
 
 See the examples project for more.
   
+Supported Function Codes
+-------
+Code     | Function
+-------- | ----
+0x01     | Read Coils
+0x02     | Read Discrete Inputs
+0x03     | Read Holding Registers
+0x04     | Read Input Registers
+0x05     | Write Single Coil
+0x06     | Write Single Register
+0x0F     | Write Multiple Coils
+0x10     | Write Multiple Registers
+0x16     | Mask Write Register
+
 Get Help
 --------
 
