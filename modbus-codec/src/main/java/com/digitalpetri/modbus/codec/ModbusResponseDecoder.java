@@ -5,6 +5,7 @@ import com.digitalpetri.modbus.FunctionCode;
 import com.digitalpetri.modbus.ModbusPdu;
 import com.digitalpetri.modbus.UnsupportedPdu;
 import com.digitalpetri.modbus.responses.ExceptionResponse;
+import com.digitalpetri.modbus.responses.MaskWriteRegisterResponse;
 import com.digitalpetri.modbus.responses.ReadCoilsResponse;
 import com.digitalpetri.modbus.responses.ReadDiscreteInputsResponse;
 import com.digitalpetri.modbus.responses.ReadHoldingRegistersResponse;
@@ -51,20 +52,30 @@ public class ModbusResponseDecoder implements ModbusPduDecoder {
         switch (functionCode) {
             case ReadCoils:
                 return decodeReadCoils(buffer);
+
             case ReadDiscreteInputs:
                 return decodeReadDiscreteInputs(buffer);
+
             case ReadHoldingRegisters:
                 return decodeReadHoldingRegisters(buffer);
+
             case ReadInputRegisters:
                 return decodeReadInputRegisters(buffer);
+
             case WriteSingleCoil:
                 return decodeWriteSingleCoil(buffer);
+
             case WriteSingleRegister:
                 return decodeWriteSingleRegister(buffer);
+
             case WriteMultipleCoils:
                 return decodeWriteMultipleCoils(buffer);
+
             case WriteMultipleRegisters:
                 return decodeWriteMultipleRegisters(buffer);
+
+            case MaskWriteRegister:
+                return decodeMaskWriteRegister(buffer);
 
             default:
                 return new UnsupportedPdu(functionCode);
@@ -125,6 +136,14 @@ public class ModbusResponseDecoder implements ModbusPduDecoder {
         int quantity = buffer.readUnsignedShort();
 
         return new WriteMultipleRegistersResponse(address, quantity);
+    }
+
+    public MaskWriteRegisterResponse decodeMaskWriteRegister(ByteBuf buffer) {
+        int address = buffer.readUnsignedShort();
+        int andMask = buffer.readUnsignedShort();
+        int orMask = buffer.readUnsignedShort();
+
+        return new MaskWriteRegisterResponse(address, andMask, orMask);
     }
 
 }

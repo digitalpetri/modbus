@@ -1,6 +1,7 @@
 package com.digitalpetri.modbus.codec;
 
 import com.digitalpetri.modbus.ModbusPdu;
+import com.digitalpetri.modbus.requests.MaskWriteRegisterRequest;
 import com.digitalpetri.modbus.requests.ReadCoilsRequest;
 import com.digitalpetri.modbus.requests.ReadDiscreteInputsRequest;
 import com.digitalpetri.modbus.requests.ReadHoldingRegistersRequest;
@@ -41,6 +42,9 @@ public class ModbusRequestEncoder implements ModbusPduEncoder {
 
                 case WriteMultipleRegisters:
                     return encodeWriteMultipleRegisters((WriteMultipleRegistersRequest) modbusPdu, buffer);
+
+                case MaskWriteRegister:
+                    return encodeMaskWriteRegister((MaskWriteRegisterRequest) modbusPdu, buffer);
 
                 default:
                     return buffer;
@@ -120,6 +124,15 @@ public class ModbusRequestEncoder implements ModbusPduEncoder {
         buffer.writeByte(byteCount);
 
         buffer.writeBytes(request.getValues(), byteCount);
+
+        return buffer;
+    }
+
+    public ByteBuf encodeMaskWriteRegister(MaskWriteRegisterRequest request, ByteBuf buffer) {
+        buffer.writeByte(request.getFunctionCode().getCode());
+        buffer.writeShort(request.getAddress());
+        buffer.writeShort(request.getAndMask());
+        buffer.writeShort(request.getOrMask());
 
         return buffer;
     }
