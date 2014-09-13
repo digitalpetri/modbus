@@ -17,6 +17,28 @@ future.thenAccept(response -> {
 ```
 
 See the examples project for more.
+
+Maven
+--------
+
+#### Modbus Master
+
+```xml
+<dependency>
+    <groupId>com.digitalpetri.modbus</groupId>
+    <artifactId>modbus-master-tcp</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+</dependency>
+```
+
+#### Modbus Slave
+```xml
+<dependency>
+    <groupId>com.digitalpetri.modbus</groupId>
+    <artifactId>modbus-slave-tcp</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+</dependency>
+```
   
 Supported Function Codes
 -------
