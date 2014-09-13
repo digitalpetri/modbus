@@ -2,21 +2,21 @@ High-performance, non-blocking, zero-buffer-copying Modbus implementation for Ja
 
 Quick Start
 --------
-  ```java
-  ModbusTcpMasterConfig config = new ModbusTcpMasterConfig.Builder("localhost").build();
-  ModbusTcpMaster master = new ModbusTcpMaster(config);
+```java
+ModbusTcpMasterConfig config = new ModbusTcpMasterConfig.Builder("localhost").build();
+ModbusTcpMaster master = new ModbusTcpMaster(config);
 
-  CompletableFuture<ReadHoldingRegistersResponse> future =
-          master.sendRequest(new ReadHoldingRegistersRequest(0, 10), 0);
+CompletableFuture<ReadHoldingRegistersResponse> future =
+        master.sendRequest(new ReadHoldingRegistersRequest(0, 10), 0);
 
-  future.thenAccept(response -> {
-      System.out.println("Response: " + ByteBufUtil.hexDump(response.getRegisters()));
+future.thenAccept(response -> {
+    System.out.println("Response: " + ByteBufUtil.hexDump(response.getRegisters()));
 
-      ReferenceCountUtil.release(response);
-  });
-  ```
-  
-  See the examples project for more.
+    ReferenceCountUtil.release(response);
+});
+```
+
+See the examples project for more.
   
 Get Help
 --------
