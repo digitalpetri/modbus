@@ -28,12 +28,13 @@ import com.digitalpetri.modbus.responses.WriteMultipleRegistersResponse;
 import com.digitalpetri.modbus.responses.WriteSingleCoilResponse;
 import com.digitalpetri.modbus.responses.WriteSingleRegisterResponse;
 import io.netty.buffer.ByteBuf;
+import io.netty.handler.codec.EncoderException;
 import io.netty.util.ReferenceCountUtil;
 
 public class ModbusResponseEncoder implements ModbusPduEncoder {
 
     @Override
-    public ByteBuf encode(ModbusPdu modbusPdu, ByteBuf buffer) {
+    public ByteBuf encode(ModbusPdu modbusPdu, ByteBuf buffer) throws EncoderException {
         try {
             if (modbusPdu instanceof ExceptionResponse) {
                 return encodeExceptionResponse((ExceptionResponse) modbusPdu, buffer);
@@ -67,7 +68,7 @@ public class ModbusResponseEncoder implements ModbusPduEncoder {
                         return encodeMaskWriteRegister((MaskWriteRegisterResponse) modbusPdu, buffer);
 
                     default:
-                        return buffer;
+                        throw new EncoderException("FunctionCode not supported: " + modbusPdu.getFunctionCode());
                 }
             }
         } finally {

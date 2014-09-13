@@ -27,12 +27,13 @@ import com.digitalpetri.modbus.requests.WriteMultipleRegistersRequest;
 import com.digitalpetri.modbus.requests.WriteSingleCoilRequest;
 import com.digitalpetri.modbus.requests.WriteSingleRegisterRequest;
 import io.netty.buffer.ByteBuf;
+import io.netty.handler.codec.EncoderException;
 import io.netty.util.ReferenceCountUtil;
 
 public class ModbusRequestEncoder implements ModbusPduEncoder {
 
     @Override
-    public ByteBuf encode(ModbusPdu modbusPdu, ByteBuf buffer) {
+    public ByteBuf encode(ModbusPdu modbusPdu, ByteBuf buffer) throws EncoderException {
         try {
             switch (modbusPdu.getFunctionCode()) {
                 case ReadCoils:
@@ -63,7 +64,7 @@ public class ModbusRequestEncoder implements ModbusPduEncoder {
                     return encodeMaskWriteRegister((MaskWriteRegisterRequest) modbusPdu, buffer);
 
                 default:
-                    return buffer;
+                    throw new EncoderException("FunctionCode not supported: " + modbusPdu.getFunctionCode());
             }
         } finally {
             ReferenceCountUtil.release(modbusPdu);
