@@ -26,6 +26,7 @@
         <module>modbus-codec</module>
         <module>modbus-core</module>
         <module>modbus-master-tcp</module>
+        <module>modbus-slave-tcp</module>
     </modules>
 
     <properties>

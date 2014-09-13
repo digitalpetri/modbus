@@ -1,0 +1,96 @@
+package com.digitalpetri.modbus.slave;
+
+import com.digitalpetri.modbus.ExceptionCode;
+import com.digitalpetri.modbus.requests.MaskWriteRegisterRequest;
+import com.digitalpetri.modbus.requests.ModbusRequest;
+import com.digitalpetri.modbus.requests.ReadCoilsRequest;
+import com.digitalpetri.modbus.requests.ReadDiscreteInputsRequest;
+import com.digitalpetri.modbus.requests.ReadHoldingRegistersRequest;
+import com.digitalpetri.modbus.requests.ReadInputRegistersRequest;
+import com.digitalpetri.modbus.requests.WriteMultipleCoilsRequest;
+import com.digitalpetri.modbus.requests.WriteMultipleRegistersRequest;
+import com.digitalpetri.modbus.requests.WriteSingleCoilRequest;
+import com.digitalpetri.modbus.requests.WriteSingleRegisterRequest;
+import com.digitalpetri.modbus.responses.MaskWriteRegisterResponse;
+import com.digitalpetri.modbus.responses.ModbusResponse;
+import com.digitalpetri.modbus.responses.ReadCoilsResponse;
+import com.digitalpetri.modbus.responses.ReadDiscreteInputsResponse;
+import com.digitalpetri.modbus.responses.ReadHoldingRegistersResponse;
+import com.digitalpetri.modbus.responses.ReadInputRegistersResponse;
+import com.digitalpetri.modbus.responses.WriteMultipleCoilsResponse;
+import com.digitalpetri.modbus.responses.WriteMultipleRegistersResponse;
+import com.digitalpetri.modbus.responses.WriteSingleCoilResponse;
+import com.digitalpetri.modbus.responses.WriteSingleRegisterResponse;
+
+public interface ServiceRequestHandler {
+
+    default void onReadHoldingRegisters(ServiceRequest<ReadHoldingRegistersRequest, ReadHoldingRegistersResponse> service) {
+        service.sendException(ExceptionCode.IllegalFunction);
+    }
+
+    default void onReadInputRegisters(ServiceRequest<ReadInputRegistersRequest, ReadInputRegistersResponse> service) {
+        service.sendException(ExceptionCode.IllegalFunction);
+    }
+
+    default void onReadCoils(ServiceRequest<ReadCoilsRequest, ReadCoilsResponse> service) {
+        service.sendException(ExceptionCode.IllegalFunction);
+    }
+
+    default void onReadDiscreteInputs(ServiceRequest<ReadDiscreteInputsRequest, ReadDiscreteInputsResponse> service) {
+        service.sendException(ExceptionCode.IllegalFunction);
+    }
+
+    default void onWriteSingleCoil(ServiceRequest<WriteSingleCoilRequest, WriteSingleCoilResponse> service) {
+        service.sendException(ExceptionCode.IllegalFunction);
+    }
+
+    default void onWriteSingleRegister(ServiceRequest<WriteSingleRegisterRequest, WriteSingleRegisterResponse> service) {
+        service.sendException(ExceptionCode.IllegalFunction);
+    }
+
+    default void onWriteMultipleCoils(ServiceRequest<WriteMultipleCoilsRequest, WriteMultipleCoilsResponse> service) {
+        service.sendException(ExceptionCode.IllegalFunction);
+    }
+
+    default void onWriteMultipleRegisters(ServiceRequest<WriteMultipleRegistersRequest, WriteMultipleRegistersResponse> service) {
+        service.sendException(ExceptionCode.IllegalFunction);
+    }
+
+    default void onMaskWriteRegister(ServiceRequest<MaskWriteRegisterRequest, MaskWriteRegisterResponse> service) {
+        service.sendException(ExceptionCode.IllegalFunction);
+    }
+
+    public static interface ServiceRequest<Request extends ModbusRequest, Response extends ModbusResponse> {
+
+        /**
+         * @return the transaction id associated with this request.
+         */
+        short getTransactionId();
+
+        /**
+         * @return the unit/slave id this request is directed to.
+         */
+        short getUnitId();
+
+        /**
+         * @return the request to service.
+         */
+        Request getRequest();
+
+        /**
+         * Send a normal response.
+         *
+         * @param response the service response
+         */
+        void sendResponse(Response response);
+
+        /**
+         * Send an exception response.
+         *
+         * @param exceptionCode the {@link ExceptionCode}
+         */
+        void sendException(ExceptionCode exceptionCode);
+
+    }
+
+}
