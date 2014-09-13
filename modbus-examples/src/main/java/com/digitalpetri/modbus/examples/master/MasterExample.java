@@ -18,12 +18,8 @@ import org.slf4j.LoggerFactory;
 
 public class MasterExample {
 
-    private static final int N_MASTERS = 100;
-
-    private static final int N_REQUESTS = 100;
-
     public static void main(String[] args) throws InterruptedException {
-        new MasterExample().start();
+        new MasterExample(100, 100).start();
     }
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
@@ -32,6 +28,14 @@ public class MasterExample {
 
     private final List<ModbusTcpMaster> masters = new CopyOnWriteArrayList<>();
     private volatile boolean started = false;
+
+    private final int nMasters;
+    private final int nRequests;
+
+    public MasterExample(int nMasters, int nRequests) {
+        this.nMasters = nMasters;
+        this.nRequests = nRequests;
+    }
 
     public void start() {
         started = true;
@@ -60,11 +64,11 @@ public class MasterExample {
             }
         }).start();
 
-        for (int i = 0; i < N_MASTERS; i++) {
+        for (int i = 0; i < nMasters; i++) {
             ModbusTcpMaster master = new ModbusTcpMaster(config);
             masters.add(master);
 
-            for (int j = 0; j < N_REQUESTS; j++) {
+            for (int j = 0; j < nRequests; j++) {
                 sendAndReceive(master);
             }
         }

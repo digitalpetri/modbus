@@ -1,5 +1,7 @@
 package com.digitalpetri.modbus.examples.slave;
 
+import java.util.concurrent.ExecutionException;
+
 import com.digitalpetri.modbus.requests.ReadHoldingRegistersRequest;
 import com.digitalpetri.modbus.responses.ReadHoldingRegistersResponse;
 import com.digitalpetri.modbus.slave.ModbusTcpSlave;
@@ -13,7 +15,7 @@ import org.slf4j.LoggerFactory;
 
 public class SlaveExample {
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws ExecutionException, InterruptedException {
         new SlaveExample().start();
     }
 
@@ -25,7 +27,7 @@ public class SlaveExample {
     public SlaveExample() {
     }
 
-    public void start() {
+    public void start() throws ExecutionException, InterruptedException {
         slave.setRequestHandler(new ServiceRequestHandler() {
             @Override
             public void onReadHoldingRegisters(ServiceRequest<ReadHoldingRegistersRequest, ReadHoldingRegistersResponse> service) {
@@ -43,7 +45,7 @@ public class SlaveExample {
             }
         });
 
-        slave.bind("localhost", 50200);
+        slave.bind("localhost", 50200).get();
     }
 
     public void stop() {
