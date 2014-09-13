@@ -1,4 +1,4 @@
-High-performance, non-blocking, zero-buffer-copying Modbus implementation for Java.
+High-performance, non-blocking, zero-buffer-copying Modbus for Java.
 
 Quick Start
 --------
