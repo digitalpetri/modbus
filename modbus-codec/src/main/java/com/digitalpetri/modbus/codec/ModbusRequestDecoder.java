@@ -123,7 +123,7 @@ public class ModbusRequestDecoder implements ModbusPduDecoder {
     private WriteMultipleCoilsRequest decodeWriteMultipleCoils(ByteBuf buffer) {
         int address = buffer.readUnsignedShort();
         int quantity = buffer.readUnsignedShort();
-        int byteCount = buffer.readByte();
+        int byteCount = buffer.readUnsignedByte();
         ByteBuf values = buffer.readSlice(byteCount).retain();
 
         return new WriteMultipleCoilsRequest(address, quantity, values);
