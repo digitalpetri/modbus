@@ -81,6 +81,8 @@ public class ModbusTcpSlave {
             }
         };
 
+        config.getBootstrapConsumer().accept(bootstrap);
+
         bootstrap.group(config.getEventLoop())
                 .channel(NioServerSocketChannel.class)
                 .handler(new LoggingHandler(LogLevel.DEBUG))

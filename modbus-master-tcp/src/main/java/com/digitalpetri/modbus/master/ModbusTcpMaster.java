@@ -198,6 +198,8 @@ public class ModbusTcpMaster implements MetricSet {
 
         Bootstrap bootstrap = new Bootstrap();
 
+        config.getBootstrapConsumer().accept(bootstrap);
+
         bootstrap.group(config.getEventLoop())
                 .channel(NioSocketChannel.class)
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) config.getTimeout().toMillis())

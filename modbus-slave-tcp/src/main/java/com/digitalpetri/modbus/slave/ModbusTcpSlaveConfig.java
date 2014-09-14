@@ -18,8 +18,11 @@ package com.digitalpetri.modbus.slave;
 
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Consumer;
 
 import com.digitalpetri.modbus.codec.Modbus;
+import io.netty.bootstrap.Bootstrap;
+import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.HashedWheelTimer;
 
@@ -29,16 +32,19 @@ public class ModbusTcpSlaveConfig {
     private final ExecutorService executor;
     private final EventLoopGroup eventLoop;
     private final HashedWheelTimer wheelTimer;
+    private final Consumer<ServerBootstrap> bootstrapConsumer;
 
     public ModbusTcpSlaveConfig(Optional<String> instanceId,
                                 ExecutorService executor,
                                 EventLoopGroup eventLoop,
-                                HashedWheelTimer wheelTimer) {
+                                HashedWheelTimer wheelTimer,
+                                Consumer<ServerBootstrap> bootstrapConsumer) {
 
         this.instanceId = instanceId;
         this.executor = executor;
         this.eventLoop = eventLoop;
         this.wheelTimer = wheelTimer;
+        this.bootstrapConsumer = bootstrapConsumer;
     }
 
     public Optional<String> getInstanceId() {
@@ -57,11 +63,16 @@ public class ModbusTcpSlaveConfig {
         return wheelTimer;
     }
 
+    public Consumer<ServerBootstrap> getBootstrapConsumer() {
+        return bootstrapConsumer;
+    }
+
     public static class Builder {
         private Optional<String> instanceId = Optional.empty();
         private ExecutorService executor;
         private EventLoopGroup eventLoop;
         private HashedWheelTimer wheelTimer;
+        private Consumer<ServerBootstrap> bootstrapConsumer = (b) -> {};
 
         public Builder setInstanceId(String instanceId) {
             this.instanceId = Optional.of(instanceId);
@@ -83,13 +94,18 @@ public class ModbusTcpSlaveConfig {
             return this;
         }
 
+        public Builder setBootstrapConsumer(Consumer<ServerBootstrap> consumer) {
+            this.bootstrapConsumer = consumer;
+            return this;
+        }
+
         public ModbusTcpSlaveConfig build() {
             return new ModbusTcpSlaveConfig(
                     instanceId,
                     executor != null ? executor : Modbus.sharedExecutor(),
                     eventLoop != null ? eventLoop : Modbus.sharedEventLoop(),
-                    wheelTimer != null ? wheelTimer : Modbus.sharedWheelTimer()
-            );
+                    wheelTimer != null ? wheelTimer : Modbus.sharedWheelTimer(),
+                    bootstrapConsumer);
         }
     }
 }

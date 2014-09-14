@@ -19,8 +19,10 @@ package com.digitalpetri.modbus.master;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Consumer;
 
 import com.digitalpetri.modbus.codec.Modbus;
+import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.HashedWheelTimer;
 
@@ -34,6 +36,7 @@ public class ModbusTcpMasterConfig {
     private final ExecutorService executor;
     private final EventLoopGroup eventLoop;
     private final HashedWheelTimer wheelTimer;
+    private final Consumer<Bootstrap> bootstrapConsumer;
 
     public ModbusTcpMasterConfig(String address,
                                  int port,
@@ -42,7 +45,8 @@ public class ModbusTcpMasterConfig {
                                  Optional<String> instanceId,
                                  ExecutorService executor,
                                  EventLoopGroup eventLoop,
-                                 HashedWheelTimer wheelTimer) {
+                                 HashedWheelTimer wheelTimer,
+                                 Consumer<Bootstrap> bootstrapConsumer) {
         this.address = address;
         this.port = port;
         this.timeout = timeout;
@@ -51,6 +55,7 @@ public class ModbusTcpMasterConfig {
         this.executor = executor;
         this.eventLoop = eventLoop;
         this.wheelTimer = wheelTimer;
+        this.bootstrapConsumer = bootstrapConsumer;
     }
 
     public String getAddress() {
@@ -85,6 +90,10 @@ public class ModbusTcpMasterConfig {
         return wheelTimer;
     }
 
+    public Consumer<Bootstrap> getBootstrapConsumer() {
+        return bootstrapConsumer;
+    }
+
     public static class Builder {
 
         private final String address;
@@ -96,6 +105,7 @@ public class ModbusTcpMasterConfig {
         private ExecutorService executor;
         private EventLoopGroup eventLoop;
         private HashedWheelTimer wheelTimer;
+        private Consumer<Bootstrap> bootstrapConsumer = (b) -> {};
 
         public Builder(String address) {
             this.address = address;
@@ -136,6 +146,11 @@ public class ModbusTcpMasterConfig {
             return this;
         }
 
+        public Builder setBootstrapConsumer(Consumer<Bootstrap> consumer) {
+            this.bootstrapConsumer = consumer;
+            return this;
+        }
+
         public ModbusTcpMasterConfig build() {
             return new ModbusTcpMasterConfig(
                     address,
@@ -145,8 +160,8 @@ public class ModbusTcpMasterConfig {
                     instanceId,
                     executor != null ? executor : Modbus.sharedExecutor(),
                     eventLoop != null ? eventLoop : Modbus.sharedEventLoop(),
-                    wheelTimer != null ? wheelTimer : Modbus.sharedWheelTimer()
-            );
+                    wheelTimer != null ? wheelTimer : Modbus.sharedWheelTimer(),
+                    bootstrapConsumer);
         }
 
     }
