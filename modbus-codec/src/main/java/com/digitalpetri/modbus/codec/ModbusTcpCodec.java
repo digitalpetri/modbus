@@ -84,9 +84,7 @@ public class ModbusTcpCodec extends ByteToMessageCodec<ModbusTcpPayload> {
             } catch (Exception e) {
                 logger.debug("Error decoding header/pdu: {}", e.getMessage(), e);
 
-                // Advance past any bytes we should have read but didn't...
-                int endIndex = startIndex + getLength(buffer, startIndex) + 6;
-                buffer.readerIndex(endIndex);
+                ctx.close();
             }
 
             startIndex = buffer.readerIndex();
