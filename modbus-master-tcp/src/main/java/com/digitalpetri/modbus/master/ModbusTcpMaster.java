@@ -115,6 +115,8 @@ public class ModbusTcpMaster implements MetricSet {
                 short txId = (short) transactionId.incrementAndGet();
 
                 Timeout timeout = config.getWheelTimer().newTimeout(t -> {
+                    if (t.isCancelled()) return;
+
                     PendingRequest<? extends ModbusResponse> timedOut = pendingRequests.remove(txId);
                     if (timedOut != null) {
                         String message = String.format("request timed out after %sms", config.getTimeout().toMillis());
