@@ -29,6 +29,7 @@ import com.codahale.metrics.MetricSet;
 import com.codahale.metrics.Timer;
 import com.digitalpetri.modbus.ModbusPdu;
 import com.digitalpetri.modbus.ModbusResponseException;
+import com.digitalpetri.modbus.ModbusTimeoutException;
 import com.digitalpetri.modbus.codec.ModbusRequestEncoder;
 import com.digitalpetri.modbus.codec.ModbusResponseDecoder;
 import com.digitalpetri.modbus.codec.ModbusTcpCodec;
@@ -119,8 +120,7 @@ public class ModbusTcpMaster implements MetricSet {
 
                     PendingRequest<? extends ModbusResponse> timedOut = pendingRequests.remove(txId);
                     if (timedOut != null) {
-                        String message = String.format("request timed out after %sms", config.getTimeout().toMillis());
-                        timedOut.promise.completeExceptionally(new Exception(message));
+                        timedOut.promise.completeExceptionally(new ModbusTimeoutException(config.getTimeout()));
                         timeoutCounter.inc();
                     }
                 }, config.getTimeout().getSeconds(), TimeUnit.SECONDS);
