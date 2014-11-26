@@ -186,6 +186,22 @@ public class ModbusTcpMaster implements MetricSet {
         return metrics;
     }
 
+    public Counter getRequestCounter() {
+        return requestCounter;
+    }
+
+    public Counter getResponseCounter() {
+        return responseCounter;
+    }
+
+    public Counter getLateResponseCounter() {
+        return lateResponseCounter;
+    }
+
+    public Counter getTimeoutCounter() {
+        return timeoutCounter;
+    }
+
     public Timer getResponseTimer() {
         return responseTimer;
     }
