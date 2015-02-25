@@ -178,6 +178,7 @@ public class ModbusTcpMaster implements MetricSet {
 
     private void onExceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         logger.error("Exception caught: {}", cause.getMessage(), cause);
+        stateContext.handleEvent(ConnectionEvent.ChannelClosed);
         ctx.close();
     }
 
