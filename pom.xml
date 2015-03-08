@@ -43,7 +43,7 @@
 
     <scm>
         <url>https://github.com/digitalpetri/modbus</url>
-        <connection>scm:git:git@github.com/digitalpetri/modbus</connection>
+        <connection>scm:git:git@github.com:digitalpetri/modbus</connection>
     </scm>
 
     <modules>
