@@ -20,7 +20,7 @@
 
     <groupId>com.digitalpetri.modbus</groupId>
     <artifactId>modbus</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1-SNAPSHOT</version>
     <packaging>pom</packaging>
 
     <developers>
@@ -42,7 +42,7 @@
     <scm>
         <url>https://github.com/digitalpetri/modbus</url>
         <connection>scm:git:git@github.com:digitalpetri/modbus</connection>
-      <tag>v1.0.0</tag>
+      <tag>HEAD</tag>
   </scm>
 
     <modules>
