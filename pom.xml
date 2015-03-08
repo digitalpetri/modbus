@@ -15,14 +15,12 @@
   ~ limitations under the License.
   -->
 
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>com.digitalpetri.modbus</groupId>
     <artifactId>modbus</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
+    <version>1.0.0</version>
     <packaging>pom</packaging>
 
     <developers>
@@ -44,7 +42,8 @@
     <scm>
         <url>https://github.com/digitalpetri/modbus</url>
         <connection>scm:git:git@github.com:digitalpetri/modbus</connection>
-    </scm>
+      <tag>v1.0.0</tag>
+  </scm>
 
     <modules>
         <module>modbus-codec</module>
