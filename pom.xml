@@ -43,7 +43,7 @@
 
     <scm>
         <url>https://github.com/digitalpetri/modbus</url>
-        <connection>scm:git:git://github.com/digitalpetri/modbus</connection>
+        <connection>scm:git:git@github.com/digitalpetri/modbus</connection>
     </scm>
 
     <modules>
@@ -57,8 +57,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
-        <metrics.version>3.0.2</metrics.version>
-        <netty.version>4.0.23.Final</netty.version>
+        <metrics.version>3.1.0</metrics.version>
+        <netty.version>4.0.26.Final</netty.version>
         <slf4j.version>1.7.7</slf4j.version>
         <testng.version>6.8.8</testng.version>
     </properties>
@@ -98,7 +98,7 @@
             </build>
         </profile>
     </profiles>
-    
+
     <build>
         <pluginManagement>
             <plugins>
@@ -127,6 +127,7 @@
                     </execution>
                 </executions>
             </plugin>
+
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>findbugs-maven-plugin</artifactId>
