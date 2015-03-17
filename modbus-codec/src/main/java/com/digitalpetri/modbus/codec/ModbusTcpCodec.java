@@ -91,32 +91,6 @@ public class ModbusTcpCodec extends ByteToMessageCodec<ModbusTcpPayload> {
         }
     }
 
-//    @Override
-//    protected void decode(ChannelHandlerContext ctx, ByteBuf buffer, List<Object> out) throws Exception {
-//        int startIndex = buffer.readerIndex();
-//
-//        while (buffer.readableBytes() >= HeaderLength &&
-//                buffer.readableBytes() >= getLength(buffer, startIndex) + HeaderSize) {
-//
-//            ByteBuf slice = buffer.readSlice(getLength(buffer, startIndex) + HeaderSize).retain();
-//
-//            Modbus.sharedExecutor().submit(() -> {
-//                try {
-//                    MbapHeader mbapHeader = MbapHeader.decode(slice);
-//                    ModbusPdu modbusPdu = decoder.decode(slice);
-//
-//                    ctx.fireChannelRead(new ModbusTcpPayload(mbapHeader.getTransactionId(), mbapHeader.getUnitId(), modbusPdu));
-//                } catch (Exception e) {
-//                    logger.debug("Error decoding header/pdu: {}", e.getMessage(), e);
-//                } finally {
-//                    ReferenceCountUtil.release(slice);
-//                }
-//            });
-//
-//            startIndex = buffer.readerIndex();
-//        }
-//    }
-
     private int getLength(ByteBuf in, int startIndex) {
         return in.getUnsignedShort(startIndex + LengthFieldIndex);
     }

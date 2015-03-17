@@ -52,7 +52,7 @@ public class SlaveExample {
                 ByteBuf registers = PooledByteBufAllocator.DEFAULT.buffer(request.getQuantity());
 
                 for (int i = 0; i < request.getQuantity(); i++) {
-                    registers.writeByte(i);
+                    registers.writeShort(i);
                 }
 
                 service.sendResponse(new ReadHoldingRegistersResponse(registers));

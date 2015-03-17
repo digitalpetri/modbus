@@ -107,7 +107,7 @@ public class ModbusTcpSlave {
     }
 
     public void shutdown() {
-        serverChannels.values().forEach(c -> c.close());
+        serverChannels.values().forEach(Channel::close);
         serverChannels.clear();
     }
 
@@ -150,6 +150,15 @@ public class ModbusTcpSlave {
 
             case MaskWriteRegister:
                 handler.onMaskWriteRegister(ModbusTcpServiceRequest.of(payload, ctx.channel()));
+                break;
+
+            default:
+                /* Function code not currently supported */
+                ExceptionResponse response = new ExceptionResponse(
+                        payload.getModbusPdu().getFunctionCode(),
+                        ExceptionCode.IllegalFunction);
+
+                ctx.writeAndFlush(new ModbusTcpPayload(payload.getTransactionId(), payload.getUnitId(), response));
                 break;
         }
     }

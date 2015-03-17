@@ -54,7 +54,7 @@ import io.netty.util.Timeout;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class ModbusTcpMaster implements MetricSet {
+public class ModbusTcpMaster {
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
@@ -182,9 +182,8 @@ public class ModbusTcpMaster implements MetricSet {
         ctx.close();
     }
 
-    @Override
-    public Map<String, Metric> getMetrics() {
-        return metrics;
+    public MetricSet getMetricSet() {
+        return () -> metrics;
     }
 
     public Counter getRequestCounter() {
