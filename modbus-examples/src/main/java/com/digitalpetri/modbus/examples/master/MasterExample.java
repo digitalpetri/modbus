@@ -76,7 +76,7 @@ public class MasterExample {
                     oneMinute += master.getResponseTimer().getOneMinuteRate();
                 }
 
-                logger.info("Mean rate: {} 1m rate: {}", mean, oneMinute);
+                logger.info("Mean rate={}, 1m rate={}", mean, oneMinute);
             }
         }).start();
 
@@ -100,7 +100,7 @@ public class MasterExample {
             if (response != null) {
                 ReferenceCountUtil.release(response);
             } else {
-                logger.error("Error: {}", ex.getMessage(), ex);
+                logger.error("Completed exceptionally, message={}", ex.getMessage(), ex);
             }
             scheduler.schedule(() -> sendAndReceive(master), 1, TimeUnit.SECONDS);
         }, Modbus.sharedExecutor());

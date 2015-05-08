@@ -16,6 +16,8 @@
 
 package com.digitalpetri.modbus.master;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -129,7 +131,15 @@ public class ModbusTcpMaster {
 
                 pendingRequests.put(txId, new PendingRequest<>(future, timeout, context));
 
-                ch.writeAndFlush(new ModbusTcpPayload(txId, (short) unitId, request));
+                ch.writeAndFlush(new ModbusTcpPayload(txId, (short) unitId, request)).addListener(f -> {
+                    if (!f.isSuccess()) {
+                        PendingRequest<?> p = pendingRequests.remove(txId);
+                        if (p != null) {
+                            p.promise.completeExceptionally(f.cause());
+                            p.timeout.cancel();
+                        }
+                    }
+                });
 
                 requestCounter.inc();
             } else {
@@ -174,12 +184,25 @@ public class ModbusTcpMaster {
 
     private void onChannelInactive(ChannelHandlerContext ctx) throws Exception {
         stateContext.handleEvent(ConnectionEvent.ChannelClosed);
+
+        failPendingRequests(new Exception("channel closed"));
     }
 
     private void onExceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         logger.error("Exception caught: {}", cause.getMessage(), cause);
+
+        failPendingRequests(cause);
+
         stateContext.handleEvent(ConnectionEvent.ChannelClosed);
         ctx.close();
+    }
+
+    private void failPendingRequests(Throwable cause) {
+        // TODO This is a race condition, pendingRequests should be tied to the lifetime of a Connected state.
+
+        List<PendingRequest<?>> pending = new ArrayList<>(pendingRequests.values());
+        pending.forEach(p -> p.promise.completeExceptionally(cause));
+        pendingRequests.clear();
     }
 
     public MetricSet getMetricSet() {

@@ -81,10 +81,8 @@ public class ModbusTcpCodec extends ByteToMessageCodec<ModbusTcpPayload> {
                 }
 
                 out.add(new ModbusTcpPayload(mbapHeader.getTransactionId(), mbapHeader.getUnitId(), modbusPdu));
-            } catch (Exception e) {
-                logger.debug("Error decoding header/pdu: {}", e.getMessage(), e);
-
-                ctx.close();
+            } catch (Throwable t) {
+                throw new Exception("error decoding header/pdu", t);
             }
 
             startIndex = buffer.readerIndex();
