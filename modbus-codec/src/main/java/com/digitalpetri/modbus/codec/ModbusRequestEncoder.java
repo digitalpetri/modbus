@@ -124,7 +124,7 @@ public class ModbusRequestEncoder implements ModbusPduEncoder {
         buffer.writeShort(request.getAddress());
         buffer.writeShort(request.getQuantity());
 
-        int byteCount = (request.getQuantity() / 8) + (request.getQuantity() % 8);
+        int byteCount = (request.getQuantity() + 7) / 8;
         buffer.writeByte(byteCount);
 
         buffer.writeBytes(request.getValues(), byteCount);

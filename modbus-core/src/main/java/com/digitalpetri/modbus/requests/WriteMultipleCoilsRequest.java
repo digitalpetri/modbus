@@ -38,7 +38,7 @@ public class WriteMultipleCoilsRequest extends ByteBufModbusRequest {
     /**
      * @param address  0x0000 to 0xFFFF (0 to 65535)
      * @param quantity 0x0001 to 0x07B0 (1 to 2000)
-     * @param values   buffer of at least N bytes, where N = (quantity / 8) + (quantity % 8)
+     * @param values   buffer of at least N bytes, where N = (quantity + 7) / 8
      */
     public WriteMultipleCoilsRequest(int address, int quantity, byte[] values) {
         this(address, quantity, Unpooled.wrappedBuffer(values));
@@ -47,7 +47,7 @@ public class WriteMultipleCoilsRequest extends ByteBufModbusRequest {
     /**
      * @param address  0x0000 to 0xFFFF (0 to 65535)
      * @param quantity 0x0001 to 0x07B0 (1 to 2000)
-     * @param values   buffer of at least N bytes, where N = (quantity / 8) + (quantity % 8)
+     * @param values   buffer of at least N bytes, where N = (quantity + 7) / 8
      */
     public WriteMultipleCoilsRequest(int address, int quantity, ByteBuffer values) {
         this(address, quantity, Unpooled.wrappedBuffer(values));
@@ -58,7 +58,7 @@ public class WriteMultipleCoilsRequest extends ByteBufModbusRequest {
      *
      * @param address  0x0000 to 0xFFFF (0 to 65535)
      * @param quantity 0x0001 to 0x07B0 (1 to 2000)
-     * @param values   buffer of at least N bytes, where N = (quantity / 8) + (quantity % 8)
+     * @param values   buffer of at least N bytes, where N = (quantity + 7) / 8
      */
     public WriteMultipleCoilsRequest(int address, int quantity, ByteBuf values) {
         super(values, FunctionCode.WriteMultipleCoils);

@@ -63,6 +63,29 @@ public class ModbusRequestSerializationTest {
         };
     }
 
+    @DataProvider
+    private Object[][] getAddressAndQuantityAndValues() {
+        return new Object[][]{
+                {0, 1, new byte[]{0x01}},
+                {0, 2, new byte[]{0x02}},
+                {0, 3, new byte[]{0x04}},
+                {0, 4, new byte[]{0x08}},
+                {0, 5, new byte[]{0x10}},
+                {0, 6, new byte[]{0x20}},
+                {0, 7, new byte[]{0x40}},
+                {0, 8, new byte[]{(byte) 0x80}},
+                {0, 9, new byte[]{0x01, 0x01}},
+                {0, 10, new byte[]{0x01, 0x02}},
+                {0, 11, new byte[]{0x01, 0x04}},
+                {0, 12, new byte[]{0x01, 0x08}},
+                {0, 13, new byte[]{0x01, 0x10}},
+                {0, 14, new byte[]{0x01, 0x20}},
+                {0, 15, new byte[]{0x01, 0x40}},
+                {0, 16, new byte[]{0x01, (byte) 0x80}},
+                {0, 17, new byte[]{0x02, 0x01, 0x01}}
+        };
+    }
+
     @Test(dataProvider = "getAddressAndQuantity")
     public void testReadCoilsRequest(int address, int quantity) {
         ReadCoilsRequest request = new ReadCoilsRequest(address, quantity);
@@ -139,9 +162,9 @@ public class ModbusRequestSerializationTest {
         assertEquals(request.getValue(), decoded.getValue());
     }
 
-    @Test
-    public void testWriteMultipleCoilsRequest() {
-        WriteMultipleCoilsRequest request = new WriteMultipleCoilsRequest(0, 24, new byte[]{1, 2, 3});
+    @Test(dataProvider = "getAddressAndQuantityAndValues")
+    public void testWriteMultipleCoilsRequest(int address, int quantity, byte[] values) {
+        WriteMultipleCoilsRequest request = new WriteMultipleCoilsRequest(address, quantity, values);
         request.retain().content().markReaderIndex();
 
         ByteBuf encoded = encoder.encode(request, Unpooled.buffer());
