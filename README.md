@@ -27,7 +27,7 @@ Maven
 <dependency>
     <groupId>com.digitalpetri.modbus</groupId>
     <artifactId>modbus-master-tcp</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
 </dependency>
 ```
 
@@ -36,7 +36,7 @@ Maven
 <dependency>
     <groupId>com.digitalpetri.modbus</groupId>
     <artifactId>modbus-slave-tcp</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
 </dependency>
 ```
   
