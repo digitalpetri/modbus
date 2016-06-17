@@ -36,8 +36,6 @@ import com.digitalpetri.modbus.codec.ModbusRequestEncoder;
 import com.digitalpetri.modbus.codec.ModbusResponseDecoder;
 import com.digitalpetri.modbus.codec.ModbusTcpCodec;
 import com.digitalpetri.modbus.codec.ModbusTcpPayload;
-import com.digitalpetri.modbus.master.fsm.ConnectionEvent;
-import com.digitalpetri.modbus.master.fsm.StateContext;
 import com.digitalpetri.modbus.requests.ModbusRequest;
 import com.digitalpetri.modbus.responses.ExceptionResponse;
 import com.digitalpetri.modbus.responses.ModbusResponse;
@@ -71,14 +69,14 @@ public class ModbusTcpMaster {
     private final Counter timeoutCounter = new Counter();
     private final Timer responseTimer = new Timer();
 
-    private final StateContext stateContext;
+    private final ChannelManager channelManager;
 
     private final ModbusTcpMasterConfig config;
 
     public ModbusTcpMaster(ModbusTcpMasterConfig config) {
         this.config = config;
 
-        stateContext = new StateContext(this, config);
+        channelManager = new ChannelManager(this);
 
         metrics.put(metricName("request-counter"), requestCounter);
         metrics.put(metricName("response-counter"), responseCounter);
@@ -87,33 +85,29 @@ public class ModbusTcpMaster {
         metrics.put(metricName("response-timer"), responseTimer);
     }
 
+    public ModbusTcpMasterConfig getConfig() {
+        return config;
+    }
+
     public CompletableFuture<ModbusTcpMaster> connect() {
         CompletableFuture<ModbusTcpMaster> future = new CompletableFuture<>();
 
-        stateContext.handleEvent(ConnectionEvent.ConnectRequested)
-                .channelFuture()
-                .whenComplete((ch, ex) -> {
-                    if (ch != null) future.complete(ModbusTcpMaster.this);
-                    else future.completeExceptionally(ex);
-                });
+        channelManager.getChannel().whenComplete((ch, ex) -> {
+            if (ch != null) future.complete(ModbusTcpMaster.this);
+            else future.completeExceptionally(ex);
+        });
 
         return future;
     }
 
     public CompletableFuture<ModbusTcpMaster> disconnect() {
-        stateContext.handleEvent(ConnectionEvent.DisconnectRequested);
-
-        return CompletableFuture.completedFuture(this);
+        return channelManager.disconnect().thenApply(v -> this);
     }
 
     public <T extends ModbusResponse> CompletableFuture<T> sendRequest(ModbusRequest request, int unitId) {
         CompletableFuture<T> future = new CompletableFuture<>();
 
-        if (config.isAutoConnect()) {
-            stateContext.handleEvent(ConnectionEvent.ConnectRequested);
-        }
-
-        stateContext.getState().channelFuture().whenComplete((ch, ex) -> {
+        channelManager.getChannel().whenComplete((ch, ex) -> {
             if (ch != null) {
                 short txId = (short) transactionId.incrementAndGet();
 
@@ -182,24 +176,15 @@ public class ModbusTcpMaster {
         }
     }
 
-    private void onChannelInactive(ChannelHandlerContext ctx) throws Exception {
-        stateContext.handleEvent(ConnectionEvent.ChannelClosed);
-
-        failPendingRequests(new Exception("channel closed"));
-    }
-
     private void onExceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         logger.error("Exception caught: {}", cause.getMessage(), cause);
 
         failPendingRequests(cause);
 
-        stateContext.handleEvent(ConnectionEvent.ChannelClosed);
         ctx.close();
     }
 
     private void failPendingRequests(Throwable cause) {
-        // TODO This is a race condition, pendingRequests should be tied to the lifetime of a Connected state.
-
         List<PendingRequest<?>> pending = new ArrayList<>(pendingRequests.values());
         pending.forEach(p -> p.promise.completeExceptionally(cause));
         pendingRequests.clear();
@@ -242,24 +227,24 @@ public class ModbusTcpMaster {
         config.getBootstrapConsumer().accept(bootstrap);
 
         bootstrap.group(config.getEventLoop())
-                .channel(NioSocketChannel.class)
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) config.getTimeout().toMillis())
-                .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
-                .handler(new ChannelInitializer<SocketChannel>() {
-                    @Override
-                    protected void initChannel(SocketChannel ch) throws Exception {
-                        ch.pipeline().addLast(new ModbusTcpCodec(new ModbusRequestEncoder(), new ModbusResponseDecoder()));
-                        ch.pipeline().addLast(new ModbusTcpMasterHandler(master));
-                    }
-                })
-                .connect(config.getAddress(), config.getPort())
-                .addListener((ChannelFuture f) -> {
-                    if (f.isSuccess()) {
-                        future.complete(f.channel());
-                    } else {
-                        future.completeExceptionally(f.cause());
-                    }
-                });
+            .channel(NioSocketChannel.class)
+            .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) config.getTimeout().toMillis())
+            .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
+            .handler(new ChannelInitializer<SocketChannel>() {
+                @Override
+                protected void initChannel(SocketChannel ch) throws Exception {
+                    ch.pipeline().addLast(new ModbusTcpCodec(new ModbusRequestEncoder(), new ModbusResponseDecoder()));
+                    ch.pipeline().addLast(new ModbusTcpMasterHandler(master));
+                }
+            })
+            .connect(config.getAddress(), config.getPort())
+            .addListener((ChannelFuture f) -> {
+                if (f.isSuccess()) {
+                    future.complete(f.channel());
+                } else {
+                    future.completeExceptionally(f.cause());
+                }
+            });
 
         return future;
     }
@@ -275,11 +260,6 @@ public class ModbusTcpMaster {
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, ModbusTcpPayload msg) throws Exception {
             master.onChannelRead(ctx, msg);
-        }
-
-        @Override
-        public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-            master.onChannelInactive(ctx);
         }
 
         @Override
