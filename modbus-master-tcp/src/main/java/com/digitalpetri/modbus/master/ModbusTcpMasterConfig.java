@@ -41,7 +41,7 @@ public class ModbusTcpMasterConfig {
     public ModbusTcpMasterConfig(String address,
                                  int port,
                                  Duration timeout,
-                                 boolean autoConnect,
+                                 @Deprecated boolean autoConnect,
                                  Optional<String> instanceId,
                                  ExecutorService executor,
                                  EventLoopGroup eventLoop,
@@ -70,6 +70,7 @@ public class ModbusTcpMasterConfig {
         return timeout;
     }
 
+    @Deprecated
     public boolean isAutoConnect() {
         return autoConnect;
     }
@@ -121,6 +122,7 @@ public class ModbusTcpMasterConfig {
             return this;
         }
 
+        @Deprecated
         public Builder setAutoConnect(boolean autoConnect) {
             this.autoConnect = autoConnect;
             return this;
