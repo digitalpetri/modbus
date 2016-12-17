@@ -77,7 +77,13 @@ class ChannelManager {
                 ch.pipeline().addLast(new ChannelInboundHandlerAdapter() {
                     @Override
                     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-                        state.set(new Idle());
+                        State currentState = state.get();
+
+                        if (currentState instanceof Connected) {
+                            if (state.compareAndSet(currentState, new Idle())) {
+                                logger.debug("channelInactive(), transitioned to Idle");
+                            }
+                        }
 
                         super.channelInactive(ctx);
                     }
@@ -118,7 +124,9 @@ class ChannelManager {
         };
 
 
-        if (currentState instanceof Connecting) {
+        if (currentState instanceof Idle) {
+            future.complete(null);
+        } else if (currentState instanceof Connecting) {
             ((Connecting) currentState).future.whenComplete(disconnect);
         } else if (currentState instanceof Connected) {
             ((Connected) currentState).future.whenComplete(disconnect);
