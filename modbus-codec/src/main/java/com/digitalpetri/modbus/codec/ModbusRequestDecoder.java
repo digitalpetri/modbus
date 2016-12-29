@@ -37,9 +37,10 @@ public class ModbusRequestDecoder implements ModbusPduDecoder {
     public ModbusPdu decode(ByteBuf buffer) throws DecoderException {
         int code = buffer.readByte();
 
-        FunctionCode functionCode = FunctionCode
-                .fromCode(code)
-                .orElseThrow(() -> new DecoderException("invalid function code: " + code));
+        FunctionCode functionCode = FunctionCode.fromCode(code);
+        if (functionCode == null) {
+            throw new DecoderException("invalid function code: " + code);
+        }
 
         return decodeResponse(functionCode, buffer);
     }

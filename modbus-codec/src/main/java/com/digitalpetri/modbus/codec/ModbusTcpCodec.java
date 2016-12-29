@@ -44,6 +44,10 @@ public class ModbusTcpCodec extends ByteToMessageCodec<ModbusTcpPayload> {
 
     @Override
     protected void encode(ChannelHandlerContext ctx, ModbusTcpPayload payload, ByteBuf buffer) throws Exception {
+        encode(payload, buffer);
+    }
+
+    public void encode(ModbusTcpPayload payload, ByteBuf buffer) throws Exception {
         int headerStartIndex = buffer.writerIndex();
         buffer.writeZero(MbapHeader.LENGTH);
 
@@ -65,6 +69,9 @@ public class ModbusTcpCodec extends ByteToMessageCodec<ModbusTcpPayload> {
 
     @Override
     protected void decode(ChannelHandlerContext ctx, ByteBuf buffer, List<Object> out) throws Exception {
+    }
+
+    public void decode(ByteBuf buffer, List<Object> out) throws Exception {
         int startIndex = buffer.readerIndex();
 
         while (buffer.readableBytes() >= HeaderLength &&

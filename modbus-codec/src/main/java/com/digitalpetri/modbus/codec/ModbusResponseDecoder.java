@@ -40,15 +40,17 @@ public class ModbusResponseDecoder implements ModbusPduDecoder {
         int code = buffer.readUnsignedByte();
 
         if (FunctionCode.isExceptionCode(code)) {
-            FunctionCode functionCode = FunctionCode
-                    .fromCode(code - 0x80)
-                    .orElseThrow(() -> new DecoderException("invalid function code: " + (code - 0x80)));
+            FunctionCode functionCode = FunctionCode.fromCode(code - 0x80);
+            if (functionCode == null) {
+                throw new DecoderException("invalid function code: " + (code - 0x80));
+            }
 
             return decodeException(functionCode, buffer);
         } else {
-            FunctionCode functionCode = FunctionCode
-                    .fromCode(code)
-                    .orElseThrow(() -> new DecoderException("invalid function code: " + code));
+            FunctionCode functionCode = FunctionCode.fromCode(code);
+            if (functionCode == null) {
+                throw new DecoderException("invalid function code: " + code);
+            }
 
             return decodeResponse(functionCode, buffer);
         }
@@ -57,9 +59,10 @@ public class ModbusResponseDecoder implements ModbusPduDecoder {
     private ModbusPdu decodeException(FunctionCode functionCode, ByteBuf buffer) throws DecoderException {
         int code = buffer.readUnsignedByte();
 
-        ExceptionCode exceptionCode = ExceptionCode
-                .fromCode(code)
-                .orElseThrow(() -> new DecoderException("invalid exception code: " + code));
+        ExceptionCode exceptionCode = ExceptionCode.fromCode(code);
+        if (exceptionCode == null) {
+            throw new DecoderException("invalid exception code: " + code);
+        }
 
         return new ExceptionResponse(functionCode, exceptionCode);
     }
