@@ -57,7 +57,7 @@ public abstract class Modbus {
     /** Shutdown/stop any shared resources that may be in use. */
     public static void releaseSharedResources() {
         sharedExecutor().shutdown();
-        sharedEventLoop().shutdownGracefully();
+        sharedEventLoop().shutdownGracefully().get();
         sharedWheelTimer().stop();
     }
 
