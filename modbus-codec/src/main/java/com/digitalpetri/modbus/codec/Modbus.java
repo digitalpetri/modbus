@@ -18,6 +18,7 @@ package com.digitalpetri.modbus.codec;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -57,7 +58,19 @@ public abstract class Modbus {
     /** Shutdown/stop any shared resources that may be in use. */
     public static void releaseSharedResources() {
         sharedExecutor().shutdown();
-        sharedEventLoop().shutdownGracefully().get();
+        sharedEventLoop().shutdownGracefully();
+        sharedWheelTimer().stop();
+    }
+
+    /**
+     * Shutdown/stop any shared resources that me be in use, blocking until finished or interrupted.
+     *
+     * @param timeout the duration to wait.
+     * @param unit    the {@link TimeUnit} of the {@code timeout} duration.
+     */
+    public static void releaseSharedResources(long timeout, TimeUnit unit) throws InterruptedException {
+        sharedExecutor().awaitTermination(timeout, unit);
+        sharedEventLoop().shutdownGracefully().await(timeout, unit);
         sharedWheelTimer().stop();
     }
 
