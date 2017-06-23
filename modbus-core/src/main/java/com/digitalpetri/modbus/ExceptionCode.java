@@ -16,8 +16,6 @@
 
 package com.digitalpetri.modbus;
 
-import java.util.Optional;
-
 public enum ExceptionCode {
 
     IllegalFunction(0x01),
@@ -40,20 +38,20 @@ public enum ExceptionCode {
         return code;
     }
 
-    public static Optional<ExceptionCode> fromCode(int code) {
+    public static ExceptionCode fromCode(int code) {
         switch (code) {
-            case 0x01: return Optional.of(IllegalFunction);
-            case 0x02: return Optional.of(IllegalDataAddress);
-            case 0x03: return Optional.of(IllegalDataValue);
-            case 0x04: return Optional.of(SlaveDeviceFailure);
-            case 0x05: return Optional.of(Acknowledge);
-            case 0x06: return Optional.of(SlaveDeviceBusy);
-            case 0x08: return Optional.of(MemoryParityError);
-            case 0x0A: return Optional.of(GatewayPathUnavailable);
-            case 0x0B: return Optional.of(GatewayTargetDeviceFailedToResponse);
+            case 0x01: return IllegalFunction;
+            case 0x02: return IllegalDataAddress;
+            case 0x03: return IllegalDataValue;
+            case 0x04: return SlaveDeviceFailure;
+            case 0x05: return Acknowledge;
+            case 0x06: return SlaveDeviceBusy;
+            case 0x08: return MemoryParityError;
+            case 0x0A: return GatewayPathUnavailable;
+            case 0x0B: return GatewayTargetDeviceFailedToResponse;
         }
 
-        return Optional.empty();
+        return null;
     }
 
 }
