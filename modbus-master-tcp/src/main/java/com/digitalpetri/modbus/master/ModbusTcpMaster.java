@@ -177,7 +177,7 @@ public class ModbusTcpMaster {
     }
 
     private void onExceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        logger.error("Exception caught: {}", cause.getMessage(), cause);
+        logger.debug("Exception caught: {}", cause.getMessage(), cause);
 
         failPendingRequests(cause);
 
