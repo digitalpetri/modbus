@@ -176,12 +176,25 @@ public class ModbusTcpMaster {
         }
     }
 
-    private void onExceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        logger.debug("Exception caught: {}", cause.getMessage(), cause);
-
+    private void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         failPendingRequests(cause);
 
         ctx.close();
+
+        onExceptionCaught(ctx, cause);
+    }
+
+    /**
+     * Logs the exception on DEBUG level.
+     * <p>
+     * Subclasses may override to customize logging behavior.
+     *
+     * @param ctx   the {@link ChannelHandlerContext}.
+     * @param cause the exception that was caught.
+     */
+    @SuppressWarnings("WeakerAccess")
+    protected void onExceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        logger.debug("Exception caught: {}", cause.getMessage(), cause);
     }
 
     private void failPendingRequests(Throwable cause) {
@@ -264,7 +277,7 @@ public class ModbusTcpMaster {
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-            master.onExceptionCaught(ctx, cause);
+            master.exceptionCaught(ctx, cause);
         }
 
     }
