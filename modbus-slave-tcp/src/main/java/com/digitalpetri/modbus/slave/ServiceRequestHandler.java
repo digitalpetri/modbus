@@ -105,7 +105,7 @@ public interface ServiceRequestHandler {
         Request getRequest();
 
         /**
-         * @return connection channel to acquire client address.
+         * @return the {@link Channel} this request was received on.
          */
         Channel getChannel();
 
