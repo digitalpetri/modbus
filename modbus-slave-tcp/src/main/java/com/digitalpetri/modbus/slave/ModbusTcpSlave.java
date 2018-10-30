@@ -228,6 +228,11 @@ public class ModbusTcpSlave {
         }
 
         @Override
+        public Channel getChannel() {
+            return channel;
+        }
+
+        @Override
         public void sendResponse(Response response) {
             channel.writeAndFlush(new ModbusTcpPayload(transactionId, unitId, response));
         }

@@ -37,6 +37,7 @@ import com.digitalpetri.modbus.responses.WriteMultipleCoilsResponse;
 import com.digitalpetri.modbus.responses.WriteMultipleRegistersResponse;
 import com.digitalpetri.modbus.responses.WriteSingleCoilResponse;
 import com.digitalpetri.modbus.responses.WriteSingleRegisterResponse;
+import io.netty.channel.Channel;
 import io.netty.util.ReferenceCountUtil;
 
 public interface ServiceRequestHandler {
@@ -102,6 +103,11 @@ public interface ServiceRequestHandler {
          * @return the request to service.
          */
         Request getRequest();
+
+        /**
+         * @return connection channel to acquire client address.
+         */
+        Channel getChannel();
 
         /**
          * Send a normal response.
