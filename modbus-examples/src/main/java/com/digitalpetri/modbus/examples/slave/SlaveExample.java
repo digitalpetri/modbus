@@ -47,6 +47,10 @@ public class SlaveExample {
         slave.setRequestHandler(new ServiceRequestHandler() {
             @Override
             public void onReadHoldingRegisters(ServiceRequest<ReadHoldingRegistersRequest, ReadHoldingRegistersResponse> service) {
+                String clientRemoteAddress = service.getChannel().remoteAddress().toString();
+                String clientIp = clientRemoteAddress.replaceAll(".*/(.*):.*", "$1");
+                String clientPort = clientRemoteAddress.replaceAll(".*:(.*)", "$1");
+
                 ReadHoldingRegistersRequest request = service.getRequest();
 
                 ByteBuf registers = PooledByteBufAllocator.DEFAULT.buffer(request.getQuantity());
