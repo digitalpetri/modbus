@@ -132,7 +132,7 @@ public class ModbusRequestDecoder implements ModbusPduDecoder {
     private WriteMultipleRegistersRequest decodeWriteMultipleRegisters(ByteBuf buffer) {
         int address = buffer.readUnsignedShort();
         int quantity = buffer.readUnsignedShort();
-        int byteCount = buffer.readByte();
+        int byteCount = buffer.readUnsignedByte();
         ByteBuf values = buffer.readSlice(byteCount).retain();
 
         return new WriteMultipleRegistersRequest(address, quantity, values);
