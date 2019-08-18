@@ -204,7 +204,7 @@ public class ModbusTcpMasterConfig {
                 maxReconnectDelaySeconds,
                 instanceId,
                 executor != null ? executor : Modbus.sharedExecutor(),
-                scheduler != null ? scheduler : Modbus.sharedScheduler(),
+                scheduler != null ? scheduler : Modbus.sharedScheduledExecutor(),
                 eventLoop != null ? eventLoop : Modbus.sharedEventLoop(),
                 wheelTimer != null ? wheelTimer : Modbus.sharedWheelTimer(),
                 bootstrapConsumer

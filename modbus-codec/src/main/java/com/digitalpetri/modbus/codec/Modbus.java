@@ -19,11 +19,15 @@ package com.digitalpetri.modbus.codec;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
-import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;
+import io.netty.util.Timeout;
+import org.slf4j.LoggerFactory;
 
 /**
  * Shared resources that if not otherwise provided can be used as defaults.
@@ -31,80 +35,171 @@ import io.netty.util.HashedWheelTimer;
  * These resources should be released when the JVM is shutting down or the ClassLoader that loaded us is unloaded.
  * See {@link #releaseSharedResources()}.
  */
-public abstract class Modbus {
+public final class Modbus {
 
     private Modbus() {}
+
+    private static NioEventLoopGroup EVENT_LOOP;
+    private static ExecutorService EXECUTOR_SERVICE;
+    private static ScheduledExecutorService SCHEDULED_EXECUTOR_SERVICE;
+    private static HashedWheelTimer WHEEL_TIMER;
+
+    /**
+     * @return a shared {@link NioEventLoopGroup}.
+     */
+    public static synchronized NioEventLoopGroup sharedEventLoop() {
+        if (EVENT_LOOP == null) {
+            ThreadFactory threadFactory = new ThreadFactory() {
+                private final AtomicLong threadNumber = new AtomicLong(0L);
+
+                @Override
+                public Thread newThread(Runnable r) {
+                    Thread thread = new Thread(r, "modbus-netty-event-loop-" + threadNumber.getAndIncrement());
+                    thread.setDaemon(true);
+                    return thread;
+                }
+            };
+
+            EVENT_LOOP = new NioEventLoopGroup(0, threadFactory);
+        }
+
+        return EVENT_LOOP;
+    }
 
     /**
      * @return a shared {@link ExecutorService}.
      */
-    public static ExecutorService sharedExecutor() {
-        return ExecutorHolder.Executor;
+    public static synchronized ExecutorService sharedExecutor() {
+        if (EXECUTOR_SERVICE == null) {
+            ThreadFactory threadFactory = new ThreadFactory() {
+                private final AtomicLong threadNumber = new AtomicLong(0L);
+
+                @Override
+                public Thread newThread(Runnable r) {
+                    Thread thread = new Thread(r, "modbus-shared-thread-pool-" + threadNumber.getAndIncrement());
+                    thread.setDaemon(true);
+                    thread.setUncaughtExceptionHandler(
+                        (t, e) ->
+                            LoggerFactory.getLogger(Modbus.class)
+                                .warn("Uncaught Exception on shared stack ExecutorService thread!", e)
+                    );
+                    return thread;
+                }
+            };
+
+            EXECUTOR_SERVICE = Executors.newCachedThreadPool(threadFactory);
+        }
+
+        return EXECUTOR_SERVICE;
     }
 
     /**
      * @return a shared {@link ScheduledExecutorService}.
      */
-    public static ScheduledExecutorService sharedScheduler() {
-        return SchedulerHolder.SCHEDULER;
-    }
+    public static synchronized ScheduledExecutorService sharedScheduledExecutor() {
+        if (SCHEDULED_EXECUTOR_SERVICE == null) {
+            ThreadFactory threadFactory = new ThreadFactory() {
+                private final AtomicLong threadNumber = new AtomicLong(0L);
 
-    /**
-     * @return a shared {@link EventLoopGroup}.
-     */
-    public static EventLoopGroup sharedEventLoop() {
-        return EventLoopHolder.EventLoop;
+                @Override
+                public Thread newThread(Runnable r) {
+                    Thread thread = new Thread(r, "modbus-shared-scheduled-executor-" + threadNumber.getAndIncrement());
+                    thread.setDaemon(true);
+                    thread.setUncaughtExceptionHandler(
+                        (t, e) ->
+                            LoggerFactory.getLogger(Modbus.class)
+                                .warn("Uncaught Exception on shared stack ScheduledExecutorService thread!", e)
+                    );
+                    return thread;
+                }
+            };
+
+            ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(
+                Runtime.getRuntime().availableProcessors(),
+                threadFactory
+            );
+
+            executor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
+
+            SCHEDULED_EXECUTOR_SERVICE = executor;
+        }
+
+        return SCHEDULED_EXECUTOR_SERVICE;
     }
 
     /**
      * @return a shared {@link HashedWheelTimer}.
      */
-    public static HashedWheelTimer sharedWheelTimer() {
-        return WheelTimerHolder.WheelTimer;
+    public static synchronized HashedWheelTimer sharedWheelTimer() {
+        if (WHEEL_TIMER == null) {
+            ThreadFactory threadFactory = r -> {
+                Thread thread = new Thread(r, "modbus-netty-wheel-timer");
+                thread.setDaemon(true);
+                return thread;
+            };
+
+            WHEEL_TIMER = new HashedWheelTimer(threadFactory);
+        }
+
+        return WHEEL_TIMER;
     }
 
     /**
-     * Shutdown/stop any shared resources that may be in use.
+     * Release shared resources, waiting at most 5 seconds for the {@link NioEventLoopGroup} to shutdown gracefully.
      */
-    public static void releaseSharedResources() {
-        sharedExecutor().shutdown();
-        sharedScheduler().shutdown();
-        sharedEventLoop().shutdownGracefully();
-        sharedWheelTimer().stop();
+    public static synchronized void releaseSharedResources() {
+        releaseSharedResources(5, TimeUnit.SECONDS);
     }
 
     /**
-     * Shutdown/stop any shared resources that me be in use, blocking until finished or interrupted.
+     * Release shared resources, waiting at most the specified timeout for the {@link NioEventLoopGroup} to shutdown
+     * gracefully.
      *
-     * @param timeout the duration to wait.
-     * @param unit    the {@link TimeUnit} of the {@code timeout} duration.
+     * @param timeout the duration of the timeout.
+     * @param unit    the unit of the timeout duration.
      */
-    public static void releaseSharedResources(long timeout, TimeUnit unit) throws InterruptedException {
-        sharedExecutor().shutdown();
-        sharedExecutor().awaitTermination(timeout, unit);
-        sharedScheduler().shutdown();
-        sharedScheduler().awaitTermination(timeout, unit);
-        sharedEventLoop().shutdownGracefully().await(timeout, unit);
-        sharedWheelTimer().stop();
-    }
+    public static synchronized void releaseSharedResources(long timeout, TimeUnit unit) {
+        if (EVENT_LOOP != null) {
+            try {
+                EVENT_LOOP.shutdownGracefully().await(timeout, unit);
+            } catch (InterruptedException e) {
+                LoggerFactory.getLogger(Modbus.class)
+                    .warn("Interrupted awaiting event loop shutdown.", e);
+            }
+            EVENT_LOOP = null;
+        }
 
-    private static class ExecutorHolder {
-        private static final ExecutorService Executor = Executors.newWorkStealingPool();
-    }
+        if (SCHEDULED_EXECUTOR_SERVICE != null) {
+            SCHEDULED_EXECUTOR_SERVICE.shutdown();
+        }
 
-    private static class SchedulerHolder {
-        private static final ScheduledExecutorService SCHEDULER = Executors.newSingleThreadScheduledExecutor();
-    }
+        if (EXECUTOR_SERVICE != null) {
+            EXECUTOR_SERVICE.shutdown();
+        }
 
-    private static class EventLoopHolder {
-        private static final EventLoopGroup EventLoop = new NioEventLoopGroup();
-    }
+        if (SCHEDULED_EXECUTOR_SERVICE != null) {
+            try {
+                SCHEDULED_EXECUTOR_SERVICE.awaitTermination(timeout, unit);
+            } catch (InterruptedException e) {
+                LoggerFactory.getLogger(Modbus.class)
+                    .warn("Interrupted awaiting scheduled executor service shutdown.", e);
+            }
+            SCHEDULED_EXECUTOR_SERVICE = null;
+        }
 
-    private static class WheelTimerHolder {
-        private static final HashedWheelTimer WheelTimer = new HashedWheelTimer();
+        if (EXECUTOR_SERVICE != null) {
+            try {
+                EXECUTOR_SERVICE.awaitTermination(timeout, unit);
+            } catch (InterruptedException e) {
+                LoggerFactory.getLogger(Modbus.class)
+                    .warn("Interrupted awaiting executor service shutdown.", e);
+            }
+            EXECUTOR_SERVICE = null;
+        }
 
-        static {
-            WheelTimer.start();
+        if (WHEEL_TIMER != null) {
+            WHEEL_TIMER.stop().forEach(Timeout::cancel);
+            WHEEL_TIMER = null;
         }
     }
 
