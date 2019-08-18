@@ -19,6 +19,7 @@ package com.digitalpetri.modbus.master;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Consumer;
 
 import com.digitalpetri.modbus.codec.Modbus;
@@ -31,28 +32,40 @@ public class ModbusTcpMasterConfig {
     private final String address;
     private final int port;
     private final Duration timeout;
-    private final boolean autoConnect;
+    private final boolean lazy;
+    private final boolean persistent;
+    private final int maxReconnectDelay;
     private final Optional<String> instanceId;
     private final ExecutorService executor;
+    private final ScheduledExecutorService scheduler;
     private final EventLoopGroup eventLoop;
     private final HashedWheelTimer wheelTimer;
     private final Consumer<Bootstrap> bootstrapConsumer;
 
-    public ModbusTcpMasterConfig(String address,
-                                 int port,
-                                 Duration timeout,
-                                 @Deprecated boolean autoConnect,
-                                 Optional<String> instanceId,
-                                 ExecutorService executor,
-                                 EventLoopGroup eventLoop,
-                                 HashedWheelTimer wheelTimer,
-                                 Consumer<Bootstrap> bootstrapConsumer) {
+    public ModbusTcpMasterConfig(
+        String address,
+        int port,
+        Duration timeout,
+        boolean lazy,
+        boolean persistent,
+        int maxReconnectDelay,
+        Optional<String> instanceId,
+        ExecutorService executor,
+        ScheduledExecutorService scheduler,
+        EventLoopGroup eventLoop,
+        HashedWheelTimer wheelTimer,
+        Consumer<Bootstrap> bootstrapConsumer
+    ) {
+
         this.address = address;
         this.port = port;
         this.timeout = timeout;
-        this.autoConnect = autoConnect;
+        this.lazy = lazy;
+        this.persistent = persistent;
+        this.maxReconnectDelay = maxReconnectDelay;
         this.instanceId = instanceId;
         this.executor = executor;
+        this.scheduler = scheduler;
         this.eventLoop = eventLoop;
         this.wheelTimer = wheelTimer;
         this.bootstrapConsumer = bootstrapConsumer;
@@ -70,9 +83,16 @@ public class ModbusTcpMasterConfig {
         return timeout;
     }
 
-    @Deprecated
-    public boolean isAutoConnect() {
-        return autoConnect;
+    public boolean isLazy() {
+        return lazy;
+    }
+
+    public boolean isPersistent() {
+        return persistent;
+    }
+
+    public int getMaxReconnectDelaySeconds() {
+        return maxReconnectDelay;
     }
 
     public Optional<String> getInstanceId() {
@@ -81,6 +101,10 @@ public class ModbusTcpMasterConfig {
 
     public ExecutorService getExecutor() {
         return executor;
+    }
+
+    public ScheduledExecutorService getScheduler() {
+        return scheduler;
     }
 
     public EventLoopGroup getEventLoop() {
@@ -101,9 +125,12 @@ public class ModbusTcpMasterConfig {
 
         private int port = 502;
         private Duration timeout = Duration.ofSeconds(5);
-        private boolean autoConnect = true;
+        private boolean lazy = true;
+        private boolean persistent = true;
+        private int maxReconnectDelaySeconds = 16;
         private Optional<String> instanceId = Optional.empty();
         private ExecutorService executor;
+        private ScheduledExecutorService scheduler;
         private EventLoopGroup eventLoop;
         private HashedWheelTimer wheelTimer;
         private Consumer<Bootstrap> bootstrapConsumer = (b) -> {};
@@ -122,9 +149,18 @@ public class ModbusTcpMasterConfig {
             return this;
         }
 
-        @Deprecated
-        public Builder setAutoConnect(boolean autoConnect) {
-            this.autoConnect = autoConnect;
+        public Builder setLazy(boolean lazy) {
+            this.lazy = lazy;
+            return this;
+        }
+
+        public Builder setPersistent(boolean persistent) {
+            this.persistent = persistent;
+            return this;
+        }
+
+        public Builder setMaxReconnectDelaySeconds(int maxReconnectDelaySeconds) {
+            this.maxReconnectDelaySeconds = maxReconnectDelaySeconds;
             return this;
         }
 
@@ -135,6 +171,11 @@ public class ModbusTcpMasterConfig {
 
         public Builder setExecutor(ExecutorService executor) {
             this.executor = executor;
+            return this;
+        }
+
+        public Builder setScheduler(ScheduledExecutorService scheduler) {
+            this.scheduler = scheduler;
             return this;
         }
 
@@ -155,15 +196,19 @@ public class ModbusTcpMasterConfig {
 
         public ModbusTcpMasterConfig build() {
             return new ModbusTcpMasterConfig(
-                    address,
-                    port,
-                    timeout,
-                    autoConnect,
-                    instanceId,
-                    executor != null ? executor : Modbus.sharedExecutor(),
-                    eventLoop != null ? eventLoop : Modbus.sharedEventLoop(),
-                    wheelTimer != null ? wheelTimer : Modbus.sharedWheelTimer(),
-                    bootstrapConsumer);
+                address,
+                port,
+                timeout,
+                lazy,
+                persistent,
+                maxReconnectDelaySeconds,
+                instanceId,
+                executor != null ? executor : Modbus.sharedExecutor(),
+                scheduler != null ? scheduler : Modbus.sharedScheduler(),
+                eventLoop != null ? eventLoop : Modbus.sharedEventLoop(),
+                wheelTimer != null ? wheelTimer : Modbus.sharedWheelTimer(),
+                bootstrapConsumer
+            );
         }
 
     }

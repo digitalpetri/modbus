@@ -82,6 +82,8 @@ public class MasterExample {
 
         for (int i = 0; i < nMasters; i++) {
             ModbusTcpMaster master = new ModbusTcpMaster(config);
+            master.connect();
+
             masters.add(master);
 
             for (int j = 0; j < nRequests; j++) {

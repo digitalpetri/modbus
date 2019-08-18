@@ -18,6 +18,7 @@ package com.digitalpetri.modbus.codec;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import io.netty.channel.EventLoopGroup;
@@ -42,6 +43,13 @@ public abstract class Modbus {
     }
 
     /**
+     * @return a shared {@link ScheduledExecutorService}.
+     */
+    public static ScheduledExecutorService sharedScheduler() {
+        return SchedulerHolder.SCHEDULER;
+    }
+
+    /**
      * @return a shared {@link EventLoopGroup}.
      */
     public static EventLoopGroup sharedEventLoop() {
@@ -55,9 +63,12 @@ public abstract class Modbus {
         return WheelTimerHolder.WheelTimer;
     }
 
-    /** Shutdown/stop any shared resources that may be in use. */
+    /**
+     * Shutdown/stop any shared resources that may be in use.
+     */
     public static void releaseSharedResources() {
         sharedExecutor().shutdown();
+        sharedScheduler().shutdown();
         sharedEventLoop().shutdownGracefully();
         sharedWheelTimer().stop();
     }
@@ -69,13 +80,20 @@ public abstract class Modbus {
      * @param unit    the {@link TimeUnit} of the {@code timeout} duration.
      */
     public static void releaseSharedResources(long timeout, TimeUnit unit) throws InterruptedException {
+        sharedExecutor().shutdown();
         sharedExecutor().awaitTermination(timeout, unit);
+        sharedScheduler().shutdown();
+        sharedScheduler().awaitTermination(timeout, unit);
         sharedEventLoop().shutdownGracefully().await(timeout, unit);
         sharedWheelTimer().stop();
     }
 
     private static class ExecutorHolder {
         private static final ExecutorService Executor = Executors.newWorkStealingPool();
+    }
+
+    private static class SchedulerHolder {
+        private static final ScheduledExecutorService SCHEDULER = Executors.newSingleThreadScheduledExecutor();
     }
 
     private static class EventLoopHolder {

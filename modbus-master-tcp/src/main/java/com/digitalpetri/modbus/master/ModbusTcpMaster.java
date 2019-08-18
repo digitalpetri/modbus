@@ -39,10 +39,18 @@ import com.digitalpetri.modbus.codec.ModbusTcpPayload;
 import com.digitalpetri.modbus.requests.ModbusRequest;
 import com.digitalpetri.modbus.responses.ExceptionResponse;
 import com.digitalpetri.modbus.responses.ModbusResponse;
+import com.digitalpetri.netty.fsm.ChannelActions;
+import com.digitalpetri.netty.fsm.ChannelFsm;
+import com.digitalpetri.netty.fsm.ChannelFsmConfig;
+import com.digitalpetri.netty.fsm.ChannelFsmFactory;
+import com.digitalpetri.netty.fsm.Event;
+import com.digitalpetri.netty.fsm.State;
+import com.digitalpetri.strictmachine.FsmContext;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
@@ -69,14 +77,25 @@ public class ModbusTcpMaster {
     private final Counter timeoutCounter = new Counter();
     private final Timer responseTimer = new Timer();
 
-    private final ChannelManager channelManager;
+    private final ChannelFsm channelFsm;
 
     private final ModbusTcpMasterConfig config;
 
     public ModbusTcpMaster(ModbusTcpMasterConfig config) {
         this.config = config;
 
-        channelManager = new ChannelManager(this);
+        ChannelFsmConfig fsmConfig = ChannelFsmConfig.newBuilder()
+            .setLazy(config.isLazy())
+            .setPersistent(config.isPersistent())
+            .setMaxIdleSeconds(8) // doesn't really matter, there's no keep alive action
+            .setMaxReconnectDelaySeconds(config.getMaxReconnectDelaySeconds())
+            .setChannelActions(new ModbusChannelActions(this))
+            .setExecutor(config.getExecutor())
+            .setScheduler(config.getScheduler())
+            .setLoggerName("com.digitalpetri.modbus.ChannelFsm")
+            .build();
+
+        channelFsm = ChannelFsmFactory.newChannelFsm(fsmConfig);
 
         metrics.put(metricName("request-counter"), requestCounter);
         metrics.put(metricName("response-counter"), responseCounter);
@@ -90,24 +109,19 @@ public class ModbusTcpMaster {
     }
 
     public CompletableFuture<ModbusTcpMaster> connect() {
-        CompletableFuture<ModbusTcpMaster> future = new CompletableFuture<>();
-
-        channelManager.getChannel().whenComplete((ch, ex) -> {
-            if (ch != null) future.complete(ModbusTcpMaster.this);
-            else future.completeExceptionally(ex);
-        });
-
-        return future;
+        return channelFsm.connect()
+            .thenApply(ch -> ModbusTcpMaster.this);
     }
 
     public CompletableFuture<ModbusTcpMaster> disconnect() {
-        return channelManager.disconnect().thenApply(v -> this);
+        return channelFsm.disconnect()
+            .thenApply(v -> ModbusTcpMaster.this);
     }
 
     public <T extends ModbusResponse> CompletableFuture<T> sendRequest(ModbusRequest request, int unitId) {
         CompletableFuture<T> future = new CompletableFuture<>();
 
-        channelManager.getChannel().whenComplete((ch, ex) -> {
+        channelFsm.getChannel().whenComplete((ch, ex) -> {
             if (ch != null) {
                 short txId = (short) transactionId.incrementAndGet();
 
@@ -305,6 +319,44 @@ public class ModbusTcpMaster {
                     future.completeExceptionally(ex);
                 }
             });
+        }
+
+    }
+
+    private static class ModbusChannelActions implements ChannelActions {
+
+        private final Logger logger = LoggerFactory.getLogger(ModbusTcpMaster.class);
+
+        private final ModbusTcpMaster master;
+
+        ModbusChannelActions(ModbusTcpMaster master) {
+            this.master = master;
+        }
+
+        @Override
+        public CompletableFuture<Channel> connect(FsmContext<State, Event> fsmContext) {
+            return ModbusTcpMaster.bootstrap(master, master.getConfig()).whenComplete((ch, ex) -> {
+                if (ch != null) {
+                    logger.debug(
+                        "Channel bootstrap succeeded: localAddress={}, remoteAddress={}",
+                        ch.localAddress(), ch.remoteAddress()
+                    );
+                } else {
+                    logger.debug("Channel bootstrap failed: {}", ex.getMessage(), ex);
+                }
+            });
+        }
+
+        @Override
+        public CompletableFuture<Void> disconnect(FsmContext<State, Event> fsmContext, Channel channel) {
+            CompletableFuture<Void> future = new CompletableFuture<>();
+
+            channel.close().addListener(
+                (ChannelFutureListener) channelFuture ->
+                    future.complete(null)
+            );
+
+            return future;
         }
 
     }

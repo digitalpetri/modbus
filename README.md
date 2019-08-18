@@ -6,8 +6,10 @@ Quick Start
 ModbusTcpMasterConfig config = new ModbusTcpMasterConfig.Builder("localhost").build();
 ModbusTcpMaster master = new ModbusTcpMaster(config);
 
+master.connect();
+
 CompletableFuture<ReadHoldingRegistersResponse> future =
-        master.sendRequest(new ReadHoldingRegistersRequest(0, 10), 0);
+    master.sendRequest(new ReadHoldingRegistersRequest(0, 10), 0);
 
 future.thenAccept(response -> {
     System.out.println("Response: " + ByteBufUtil.hexDump(response.getRegisters()));
