@@ -35,7 +35,7 @@ public class ModbusTcpMasterConfig {
     private final boolean lazy;
     private final boolean persistent;
     private final int maxReconnectDelay;
-    private final Optional<String> instanceId;
+    private final String instanceId;
     private final ExecutorService executor;
     private final ScheduledExecutorService scheduler;
     private final EventLoopGroup eventLoop;
@@ -49,7 +49,7 @@ public class ModbusTcpMasterConfig {
         boolean lazy,
         boolean persistent,
         int maxReconnectDelay,
-        Optional<String> instanceId,
+        String instanceId,
         ExecutorService executor,
         ScheduledExecutorService scheduler,
         EventLoopGroup eventLoop,
@@ -96,7 +96,7 @@ public class ModbusTcpMasterConfig {
     }
 
     public Optional<String> getInstanceId() {
-        return instanceId;
+        return Optional.ofNullable(instanceId);
     }
 
     public ExecutorService getExecutor() {
@@ -128,7 +128,7 @@ public class ModbusTcpMasterConfig {
         private boolean lazy = true;
         private boolean persistent = true;
         private int maxReconnectDelaySeconds = 16;
-        private Optional<String> instanceId = Optional.empty();
+        private String instanceId = null;
         private ExecutorService executor;
         private ScheduledExecutorService scheduler;
         private EventLoopGroup eventLoop;
@@ -165,7 +165,7 @@ public class ModbusTcpMasterConfig {
         }
 
         public Builder setInstanceId(String instanceId) {
-            this.instanceId = Optional.of(instanceId);
+            this.instanceId = instanceId;
             return this;
         }
 
