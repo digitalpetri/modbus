@@ -21,7 +21,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
 import com.digitalpetri.modbus.codec.Modbus;
-import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.HashedWheelTimer;
@@ -101,11 +100,12 @@ public class ModbusTcpSlaveConfig {
 
         public ModbusTcpSlaveConfig build() {
             return new ModbusTcpSlaveConfig(
-                    instanceId,
-                    executor != null ? executor : Modbus.sharedExecutor(),
-                    eventLoop != null ? eventLoop : Modbus.sharedEventLoop(),
-                    wheelTimer != null ? wheelTimer : Modbus.sharedWheelTimer(),
-                    bootstrapConsumer);
+                instanceId,
+                executor != null ? executor : Modbus.sharedExecutor(),
+                eventLoop != null ? eventLoop : Modbus.sharedEventLoop(),
+                wheelTimer != null ? wheelTimer : Modbus.sharedWheelTimer(),
+                bootstrapConsumer
+            );
         }
     }
 }

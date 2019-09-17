@@ -87,7 +87,7 @@ public interface ServiceRequestHandler {
         ReferenceCountUtil.release(service.getRequest());
     }
 
-    public static interface ServiceRequest<Request extends ModbusRequest, Response extends ModbusResponse> {
+    interface ServiceRequest<Request extends ModbusRequest, Response extends ModbusResponse> {
 
         /**
          * @return the transaction id associated with this request.

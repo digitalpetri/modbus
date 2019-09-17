@@ -51,7 +51,7 @@ public class ModbusTcpSlave {
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
     private final AtomicReference<ServiceRequestHandler> requestHandler =
-            new AtomicReference<>(new ServiceRequestHandler() {});
+        new AtomicReference<>(new ServiceRequestHandler() {});
 
     private final Map<SocketAddress, Channel> serverChannels = new ConcurrentHashMap<>();
 
@@ -69,7 +69,7 @@ public class ModbusTcpSlave {
 
         ChannelInitializer<SocketChannel> initializer = new ChannelInitializer<SocketChannel>() {
             @Override
-            protected void initChannel(SocketChannel channel) throws Exception {
+            protected void initChannel(SocketChannel channel) {
                 channelCounter.inc();
                 logger.info("channel initialized: {}", channel);
 
@@ -84,10 +84,10 @@ public class ModbusTcpSlave {
         config.getBootstrapConsumer().accept(bootstrap);
 
         bootstrap.group(config.getEventLoop())
-                .channel(NioServerSocketChannel.class)
-                .handler(new LoggingHandler(LogLevel.DEBUG))
-                .childHandler(initializer)
-                .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);
+            .channel(NioServerSocketChannel.class)
+            .handler(new LoggingHandler(LogLevel.DEBUG))
+            .childHandler(initializer)
+            .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);
 
         bootstrap.bind(host, port).addListener((ChannelFuture future) -> {
             if (future.isSuccess()) {
@@ -155,8 +155,8 @@ public class ModbusTcpSlave {
             default:
                 /* Function code not currently supported */
                 ExceptionResponse response = new ExceptionResponse(
-                        payload.getModbusPdu().getFunctionCode(),
-                        ExceptionCode.IllegalFunction);
+                    payload.getModbusPdu().getFunctionCode(),
+                    ExceptionCode.IllegalFunction);
 
                 ctx.writeAndFlush(new ModbusTcpPayload(payload.getTransactionId(), payload.getUnitId(), response));
                 break;
@@ -181,24 +181,24 @@ public class ModbusTcpSlave {
         }
 
         @Override
-        protected void channelRead0(ChannelHandlerContext ctx, ModbusTcpPayload msg) throws Exception {
+        protected void channelRead0(ChannelHandlerContext ctx, ModbusTcpPayload msg) {
             slave.onChannelRead(ctx, msg);
         }
 
         @Override
-        public void channelInactive(ChannelHandlerContext ctx) throws Exception {
+        public void channelInactive(ChannelHandlerContext ctx) {
             slave.onChannelInactive(ctx);
         }
 
         @Override
-        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             slave.onExceptionCaught(ctx, cause);
         }
 
     }
 
     private static class ModbusTcpServiceRequest<Request extends ModbusRequest, Response extends ModbusResponse>
-            implements ServiceRequestHandler.ServiceRequest<Request, Response> {
+        implements ServiceRequestHandler.ServiceRequest<Request, Response> {
 
         private final short transactionId;
         private final short unitId;
@@ -249,10 +249,10 @@ public class ModbusTcpSlave {
         ModbusTcpServiceRequest<Request, Response> of(ModbusTcpPayload payload, Channel channel) {
 
             return new ModbusTcpServiceRequest<>(
-                    payload.getTransactionId(),
-                    payload.getUnitId(),
-                    (Request) payload.getModbusPdu(),
-                    channel
+                payload.getTransactionId(),
+                payload.getUnitId(),
+                (Request) payload.getModbusPdu(),
+                channel
             );
         }
 

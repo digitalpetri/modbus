@@ -158,7 +158,7 @@ public class ModbusTcpMaster {
         return future;
     }
 
-    private void onChannelRead(ChannelHandlerContext ctx, ModbusTcpPayload payload) throws Exception {
+    private void onChannelRead(ChannelHandlerContext ctx, ModbusTcpPayload payload) {
         ModbusPdu modbusPdu = payload.getModbusPdu();
 
         if (modbusPdu instanceof ModbusResponse) {
@@ -259,7 +259,7 @@ public class ModbusTcpMaster {
             .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT)
             .handler(new ChannelInitializer<SocketChannel>() {
                 @Override
-                protected void initChannel(SocketChannel ch) throws Exception {
+                protected void initChannel(SocketChannel ch) {
                     ch.pipeline().addLast(new ModbusTcpCodec(new ModbusRequestEncoder(), new ModbusResponseDecoder()));
                     ch.pipeline().addLast(new ModbusTcpMasterHandler(master));
                 }
@@ -285,12 +285,12 @@ public class ModbusTcpMaster {
         }
 
         @Override
-        protected void channelRead0(ChannelHandlerContext ctx, ModbusTcpPayload msg) throws Exception {
+        protected void channelRead0(ChannelHandlerContext ctx, ModbusTcpPayload msg) {
             master.onChannelRead(ctx, msg);
         }
 
         @Override
-        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             master.exceptionCaught(ctx, cause);
         }
 

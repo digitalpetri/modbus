@@ -43,7 +43,7 @@ public class ModbusTcpCodec extends ByteToMessageCodec<ModbusTcpPayload> {
     }
 
     @Override
-    protected void encode(ChannelHandlerContext ctx, ModbusTcpPayload payload, ByteBuf buffer) throws Exception {
+    protected void encode(ChannelHandlerContext ctx, ModbusTcpPayload payload, ByteBuf buffer) {
         int headerStartIndex = buffer.writerIndex();
         buffer.writeZero(MbapHeader.LENGTH);
 
@@ -52,9 +52,9 @@ public class ModbusTcpCodec extends ByteToMessageCodec<ModbusTcpPayload> {
         int pduLength = buffer.writerIndex() - pduStartIndex;
 
         MbapHeader header = new MbapHeader(
-                payload.getTransactionId(),
-                pduLength + 1,
-                payload.getUnitId()
+            payload.getTransactionId(),
+            pduLength + 1,
+            payload.getUnitId()
         );
 
         int currentWriterIndex = buffer.writerIndex();
@@ -68,7 +68,7 @@ public class ModbusTcpCodec extends ByteToMessageCodec<ModbusTcpPayload> {
         int startIndex = buffer.readerIndex();
 
         while (buffer.readableBytes() >= HeaderLength &&
-                buffer.readableBytes() >= getLength(buffer, startIndex) + HeaderSize) {
+            buffer.readableBytes() >= getLength(buffer, startIndex) + HeaderSize) {
 
             try {
                 MbapHeader mbapHeader = MbapHeader.decode(buffer);

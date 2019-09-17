@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 
 public class MasterExample {
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) {
         new MasterExample(100, 100).start();
     }
 
@@ -57,8 +57,8 @@ public class MasterExample {
         started = true;
 
         ModbusTcpMasterConfig config = new ModbusTcpMasterConfig.Builder("localhost")
-                .setPort(50200)
-                .build();
+            .setPort(50200)
+            .build();
 
         new Thread(() -> {
             while (started) {
@@ -96,7 +96,7 @@ public class MasterExample {
         if (!started) return;
 
         CompletableFuture<ReadHoldingRegistersResponse> future =
-                master.sendRequest(new ReadHoldingRegistersRequest(0, 10), 0);
+            master.sendRequest(new ReadHoldingRegistersRequest(0, 10), 0);
 
         future.whenCompleteAsync((response, ex) -> {
             if (response != null) {
