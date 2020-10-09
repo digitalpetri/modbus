@@ -55,6 +55,7 @@ Code     | Function
 0x0F     | Write Multiple Coils
 0x10     | Write Multiple Registers
 0x16     | Mask Write Register
+0x17     | Read/Write Multiple Registers
 
 Get Help
 --------
