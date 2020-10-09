@@ -20,16 +20,7 @@ import com.digitalpetri.modbus.ExceptionCode;
 import com.digitalpetri.modbus.FunctionCode;
 import com.digitalpetri.modbus.ModbusPdu;
 import com.digitalpetri.modbus.UnsupportedPdu;
-import com.digitalpetri.modbus.responses.ExceptionResponse;
-import com.digitalpetri.modbus.responses.MaskWriteRegisterResponse;
-import com.digitalpetri.modbus.responses.ReadCoilsResponse;
-import com.digitalpetri.modbus.responses.ReadDiscreteInputsResponse;
-import com.digitalpetri.modbus.responses.ReadHoldingRegistersResponse;
-import com.digitalpetri.modbus.responses.ReadInputRegistersResponse;
-import com.digitalpetri.modbus.responses.WriteMultipleCoilsResponse;
-import com.digitalpetri.modbus.responses.WriteMultipleRegistersResponse;
-import com.digitalpetri.modbus.responses.WriteSingleCoilResponse;
-import com.digitalpetri.modbus.responses.WriteSingleRegisterResponse;
+import com.digitalpetri.modbus.responses.*;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.DecoderException;
 
@@ -92,6 +83,9 @@ public class ModbusResponseDecoder implements ModbusPduDecoder {
 
             case MaskWriteRegister:
                 return decodeMaskWriteRegister(buffer);
+
+            case ReadWriteMultipleRegisters:
+                return decodeReadWriteMultipleRegisters(buffer);
 
             default:
                 return new UnsupportedPdu(functionCode);
@@ -160,6 +154,13 @@ public class ModbusResponseDecoder implements ModbusPduDecoder {
         int orMask = buffer.readUnsignedShort();
 
         return new MaskWriteRegisterResponse(address, andMask, orMask);
+    }
+
+    public ReadWriteMultipleRegistersResponse decodeReadWriteMultipleRegisters(ByteBuf buffer) {
+        int byteCount = buffer.readUnsignedByte();
+        ByteBuf registers = buffer.readSlice(byteCount).retain();
+
+        return new ReadWriteMultipleRegistersResponse(registers);
     }
 
 }

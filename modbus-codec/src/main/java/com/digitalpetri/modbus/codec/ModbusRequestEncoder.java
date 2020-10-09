@@ -17,15 +17,7 @@
 package com.digitalpetri.modbus.codec;
 
 import com.digitalpetri.modbus.ModbusPdu;
-import com.digitalpetri.modbus.requests.MaskWriteRegisterRequest;
-import com.digitalpetri.modbus.requests.ReadCoilsRequest;
-import com.digitalpetri.modbus.requests.ReadDiscreteInputsRequest;
-import com.digitalpetri.modbus.requests.ReadHoldingRegistersRequest;
-import com.digitalpetri.modbus.requests.ReadInputRegistersRequest;
-import com.digitalpetri.modbus.requests.WriteMultipleCoilsRequest;
-import com.digitalpetri.modbus.requests.WriteMultipleRegistersRequest;
-import com.digitalpetri.modbus.requests.WriteSingleCoilRequest;
-import com.digitalpetri.modbus.requests.WriteSingleRegisterRequest;
+import com.digitalpetri.modbus.requests.*;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.EncoderException;
 import io.netty.util.ReferenceCountUtil;
@@ -62,6 +54,9 @@ public class ModbusRequestEncoder implements ModbusPduEncoder {
 
                 case MaskWriteRegister:
                     return encodeMaskWriteRegister((MaskWriteRegisterRequest) modbusPdu, buffer);
+
+                case ReadWriteMultipleRegisters:
+                    return encodeReadWriteMultipleRegisters((ReadWriteMultipleRegistersRequest) modbusPdu, buffer);
 
                 default:
                     throw new EncoderException("FunctionCode not supported: " + modbusPdu.getFunctionCode());
@@ -150,6 +145,21 @@ public class ModbusRequestEncoder implements ModbusPduEncoder {
         buffer.writeShort(request.getAddress());
         buffer.writeShort(request.getAndMask());
         buffer.writeShort(request.getOrMask());
+
+        return buffer;
+    }
+
+    public ByteBuf encodeReadWriteMultipleRegisters(ReadWriteMultipleRegistersRequest request, ByteBuf buffer) {
+        buffer.writeByte(request.getFunctionCode().getCode());
+        buffer.writeShort(request.getReadAddress());
+        buffer.writeShort(request.getReadQuantity());
+        buffer.writeShort(request.getWriteAddress());
+        buffer.writeShort(request.getWriteQuantity());
+
+        int byteCount = request.getWriteQuantity() * 2;
+        buffer.writeByte(byteCount);
+
+        buffer.writeBytes(request.getValues(), byteCount);
 
         return buffer;
     }
