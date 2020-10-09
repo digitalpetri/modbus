@@ -17,7 +17,17 @@
 package com.digitalpetri.modbus.codec;
 
 import com.digitalpetri.modbus.ModbusPdu;
-import com.digitalpetri.modbus.responses.*;
+import com.digitalpetri.modbus.responses.ExceptionResponse;
+import com.digitalpetri.modbus.responses.MaskWriteRegisterResponse;
+import com.digitalpetri.modbus.responses.ReadCoilsResponse;
+import com.digitalpetri.modbus.responses.ReadDiscreteInputsResponse;
+import com.digitalpetri.modbus.responses.ReadHoldingRegistersResponse;
+import com.digitalpetri.modbus.responses.ReadInputRegistersResponse;
+import com.digitalpetri.modbus.responses.ReadWriteMultipleRegistersResponse;
+import com.digitalpetri.modbus.responses.WriteMultipleCoilsResponse;
+import com.digitalpetri.modbus.responses.WriteMultipleRegistersResponse;
+import com.digitalpetri.modbus.responses.WriteSingleCoilResponse;
+import com.digitalpetri.modbus.responses.WriteSingleRegisterResponse;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.EncoderException;
 import io.netty.util.ReferenceCountUtil;

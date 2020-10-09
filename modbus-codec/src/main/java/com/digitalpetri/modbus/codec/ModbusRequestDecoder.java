@@ -19,7 +19,16 @@ package com.digitalpetri.modbus.codec;
 import com.digitalpetri.modbus.FunctionCode;
 import com.digitalpetri.modbus.ModbusPdu;
 import com.digitalpetri.modbus.UnsupportedPdu;
-import com.digitalpetri.modbus.requests.*;
+import com.digitalpetri.modbus.requests.MaskWriteRegisterRequest;
+import com.digitalpetri.modbus.requests.ReadCoilsRequest;
+import com.digitalpetri.modbus.requests.ReadDiscreteInputsRequest;
+import com.digitalpetri.modbus.requests.ReadHoldingRegistersRequest;
+import com.digitalpetri.modbus.requests.ReadInputRegistersRequest;
+import com.digitalpetri.modbus.requests.ReadWriteMultipleRegistersRequest;
+import com.digitalpetri.modbus.requests.WriteMultipleCoilsRequest;
+import com.digitalpetri.modbus.requests.WriteMultipleRegistersRequest;
+import com.digitalpetri.modbus.requests.WriteSingleCoilRequest;
+import com.digitalpetri.modbus.requests.WriteSingleRegisterRequest;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.DecoderException;
 
@@ -30,8 +39,8 @@ public class ModbusRequestDecoder implements ModbusPduDecoder {
         int code = buffer.readByte();
 
         FunctionCode functionCode = FunctionCode
-                .fromCode(code)
-                .orElseThrow(() -> new DecoderException("invalid function code: " + code));
+            .fromCode(code)
+            .orElseThrow(() -> new DecoderException("invalid function code: " + code));
 
         return decodeResponse(functionCode, buffer);
     }

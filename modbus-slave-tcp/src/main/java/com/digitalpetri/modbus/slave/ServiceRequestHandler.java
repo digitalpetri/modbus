@@ -17,8 +17,28 @@
 package com.digitalpetri.modbus.slave;
 
 import com.digitalpetri.modbus.ExceptionCode;
-import com.digitalpetri.modbus.requests.*;
-import com.digitalpetri.modbus.responses.*;
+import com.digitalpetri.modbus.requests.MaskWriteRegisterRequest;
+import com.digitalpetri.modbus.requests.ModbusRequest;
+import com.digitalpetri.modbus.requests.ReadCoilsRequest;
+import com.digitalpetri.modbus.requests.ReadDiscreteInputsRequest;
+import com.digitalpetri.modbus.requests.ReadHoldingRegistersRequest;
+import com.digitalpetri.modbus.requests.ReadInputRegistersRequest;
+import com.digitalpetri.modbus.requests.ReadWriteMultipleRegistersRequest;
+import com.digitalpetri.modbus.requests.WriteMultipleCoilsRequest;
+import com.digitalpetri.modbus.requests.WriteMultipleRegistersRequest;
+import com.digitalpetri.modbus.requests.WriteSingleCoilRequest;
+import com.digitalpetri.modbus.requests.WriteSingleRegisterRequest;
+import com.digitalpetri.modbus.responses.MaskWriteRegisterResponse;
+import com.digitalpetri.modbus.responses.ModbusResponse;
+import com.digitalpetri.modbus.responses.ReadCoilsResponse;
+import com.digitalpetri.modbus.responses.ReadDiscreteInputsResponse;
+import com.digitalpetri.modbus.responses.ReadHoldingRegistersResponse;
+import com.digitalpetri.modbus.responses.ReadInputRegistersResponse;
+import com.digitalpetri.modbus.responses.ReadWriteMultipleRegistersResponse;
+import com.digitalpetri.modbus.responses.WriteMultipleCoilsResponse;
+import com.digitalpetri.modbus.responses.WriteMultipleRegistersResponse;
+import com.digitalpetri.modbus.responses.WriteSingleCoilResponse;
+import com.digitalpetri.modbus.responses.WriteSingleRegisterResponse;
 import io.netty.channel.Channel;
 import io.netty.util.ReferenceCountUtil;
 

@@ -17,11 +17,11 @@
 
 package com.digitalpetri.modbus.requests;
 
+import java.nio.ByteBuffer;
+
 import com.digitalpetri.modbus.FunctionCode;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-
-import java.nio.ByteBuffer;
 
 /**
  * This function code is used to write a block of contiguous registers (1 to 123 registers) in a remote device.
@@ -30,62 +30,62 @@ import java.nio.ByteBuffer;
  */
 public class ReadWriteMultipleRegistersRequest extends ByteBufModbusRequest {
 
-	private final int readAddress;
-	private final int readQuantity;
-	private final int writeAddress;
-	private final int writeQuantity;
+    private final int readAddress;
+    private final int readQuantity;
+    private final int writeAddress;
+    private final int writeQuantity;
 
-	/**
-	 * @param readAddress  0x0000 to 0xFFFF (0 to 65535)
-	 * @param readQuantity 0x0001 to 0x007B (1 to 123)
+    /**
+     * @param readAddress   0x0000 to 0xFFFF (0 to 65535)
+     * @param readQuantity  0x0001 to 0x007B (1 to 123)
      * @param writeAddress  0x0000 to 0xFFFF (0 to 65535)
      * @param writeQuantity 0x0001 to 0x007B (1 to 123)
-	 * @param values       buffer of at least N bytes, where N = quantity * 2
-	 */
-	public ReadWriteMultipleRegistersRequest(int readAddress, int readQuantity, int writeAddress, int writeQuantity,
-											 byte[] values) {
-		this(readAddress, readQuantity, writeAddress, writeQuantity, Unpooled.wrappedBuffer(values));
-	}
+     * @param values        buffer of at least N bytes, where N = quantity * 2
+     */
+    public ReadWriteMultipleRegistersRequest(int readAddress, int readQuantity, int writeAddress, int writeQuantity,
+                                             byte[] values) {
+        this(readAddress, readQuantity, writeAddress, writeQuantity, Unpooled.wrappedBuffer(values));
+    }
 
-	/**
-	 * @param readAddress  0x0000 to 0xFFFF (0 to 65535)
-	 * @param readQuantity 0x0001 to 0x007B (1 to 123)
+    /**
+     * @param readAddress   0x0000 to 0xFFFF (0 to 65535)
+     * @param readQuantity  0x0001 to 0x007B (1 to 123)
      * @param writeAddress  0x0000 to 0xFFFF (0 to 65535)
      * @param writeQuantity 0x0001 to 0x007B (1 to 123)
-	 * @param values       buffer of at least N bytes, where N = quantity * 2
-	 */
-	public ReadWriteMultipleRegistersRequest(int readAddress, int readQuantity, int writeAddress, int writeQuantity,
-											 ByteBuffer values) {
-		this(readAddress, readQuantity, writeAddress, writeQuantity, Unpooled.wrappedBuffer(values));
-	}
+     * @param values        buffer of at least N bytes, where N = quantity * 2
+     */
+    public ReadWriteMultipleRegistersRequest(int readAddress, int readQuantity, int writeAddress, int writeQuantity,
+                                             ByteBuffer values) {
+        this(readAddress, readQuantity, writeAddress, writeQuantity, Unpooled.wrappedBuffer(values));
+    }
 
-	/**
-	 * Create a request using a {@link ByteBuf}. The buffer will have its reference count decremented after encoding.
-	 *
-	 * @param readAddress   0x0000 to 0xFFFF (0 to 65535)
-	 * @param readQuantity  0x0001 to 0x007B (1 to 123)
-	 * @param writeAddress  0x0000 to 0xFFFF (0 to 65535)
-	 * @param writeQuantity 0x0001 to 0x007B (1 to 123)
-	 * @param values        buffer of at least N bytes, where N = quantity * 2
-	 */
-	public ReadWriteMultipleRegistersRequest(int readAddress, int readQuantity, int writeAddress, int writeQuantity,
-											 ByteBuf values) {
-		super(values, FunctionCode.ReadWriteMultipleRegisters);
+    /**
+     * Create a request using a {@link ByteBuf}. The buffer will have its reference count decremented after encoding.
+     *
+     * @param readAddress   0x0000 to 0xFFFF (0 to 65535)
+     * @param readQuantity  0x0001 to 0x007B (1 to 123)
+     * @param writeAddress  0x0000 to 0xFFFF (0 to 65535)
+     * @param writeQuantity 0x0001 to 0x007B (1 to 123)
+     * @param values        buffer of at least N bytes, where N = quantity * 2
+     */
+    public ReadWriteMultipleRegistersRequest(int readAddress, int readQuantity, int writeAddress, int writeQuantity,
+                                             ByteBuf values) {
+        super(values, FunctionCode.ReadWriteMultipleRegisters);
 
-		this.readAddress = readAddress;
-		this.readQuantity = readQuantity;
+        this.readAddress = readAddress;
+        this.readQuantity = readQuantity;
 
-		this.writeAddress = writeAddress;
-		this.writeQuantity = writeQuantity;
-	}
+        this.writeAddress = writeAddress;
+        this.writeQuantity = writeQuantity;
+    }
 
-	public int getReadAddress() {
-		return readAddress;
-	}
+    public int getReadAddress() {
+        return readAddress;
+    }
 
-	public int getReadQuantity() {
-		return readQuantity;
-	}
+    public int getReadQuantity() {
+        return readQuantity;
+    }
 
     public int getWriteAddress() {
         return writeAddress;
@@ -95,8 +95,8 @@ public class ReadWriteMultipleRegistersRequest extends ByteBufModbusRequest {
         return writeQuantity;
     }
 
-	public ByteBuf getValues() {
-		return super.content();
-	}
+    public ByteBuf getValues() {
+        return super.content();
+    }
 
 }
