@@ -23,6 +23,7 @@ import com.digitalpetri.modbus.requests.ReadCoilsRequest;
 import com.digitalpetri.modbus.requests.ReadDiscreteInputsRequest;
 import com.digitalpetri.modbus.requests.ReadHoldingRegistersRequest;
 import com.digitalpetri.modbus.requests.ReadInputRegistersRequest;
+import com.digitalpetri.modbus.requests.ReadWriteMultipleRegistersRequest;
 import com.digitalpetri.modbus.requests.WriteMultipleCoilsRequest;
 import com.digitalpetri.modbus.requests.WriteMultipleRegistersRequest;
 import com.digitalpetri.modbus.requests.WriteSingleCoilRequest;
@@ -33,6 +34,7 @@ import com.digitalpetri.modbus.responses.ReadCoilsResponse;
 import com.digitalpetri.modbus.responses.ReadDiscreteInputsResponse;
 import com.digitalpetri.modbus.responses.ReadHoldingRegistersResponse;
 import com.digitalpetri.modbus.responses.ReadInputRegistersResponse;
+import com.digitalpetri.modbus.responses.ReadWriteMultipleRegistersResponse;
 import com.digitalpetri.modbus.responses.WriteMultipleCoilsResponse;
 import com.digitalpetri.modbus.responses.WriteMultipleRegistersResponse;
 import com.digitalpetri.modbus.responses.WriteSingleCoilResponse;
@@ -83,6 +85,11 @@ public interface ServiceRequestHandler {
     }
 
     default void onMaskWriteRegister(ServiceRequest<MaskWriteRegisterRequest, MaskWriteRegisterResponse> service) {
+        service.sendException(ExceptionCode.IllegalFunction);
+        ReferenceCountUtil.release(service.getRequest());
+    }
+
+    default void onReadWriteMultipleRegisters(ServiceRequest<ReadWriteMultipleRegistersRequest, ReadWriteMultipleRegistersResponse> service) {
         service.sendException(ExceptionCode.IllegalFunction);
         ReferenceCountUtil.release(service.getRequest());
     }

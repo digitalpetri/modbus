@@ -152,6 +152,10 @@ public class ModbusTcpSlave {
                 handler.onMaskWriteRegister(ModbusTcpServiceRequest.of(payload, ctx.channel()));
                 break;
 
+            case ReadWriteMultipleRegisters:
+                handler.onReadWriteMultipleRegisters(ModbusTcpServiceRequest.of(payload, ctx.channel()));
+                break;
+
             default:
                 /* Function code not currently supported */
                 ExceptionResponse response = new ExceptionResponse(

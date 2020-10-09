@@ -23,6 +23,7 @@ import com.digitalpetri.modbus.responses.ReadCoilsResponse;
 import com.digitalpetri.modbus.responses.ReadDiscreteInputsResponse;
 import com.digitalpetri.modbus.responses.ReadHoldingRegistersResponse;
 import com.digitalpetri.modbus.responses.ReadInputRegistersResponse;
+import com.digitalpetri.modbus.responses.ReadWriteMultipleRegistersResponse;
 import com.digitalpetri.modbus.responses.WriteMultipleCoilsResponse;
 import com.digitalpetri.modbus.responses.WriteMultipleRegistersResponse;
 import com.digitalpetri.modbus.responses.WriteSingleCoilResponse;
@@ -66,6 +67,9 @@ public class ModbusResponseEncoder implements ModbusPduEncoder {
 
                     case MaskWriteRegister:
                         return encodeMaskWriteRegister((MaskWriteRegisterResponse) modbusPdu, buffer);
+
+                    case ReadWriteMultipleRegisters:
+                        return encodeReadWriteMultipleRegisters((ReadWriteMultipleRegistersResponse) modbusPdu, buffer);
 
                     default:
                         throw new EncoderException("FunctionCode not supported: " + modbusPdu.getFunctionCode());
@@ -156,5 +160,11 @@ public class ModbusResponseEncoder implements ModbusPduEncoder {
         return buffer;
     }
 
+    private ByteBuf encodeReadWriteMultipleRegisters(ReadWriteMultipleRegistersResponse response, ByteBuf buffer) {
+        buffer.writeByte(response.getFunctionCode().getCode());
+        buffer.writeByte(response.getRegisters().readableBytes());
+        buffer.writeBytes(response.getRegisters());
 
+        return buffer;
+    }
 }

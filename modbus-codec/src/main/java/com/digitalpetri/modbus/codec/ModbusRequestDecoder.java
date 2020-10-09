@@ -24,6 +24,7 @@ import com.digitalpetri.modbus.requests.ReadCoilsRequest;
 import com.digitalpetri.modbus.requests.ReadDiscreteInputsRequest;
 import com.digitalpetri.modbus.requests.ReadHoldingRegistersRequest;
 import com.digitalpetri.modbus.requests.ReadInputRegistersRequest;
+import com.digitalpetri.modbus.requests.ReadWriteMultipleRegistersRequest;
 import com.digitalpetri.modbus.requests.WriteMultipleCoilsRequest;
 import com.digitalpetri.modbus.requests.WriteMultipleRegistersRequest;
 import com.digitalpetri.modbus.requests.WriteSingleCoilRequest;
@@ -38,8 +39,8 @@ public class ModbusRequestDecoder implements ModbusPduDecoder {
         int code = buffer.readByte();
 
         FunctionCode functionCode = FunctionCode
-                .fromCode(code)
-                .orElseThrow(() -> new DecoderException("invalid function code: " + code));
+            .fromCode(code)
+            .orElseThrow(() -> new DecoderException("invalid function code: " + code));
 
         return decodeResponse(functionCode, buffer);
     }
@@ -72,6 +73,9 @@ public class ModbusRequestDecoder implements ModbusPduDecoder {
 
             case MaskWriteRegister:
                 return decodeMaskWriteRegister(buffer);
+
+            case ReadWriteMultipleRegisters:
+                return decodeReadWriteMultipleRegisters(buffer);
 
             default:
                 return new UnsupportedPdu(functionCode);
@@ -144,6 +148,17 @@ public class ModbusRequestDecoder implements ModbusPduDecoder {
         int orMask = buffer.readUnsignedShort();
 
         return new MaskWriteRegisterRequest(address, andMask, orMask);
+    }
+
+    private ReadWriteMultipleRegistersRequest decodeReadWriteMultipleRegisters(ByteBuf buffer) {
+        int readAddress = buffer.readUnsignedShort();
+        int readQuantity = buffer.readUnsignedShort();
+        int writeAddress = buffer.readUnsignedShort();
+        int writeQuantity = buffer.readUnsignedShort();
+        int byteCount = buffer.readUnsignedByte();
+        ByteBuf values = buffer.readSlice(byteCount).retain();
+
+        return new ReadWriteMultipleRegistersRequest(readAddress, readQuantity, writeAddress, writeQuantity, values);
     }
 
 }
