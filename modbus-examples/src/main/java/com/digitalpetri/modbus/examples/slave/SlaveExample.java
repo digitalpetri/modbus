@@ -32,7 +32,18 @@ import org.slf4j.LoggerFactory;
 public class SlaveExample {
 
     public static void main(String[] args) throws ExecutionException, InterruptedException {
-        new SlaveExample().start();
+        final SlaveExample slaveExample = new SlaveExample();
+
+        slaveExample.start();
+
+        Runtime.getRuntime().addShutdownHook(new Thread("modbus-slave-shutdown-hook") {
+            @Override
+            public void run() {
+                slaveExample.stop();
+            }
+        });
+
+        Thread.sleep(Integer.MAX_VALUE);
     }
 
     private final Logger logger = LoggerFactory.getLogger(getClass());
@@ -40,8 +51,7 @@ public class SlaveExample {
     private final ModbusTcpSlaveConfig config = new ModbusTcpSlaveConfig.Builder().build();
     private final ModbusTcpSlave slave = new ModbusTcpSlave(config);
 
-    public SlaveExample() {
-    }
+    public SlaveExample() {}
 
     public void start() throws ExecutionException, InterruptedException {
         slave.setRequestHandler(new ServiceRequestHandler() {
@@ -71,4 +81,5 @@ public class SlaveExample {
     public void stop() {
         slave.shutdown();
     }
+
 }
