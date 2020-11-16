@@ -1,3 +1,5 @@
+[![Maven Central](https://img.shields.io/maven-central/v/com.digitalpetri.modbus/modbus.svg)](https://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22com.digitalpetri.modbus%22%20AND%20a%3A%22modbus%22)
+
 High-performance, non-blocking, zero-buffer-copying Modbus for Java.
 
 Quick Start
