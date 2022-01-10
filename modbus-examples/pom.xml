@@ -26,6 +26,10 @@
 
     <artifactId>modbus-examples</artifactId>
 
+    <properties>
+        <javaModuleName>com.digitalpetri.modbus.examples</javaModuleName>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>com.digitalpetri.modbus</groupId>
