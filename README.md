@@ -62,7 +62,7 @@ Code     | Function
 Get Help
 --------
 
-See the examples project or contact kevinherron@gmail.com for more information.
+See the examples project or create a new post in [Discussions](https://github.com/digitalpetri/modbus/discussions/categories/q-a).
 
 
 License
