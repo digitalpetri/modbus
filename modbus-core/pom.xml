@@ -26,6 +26,10 @@
 
     <artifactId>modbus-core</artifactId>
 
+    <properties>
+        <javaModuleName>com.digitalpetri.modbus.core</javaModuleName>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>io.netty</groupId>

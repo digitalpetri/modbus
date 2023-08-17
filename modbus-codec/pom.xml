@@ -26,6 +26,10 @@
 
     <artifactId>modbus-codec</artifactId>
 
+    <properties>
+        <javaModuleName>com.digitalpetri.modbus.codec</javaModuleName>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>com.digitalpetri.modbus</groupId>
