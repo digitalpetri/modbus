@@ -40,13 +40,13 @@
         <dependency>
             <groupId>io.dropwizard.metrics</groupId>
             <artifactId>metrics-core</artifactId>
-            <version>3.1.2</version>
+            <version>3.1.5</version>
         </dependency>
 
         <dependency>
             <groupId>org.testng</groupId>
             <artifactId>testng</artifactId>
-            <version>7.7.0</version>
+            <version>7.5.1</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
