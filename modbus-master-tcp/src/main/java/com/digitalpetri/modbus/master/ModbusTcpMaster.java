@@ -260,8 +260,6 @@ public class ModbusTcpMaster {
 
         Bootstrap bootstrap = new Bootstrap();
 
-        config.getBootstrapConsumer().accept(bootstrap);
-
         bootstrap.group(config.getEventLoop())
             .channel(NioSocketChannel.class)
             .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) config.getTimeout().toMillis())
@@ -272,8 +270,11 @@ public class ModbusTcpMaster {
                     ch.pipeline().addLast(new ModbusTcpCodec(new ModbusRequestEncoder(), new ModbusResponseDecoder()));
                     ch.pipeline().addLast(new ModbusTcpMasterHandler(master));
                 }
-            })
-            .connect(config.getAddress(), config.getPort())
+            });
+
+        config.getBootstrapConsumer().accept(bootstrap);
+
+        bootstrap.connect(config.getAddress(), config.getPort())
             .addListener((ChannelFuture f) -> {
                 if (f.isSuccess()) {
                     future.complete(f.channel());
