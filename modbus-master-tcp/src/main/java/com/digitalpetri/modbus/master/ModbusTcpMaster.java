@@ -118,6 +118,15 @@ public class ModbusTcpMaster {
             .thenApply(v -> ModbusTcpMaster.this);
     }
 
+    /**
+     * Get whether the master is currently connected.
+     *
+     * @return {@code true} if the master is currently connected, {@code false} otherwise.
+     */
+    public boolean isConnected() {
+        return channelFsm.getState() == State.Connected;
+    }
+
     public <T extends ModbusResponse> CompletableFuture<T> sendRequest(ModbusRequest request, int unitId) {
         CompletableFuture<T> future = new CompletableFuture<>();
 
