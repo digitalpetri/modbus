@@ -33,12 +33,7 @@ import com.digitalpetri.modbus.responses.ExceptionResponse;
 import com.digitalpetri.modbus.responses.ModbusResponse;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.logging.LogLevel;
@@ -51,7 +46,8 @@ public class ModbusTcpSlave {
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
     private final AtomicReference<ServiceRequestHandler> requestHandler =
-        new AtomicReference<>(new ServiceRequestHandler() {});
+        new AtomicReference<>(new ServiceRequestHandler() {
+        });
 
     private final Map<SocketAddress, Channel> serverChannels = new ConcurrentHashMap<>();
 
@@ -92,7 +88,7 @@ public class ModbusTcpSlave {
         bootstrap.bind(host, port).addListener((ChannelFuture future) -> {
             if (future.isSuccess()) {
                 Channel channel = future.channel();
-                serverChannels.put(channel.localAddress(), channel);
+                putServerChannel(channel.localAddress(), channel);
                 bindFuture.complete(ModbusTcpSlave.this);
             } else {
                 bindFuture.completeExceptionally(future.cause());
@@ -109,6 +105,10 @@ public class ModbusTcpSlave {
     public void shutdown() {
         serverChannels.values().forEach(Channel::close);
         serverChannels.clear();
+    }
+
+    protected void putServerChannel(SocketAddress socketAddress, Channel channel) {
+        this.serverChannels.put(socketAddress, channel);
     }
 
     private void onChannelRead(ChannelHandlerContext ctx, ModbusTcpPayload payload) {
