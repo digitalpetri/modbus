@@ -75,7 +75,7 @@ public class ModbusTcpSlave {
 
                 channel.pipeline().addLast(new LoggingHandler(LogLevel.TRACE));
                 channel.pipeline().addLast(new ModbusTcpCodec(new ModbusResponseEncoder(), new ModbusRequestDecoder()));
-                channel.pipeline().addLast(new ModbusTcpSlaveHandler(ModbusTcpSlave.this));
+                channel.pipeline().addLast(newModbusTcpSlaveHandler());
 
                 channel.closeFuture().addListener(future -> channelCounter.dec());
             }
@@ -167,20 +167,24 @@ public class ModbusTcpSlave {
         }
     }
 
-    private void onChannelInactive(ChannelHandlerContext ctx) {
+    protected void onChannelInactive(ChannelHandlerContext ctx) {
         logger.debug("Master/client channel closed: {}", ctx.channel());
     }
 
-    private void onExceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+    protected void onExceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         logger.error("Exception caught on channel: {}", ctx.channel(), cause);
         ctx.close();
     }
 
-    private static class ModbusTcpSlaveHandler extends SimpleChannelInboundHandler<ModbusTcpPayload> {
+    protected ModbusTcpSlaveHandler newModbusTcpSlaveHandler() {
+        return new ModbusTcpSlaveHandler(this);
+    }
+
+    protected static class ModbusTcpSlaveHandler extends SimpleChannelInboundHandler<ModbusTcpPayload> {
 
         private final ModbusTcpSlave slave;
 
-        private ModbusTcpSlaveHandler(ModbusTcpSlave slave) {
+        protected ModbusTcpSlaveHandler(ModbusTcpSlave slave) {
             this.slave = slave;
         }
 
@@ -201,7 +205,7 @@ public class ModbusTcpSlave {
 
     }
 
-    private static class ModbusTcpServiceRequest<Request extends ModbusRequest, Response extends ModbusResponse>
+    protected static class ModbusTcpServiceRequest<Request extends ModbusRequest, Response extends ModbusResponse>
         implements ServiceRequestHandler.ServiceRequest<Request, Response> {
 
         private final short transactionId;
