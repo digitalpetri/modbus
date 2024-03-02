@@ -46,8 +46,7 @@ public class ModbusTcpSlave {
     private final Logger logger = LoggerFactory.getLogger(getClass());
 
     private final AtomicReference<ServiceRequestHandler> requestHandler =
-        new AtomicReference<>(new ServiceRequestHandler() {
-        });
+        new AtomicReference<>(new ServiceRequestHandler() {});
 
     private final Map<SocketAddress, Channel> serverChannels = new ConcurrentHashMap<>();
 
