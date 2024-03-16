@@ -33,12 +33,7 @@ import com.digitalpetri.modbus.responses.ExceptionResponse;
 import com.digitalpetri.modbus.responses.ModbusResponse;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.PooledByteBufAllocator;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.logging.LogLevel;
@@ -75,7 +70,7 @@ public class ModbusTcpSlave {
 
                 channel.pipeline().addLast(new LoggingHandler(LogLevel.TRACE));
                 channel.pipeline().addLast(new ModbusTcpCodec(new ModbusResponseEncoder(), new ModbusRequestDecoder()));
-                channel.pipeline().addLast(new ModbusTcpSlaveHandler(ModbusTcpSlave.this));
+                channel.pipeline().addLast(newModbusTcpSlaveHandler());
 
                 channel.closeFuture().addListener(future -> channelCounter.dec());
             }
@@ -92,7 +87,7 @@ public class ModbusTcpSlave {
         bootstrap.bind(host, port).addListener((ChannelFuture future) -> {
             if (future.isSuccess()) {
                 Channel channel = future.channel();
-                serverChannels.put(channel.localAddress(), channel);
+                putServerChannel(channel.localAddress(), channel);
                 bindFuture.complete(ModbusTcpSlave.this);
             } else {
                 bindFuture.completeExceptionally(future.cause());
@@ -109,6 +104,10 @@ public class ModbusTcpSlave {
     public void shutdown() {
         serverChannels.values().forEach(Channel::close);
         serverChannels.clear();
+    }
+
+    protected void putServerChannel(SocketAddress socketAddress, Channel channel) {
+        this.serverChannels.put(socketAddress, channel);
     }
 
     private void onChannelRead(ChannelHandlerContext ctx, ModbusTcpPayload payload) {
@@ -167,20 +166,24 @@ public class ModbusTcpSlave {
         }
     }
 
-    private void onChannelInactive(ChannelHandlerContext ctx) {
+    protected void onChannelInactive(ChannelHandlerContext ctx) {
         logger.debug("Master/client channel closed: {}", ctx.channel());
     }
 
-    private void onExceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+    protected void onExceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         logger.error("Exception caught on channel: {}", ctx.channel(), cause);
         ctx.close();
     }
 
-    private static class ModbusTcpSlaveHandler extends SimpleChannelInboundHandler<ModbusTcpPayload> {
+    protected ModbusTcpSlaveHandler newModbusTcpSlaveHandler() {
+        return new ModbusTcpSlaveHandler(this);
+    }
+
+    protected static class ModbusTcpSlaveHandler extends SimpleChannelInboundHandler<ModbusTcpPayload> {
 
         private final ModbusTcpSlave slave;
 
-        private ModbusTcpSlaveHandler(ModbusTcpSlave slave) {
+        protected ModbusTcpSlaveHandler(ModbusTcpSlave slave) {
             this.slave = slave;
         }
 
