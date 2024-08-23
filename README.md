@@ -1,71 +1,90 @@
 [![Maven Central](https://img.shields.io/maven-central/v/com.digitalpetri.modbus/modbus.svg)](https://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22com.digitalpetri.modbus%22%20AND%20a%3A%22modbus%22)
 
-High-performance, non-blocking, zero-buffer-copying Modbus for Java.
+A modern, performant, easy to use client and server implementation of Modbus TCP, Modbus RTU/TCP, and Modbus RTU/Serial for Java 17+.
 
-Quick Start
---------
+### Quick Start Examples
+
+#### Modbus TCP Client
 ```java
-ModbusTcpMasterConfig config = new ModbusTcpMasterConfig.Builder("localhost").build();
-ModbusTcpMaster master = new ModbusTcpMaster(config);
-
-master.connect();
-
-CompletableFuture<ReadHoldingRegistersResponse> future =
-    master.sendRequest(new ReadHoldingRegistersRequest(0, 10), 0);
-
-future.thenAccept(response -> {
-    System.out.println("Response: " + ByteBufUtil.hexDump(response.getRegisters()));
-
-    ReferenceCountUtil.release(response);
+var transport = NettyTcpClientTransport.create(cfg -> {
+  cfg.hostname = "172.17.0.2";
+  cfg.port = 502;
 });
+
+var client = ModbusTcpClient.create(transport);
+client.connect();
+
+ReadHoldingRegistersResponse response = client.readHoldingRegisters(
+    1,
+    new ReadHoldingRegistersRequest(0, 10)
+);
+
+System.out.println("Response: " + response);
 ```
 
-See the examples project for more.
+#### Modbus RTU/Serial Client
+```java
+var transport = SerialPortClientTransport.create(cfg -> {
+  cfg.serialPort = "/dev/ttyUSB0";
+  cfg.baudRate = 115200;
+  cfg.dataBits = 8;
+  cfg.parity = SerialPort.NO_PARITY;
+  cfg.stopBits = SerialPort.ONE_STOP_BIT;
+});
 
-Maven
---------
+var client = ModbusRtuClient.create(transport);
+client.connect();
 
-#### Modbus Master
+client.readHoldingRegisters(
+    1,
+    new ReadHoldingRegistersRequest(0, 10)
+);
+
+System.out.println("Response: " + response);
+```
+
+### Maven
+
+#### Modbus TCP
 
 ```xml
 <dependency>
     <groupId>com.digitalpetri.modbus</groupId>
-    <artifactId>modbus-master-tcp</artifactId>
-    <version>1.2.2</version>
+    <artifactId>modbus-tcp</artifactId>
+    <version>2.0.0-SNAPSHOT</version>
 </dependency>
 ```
 
-#### Modbus Slave
+#### Modbus Serial
 ```xml
 <dependency>
     <groupId>com.digitalpetri.modbus</groupId>
-    <artifactId>modbus-slave-tcp</artifactId>
-    <version>1.2.2</version>
+    <artifactId>modbus-serial</artifactId>
+    <version>2.0.0-SNAPSHOT</version>
 </dependency>
 ```
-  
-Supported Function Codes
--------
-Code     | Function
--------- | ----
-0x01     | Read Coils
-0x02     | Read Discrete Inputs
-0x03     | Read Holding Registers
-0x04     | Read Input Registers
-0x05     | Write Single Coil
-0x06     | Write Single Register
-0x0F     | Write Multiple Coils
-0x10     | Write Multiple Registers
-0x16     | Mask Write Register
-0x17     | Read/Write Multiple Registers
 
-Get Help
---------
+### Features
 
-See the examples project or create a new post in [Discussions](https://github.com/digitalpetri/modbus/discussions/categories/q-a).
+#### Supported Function Codes
+Code     | Function | Client | Server
+-------- | -------- | ------ | ------
+0x01     | Read Coils | ✅ | ✅
+0x02     | Read Discrete Inputs | ✅ | ✅
+0x03     | Read Holding Registers | ✅ | ✅
+0x04     | Read Input Registers | ✅ | ✅
+0x05     | Write Single Coil | ✅ | ✅
+0x06     | Write Single Register | ✅ | ✅
+0x0F     | Write Multiple Coils | ✅ | ✅
+0x10     | Write Multiple Registers | ✅ | ✅
+0x16     | Mask Write Register | ✅ | ✅
+0x17     | Read/Write Multiple Registers | ✅ | ✅
 
+- raw/custom PDUs on Modbus/TCP
+- broadcast messages on Modbus/RTU
+- pluggable codec implementations
+- pluggable transport implementations
 
-License
---------
+### License
 
-Apache License, Version 2.0
+Eclipse Public License - v 2.0
