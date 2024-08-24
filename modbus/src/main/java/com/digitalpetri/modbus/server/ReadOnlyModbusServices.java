@@ -124,7 +124,7 @@ public abstract class ReadOnlyModbusServices implements ModbusServices {
     };
   }
 
-  private static Function<Map<Integer, byte[]>, byte[]> readRegisters(int address, int quantity) {
+  protected static Function<Map<Integer, byte[]>, byte[]> readRegisters(int address, int quantity) {
     final var registers = new byte[quantity * 2];
 
     return registerMap -> {

@@ -15,6 +15,8 @@ import com.digitalpetri.modbus.pdu.ReadHoldingRegistersRequest;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersResponse;
 import com.digitalpetri.modbus.pdu.ReadInputRegistersRequest;
 import com.digitalpetri.modbus.pdu.ReadInputRegistersResponse;
+import com.digitalpetri.modbus.pdu.ReadWriteMultipleRegistersRequest;
+import com.digitalpetri.modbus.pdu.ReadWriteMultipleRegistersResponse;
 import com.digitalpetri.modbus.pdu.WriteMultipleCoilsRequest;
 import com.digitalpetri.modbus.pdu.WriteMultipleCoilsResponse;
 import com.digitalpetri.modbus.pdu.WriteMultipleRegistersRequest;
@@ -597,6 +599,56 @@ public abstract class ModbusClient {
 
     return sendAsync(unitId, request)
         .thenApply(MaskWriteRegisterResponse.class::cast);
+  }
+
+  //endregion
+
+  //region ReadWriteMultipleRegisters (0x17)
+
+  /**
+   * Send a {@link ReadWriteMultipleRegistersRequest} (FC 0x17) to the remote device identified by
+   * {@code unitId}.
+   *
+   * @param unitId the remote device unit id.
+   * @param request the {@link ReadWriteMultipleRegistersRequest}.
+   * @return the {@link ReadWriteMultipleRegistersResponse}.
+   * @throws ModbusExecutionException if any unexpected execution error occurs.
+   * @throws ModbusResponseException if the remote device responds with an error.
+   * @throws ModbusTimeoutException if the request times out.
+   */
+  public ReadWriteMultipleRegistersResponse readWriteMultipleRegisters(
+      int unitId,
+      ReadWriteMultipleRegistersRequest request
+  ) throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
+
+    ModbusResponsePdu response = send(unitId, request);
+
+    if (response instanceof ReadWriteMultipleRegistersResponse r) {
+      return r;
+    } else {
+      throw new ModbusExecutionException(
+          "unexpected response: 0x%02X"
+              .formatted(response.getFunctionCode())
+      );
+    }
+  }
+
+  /**
+   * Send a {@link ReadWriteMultipleRegistersRequest} (FC 0x17) to the remote device identified by
+   * {@code unitId}.
+   *
+   * @param unitId the remote device unit id.
+   * @param request the {@link ReadWriteMultipleRegistersRequest}.
+   * @return a {@link CompletionStage} that completes successfully with the
+   *     {@link ReadWriteMultipleRegistersResponse}, or completes exceptionally if an error occurs.
+   */
+  public CompletionStage<ReadWriteMultipleRegistersResponse> readWriteMultipleRegistersAsync(
+      int unitId,
+      ReadWriteMultipleRegistersRequest request
+  ) {
+
+    return sendAsync(unitId, request)
+        .thenApply(ReadWriteMultipleRegistersResponse.class::cast);
   }
 
   //endregion

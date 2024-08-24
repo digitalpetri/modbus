@@ -104,6 +104,21 @@ public class ModbusRtuRequestFrameParser {
           }
         }
 
+        case 0x17 -> {
+          int minimum = 1 + (1 + 2 + 2 + 2 + 1 + 2) + 2;
+          if (readableBytes >= minimum) {
+            int byteCount = buffer.get(10);
+            if (readableBytes >= minimum + byteCount) {
+              ModbusRtuFrame frame = readFrame(buffer.flip(), minimum + byteCount);
+              return new Accumulated(frame);
+            } else {
+              return new Accumulating(buffer, minimum + byteCount);
+            }
+          } else {
+            return new Accumulating(buffer, minimum);
+          }
+        }
+
         default -> {
           return new ParseError(buffer, "unsupported function code: 0x%02X".formatted(fcb));
         }

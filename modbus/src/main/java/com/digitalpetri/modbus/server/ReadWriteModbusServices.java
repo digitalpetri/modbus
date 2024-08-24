@@ -3,6 +3,8 @@ package com.digitalpetri.modbus.server;
 import com.digitalpetri.modbus.exceptions.UnknownUnitIdException;
 import com.digitalpetri.modbus.pdu.MaskWriteRegisterRequest;
 import com.digitalpetri.modbus.pdu.MaskWriteRegisterResponse;
+import com.digitalpetri.modbus.pdu.ReadWriteMultipleRegistersRequest;
+import com.digitalpetri.modbus.pdu.ReadWriteMultipleRegistersResponse;
 import com.digitalpetri.modbus.pdu.WriteMultipleCoilsRequest;
 import com.digitalpetri.modbus.pdu.WriteMultipleCoilsResponse;
 import com.digitalpetri.modbus.pdu.WriteMultipleRegistersRequest;
@@ -158,6 +160,43 @@ public abstract class ReadWriteModbusServices
     }));
 
     return new MaskWriteRegisterResponse(address, andMask, orMask);
+  }
+
+  @Override
+  public ReadWriteMultipleRegistersResponse readWriteMultipleRegisters(
+      ModbusRequestContext context,
+      int unitId,
+      ReadWriteMultipleRegistersRequest request
+  ) throws UnknownUnitIdException {
+
+    ProcessImage processImage = getProcessImage(unitId)
+        .orElseThrow(() -> new UnknownUnitIdException(unitId));
+
+    final int readAddress = request.readAddress();
+    final int readQuantity = request.readQuantity();
+    final int writeAddress = request.writeAddress();
+    final int writeQuantity = request.writeQuantity();
+    final byte[] values = request.values();
+
+    byte[] registers = processImage.get(tx -> {
+      tx.writeHoldingRegisters(registerMap -> {
+        for (int i = 0; i < writeQuantity; i++) {
+          byte high = values[i * 2];
+          byte low = values[i * 2 + 1];
+
+          if (high == 0 && low == 0) {
+            registerMap.remove(writeAddress + i);
+          } else {
+            byte[] value = new byte[]{high, low};
+            registerMap.put(writeAddress + i, value);
+          }
+        }
+      });
+
+      return tx.readHoldingRegisters(readRegisters(readAddress, readQuantity));
+    });
+
+    return new ReadWriteMultipleRegistersResponse(registers);
   }
 
 }

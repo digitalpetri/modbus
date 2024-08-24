@@ -3,6 +3,8 @@ package com.digitalpetri.modbus.server;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.digitalpetri.modbus.pdu.MaskWriteRegisterRequest;
+import com.digitalpetri.modbus.pdu.ReadWriteMultipleRegistersRequest;
+import com.digitalpetri.modbus.pdu.ReadWriteMultipleRegistersResponse;
 import com.digitalpetri.modbus.pdu.WriteMultipleCoilsRequest;
 import com.digitalpetri.modbus.pdu.WriteMultipleRegistersRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleCoilRequest;
@@ -186,6 +188,48 @@ public class ReadWriteModbusServicesTest {
         byte[] registerBytes = registerMap.getOrDefault(i, new byte[2]);
         short registerValue = (short) ((registerBytes[0] & 0xFF) << 8 | (registerBytes[1] & 0xFF));
         assertEquals(expectedValues[i], registerValue);
+      }
+      return null;
+    }));
+  }
+
+  @Test
+  void readWriteMultipleRegisters() throws Exception {
+    var randomBytes = new byte[65536 * 2];
+    random.nextBytes(randomBytes);
+
+    int address = 0;
+    int remaining = 65536;
+    int quantity = Math.min(remaining - address, random.nextInt(0x79) + 1);
+
+    while (remaining > 0) {
+      var values = new byte[quantity * 2];
+
+      ReadWriteMultipleRegistersResponse response = services.readWriteMultipleRegisters(
+          new TestModbusRequestContext(),
+          0,
+          new ReadWriteMultipleRegistersRequest(address, quantity, address, quantity, values)
+      );
+
+      byte[] registers = response.registers();
+      for (byte register : registers) {
+        assertEquals(0, register);
+      }
+
+      address += quantity;
+      remaining -= quantity;
+      quantity = Math.min(remaining, random.nextInt(123) + 1);
+    }
+
+    // the above wrote zero to all the randomly initialized registers
+    processImage.with(tx -> tx.readHoldingRegisters(holdingRegisterMap -> {
+      for (int i = 0; i < 65536; i++) {
+        byte[] registerBytes = holdingRegisterMap.getOrDefault(i, new byte[2]);
+        byte b0 = registerBytes[0];
+        byte b1 = registerBytes[1];
+
+        assertEquals(0, b0);
+        assertEquals(0, b1);
       }
       return null;
     }));

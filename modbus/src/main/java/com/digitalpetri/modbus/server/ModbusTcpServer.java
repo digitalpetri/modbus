@@ -5,7 +5,6 @@ import com.digitalpetri.modbus.FunctionCode;
 import com.digitalpetri.modbus.MbapHeader;
 import com.digitalpetri.modbus.ModbusTcpFrame;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
-import com.digitalpetri.modbus.exceptions.UnknownUnitIdException;
 import com.digitalpetri.modbus.pdu.MaskWriteRegisterRequest;
 import com.digitalpetri.modbus.pdu.ModbusRequestPdu;
 import com.digitalpetri.modbus.pdu.ModbusResponsePdu;
@@ -13,6 +12,7 @@ import com.digitalpetri.modbus.pdu.ReadCoilsRequest;
 import com.digitalpetri.modbus.pdu.ReadDiscreteInputsRequest;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersRequest;
 import com.digitalpetri.modbus.pdu.ReadInputRegistersRequest;
+import com.digitalpetri.modbus.pdu.ReadWriteMultipleRegistersRequest;
 import com.digitalpetri.modbus.pdu.WriteMultipleCoilsRequest;
 import com.digitalpetri.modbus.pdu.WriteMultipleRegistersRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleCoilRequest;
@@ -159,6 +159,13 @@ public class ModbusTcpServer implements ModbusServer {
             yield services.maskWriteRegister(context, unitId, request);
           } else {
             throw new IllegalArgumentException("expected MaskWriteRegisterRequest");
+          }
+        }
+        case READ_WRITE_MULTIPLE_REGISTERS -> {
+          if (requestPdu instanceof ReadWriteMultipleRegistersRequest request) {
+            yield services.readWriteMultipleRegisters(context, unitId, request);
+          } else {
+            throw new IllegalArgumentException("expected ReadWriteMultipleRegistersRequest");
           }
         }
         default -> throw new ModbusResponseException(requestPdu.getFunctionCode(),

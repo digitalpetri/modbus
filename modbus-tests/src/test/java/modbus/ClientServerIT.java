@@ -16,6 +16,8 @@ import com.digitalpetri.modbus.pdu.ReadHoldingRegistersRequest;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersResponse;
 import com.digitalpetri.modbus.pdu.ReadInputRegistersRequest;
 import com.digitalpetri.modbus.pdu.ReadInputRegistersResponse;
+import com.digitalpetri.modbus.pdu.ReadWriteMultipleRegistersRequest;
+import com.digitalpetri.modbus.pdu.ReadWriteMultipleRegistersResponse;
 import com.digitalpetri.modbus.pdu.WriteMultipleCoilsRequest;
 import com.digitalpetri.modbus.pdu.WriteMultipleCoilsResponse;
 import com.digitalpetri.modbus.pdu.WriteMultipleRegistersRequest;
@@ -127,6 +129,18 @@ public abstract class ClientServerIT {
     assertEquals(0, response.address());
     assertEquals(0xFF00, response.andMask());
     assertEquals(0x00FF, response.orMask());
+  }
+
+  @Test
+  void readWriteMultipleRegisters() throws Exception {
+    ReadWriteMultipleRegistersResponse response = getClient().readWriteMultipleRegisters(
+        1,
+        new ReadWriteMultipleRegistersRequest(0, 1, 0, 1, new byte[]{0x12, 0x34})
+    );
+
+    byte[] registers = response.registers();
+    assertEquals(0x12, registers[0]);
+    assertEquals(0x34, registers[1]);
   }
 
   @Test

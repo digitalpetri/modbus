@@ -76,7 +76,7 @@ public class ModbusRtuResponseFrameParser {
       byte fcb = buffer.get(1);
 
       switch (fcb & 0xFF) {
-        case 0x01, 0x02, 0x03, 0x04 -> {
+        case 0x01, 0x02, 0x03, 0x04, 0x17 -> {
           int count = buffer.get(2) & 0xFF;
           int calculatedLength = count + 5;
 
