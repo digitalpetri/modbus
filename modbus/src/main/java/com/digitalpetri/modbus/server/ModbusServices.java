@@ -14,6 +14,8 @@ import com.digitalpetri.modbus.pdu.ReadHoldingRegistersRequest;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersResponse;
 import com.digitalpetri.modbus.pdu.ReadInputRegistersRequest;
 import com.digitalpetri.modbus.pdu.ReadInputRegistersResponse;
+import com.digitalpetri.modbus.pdu.ReadWriteMultipleRegistersRequest;
+import com.digitalpetri.modbus.pdu.ReadWriteMultipleRegistersResponse;
 import com.digitalpetri.modbus.pdu.WriteMultipleCoilsRequest;
 import com.digitalpetri.modbus.pdu.WriteMultipleCoilsResponse;
 import com.digitalpetri.modbus.pdu.WriteMultipleRegistersRequest;
@@ -210,6 +212,27 @@ public interface ModbusServices {
   ) throws ModbusResponseException, UnknownUnitIdException {
 
     throw new ModbusResponseException(FunctionCode.MASK_WRITE_REGISTER,
+        ExceptionCode.ILLEGAL_FUNCTION);
+  }
+
+  /**
+   * Handle an incoming {@link ReadWriteMultipleRegistersRequest} targeting {@code unitId}.
+   *
+   * @param context the {@link ModbusRequestContext} for the request.
+   * @param unitId the unit id being targeted.
+   * @param request the {@link ReadWriteMultipleRegistersRequest} to handle.
+   * @return a {@link ReadWriteMultipleRegistersResponse}.
+   * @throws ModbusResponseException if there is an error handling the request that can be
+   *     reported by an {@link ExceptionCode}.
+   * @throws UnknownUnitIdException if the unit id is not known to this server.
+   */
+  default ReadWriteMultipleRegistersResponse readWriteMultipleRegisters(
+      ModbusRequestContext context,
+      int unitId,
+      ReadWriteMultipleRegistersRequest request
+  ) throws ModbusResponseException, UnknownUnitIdException {
+
+    throw new ModbusResponseException(FunctionCode.READ_WRITE_MULTIPLE_REGISTERS,
         ExceptionCode.ILLEGAL_FUNCTION);
   }
 

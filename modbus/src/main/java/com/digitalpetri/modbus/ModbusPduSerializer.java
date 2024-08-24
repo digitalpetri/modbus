@@ -12,6 +12,8 @@ import com.digitalpetri.modbus.pdu.ReadHoldingRegistersRequest;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersResponse;
 import com.digitalpetri.modbus.pdu.ReadInputRegistersRequest;
 import com.digitalpetri.modbus.pdu.ReadInputRegistersResponse;
+import com.digitalpetri.modbus.pdu.ReadWriteMultipleRegistersRequest;
+import com.digitalpetri.modbus.pdu.ReadWriteMultipleRegistersResponse;
 import com.digitalpetri.modbus.pdu.WriteMultipleCoilsRequest;
 import com.digitalpetri.modbus.pdu.WriteMultipleCoilsResponse;
 import com.digitalpetri.modbus.pdu.WriteMultipleRegistersRequest;
@@ -120,6 +122,13 @@ public interface ModbusPduSerializer {
             throw new IllegalArgumentException("expected MaskWriteRegisterRequest");
           }
         }
+        case 0x17 -> {
+          if (pdu instanceof ReadWriteMultipleRegistersRequest request) {
+            ReadWriteMultipleRegistersRequest.Serializer.encode(request, buffer);
+          } else {
+            throw new IllegalArgumentException("expected ReadWriteMultipleRegistersRequest");
+          }
+        }
         default -> throw new ModbusException(
             "no serializer for functionCode=0x%02X"
                 .formatted(pdu.getFunctionCode())
@@ -139,6 +148,7 @@ public interface ModbusPduSerializer {
         case 0x0F -> WriteMultipleCoilsRequest.Serializer.decode(buffer);
         case 0x10 -> WriteMultipleRegistersRequest.Serializer.decode(buffer);
         case 0x16 -> MaskWriteRegisterRequest.Serializer.decode(buffer);
+        case 0x17 -> ReadWriteMultipleRegistersRequest.Serializer.decode(buffer);
         default -> throw new ModbusException(
             "no serializer for functionCode=0x%02X"
                 .formatted(functionCode)
@@ -224,6 +234,13 @@ public interface ModbusPduSerializer {
             throw new IllegalArgumentException("expected MaskWriteRegisterResponse");
           }
         }
+        case 0x17 -> {
+          if (pdu instanceof ReadWriteMultipleRegistersResponse response) {
+            ReadWriteMultipleRegistersResponse.Serializer.encode(response, buffer);
+          } else {
+            throw new IllegalArgumentException("expected ReadWriteMultipleRegistersResponse");
+          }
+        }
         default -> throw new ModbusException(
             "no serializer for functionCode=0x%02X"
                 .formatted(pdu.getFunctionCode())
@@ -243,6 +260,7 @@ public interface ModbusPduSerializer {
         case 0x0F -> WriteMultipleCoilsResponse.Serializer.decode(buffer);
         case 0x10 -> WriteMultipleRegistersResponse.Serializer.decode(buffer);
         case 0x16 -> MaskWriteRegisterResponse.Serializer.decode(buffer);
+        case 0x17 -> ReadWriteMultipleRegistersResponse.Serializer.decode(buffer);
         default -> throw new ModbusException(
             "no serializer for functionCode=0x%02X"
                 .formatted(functionCode)
