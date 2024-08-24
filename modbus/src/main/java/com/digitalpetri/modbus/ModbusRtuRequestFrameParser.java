@@ -105,7 +105,7 @@ public class ModbusRtuRequestFrameParser {
         }
 
         case 0x17 -> {
-          int minimum = 1 + (1 + 2 + 2 + 2 + 1 + 2) + 2;
+          int minimum = 1 + (1 + 2 + 2 + 2 + 2 + 1) + 2;
           if (readableBytes >= minimum) {
             int byteCount = buffer.get(10);
             if (readableBytes >= minimum + byteCount) {
