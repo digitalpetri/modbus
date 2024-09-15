@@ -19,7 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,17 +33,27 @@ public class ModbusTcpClient extends ModbusClient {
 
   private final Logger logger = LoggerFactory.getLogger(getClass());
 
-  private final TransactionSequence transactionSequence = new TransactionSequence();
   private final Map<Integer, ResponsePromise> promises = new ConcurrentHashMap<>();
 
-  private final ModbusTcpClientTransport transport;
   private final ModbusClientConfig config;
+  private final ModbusTcpClientTransport transport;
+  private final TransactionSequence transactionSequence;
 
   public ModbusTcpClient(ModbusClientConfig config, ModbusTcpClientTransport transport) {
+    this(config, transport, new DefaultTransactionSequence());
+  }
+
+  public ModbusTcpClient(
+      ModbusClientConfig config,
+      ModbusTcpClientTransport transport,
+      TransactionSequence transactionSequence
+  ) {
+
     super(transport);
 
     this.config = config;
     this.transport = transport;
+    this.transactionSequence = transactionSequence;
 
     transport.receive(this::onFrameReceived);
   }
@@ -224,12 +234,44 @@ public class ModbusTcpClient extends ModbusClient {
       TimeoutHandle timeout
   ) {}
 
-  static class TransactionSequence {
+  public interface TransactionSequence {
 
-    private final AtomicInteger transactionId = new AtomicInteger(0);
+    /**
+     * Return the next 2-byte transaction identifier. Range is [0, 65535] by default.
+     *
+     * @return the next 2-byte transaction identifier.
+     */
+    int next();
+  }
 
-    int next() {
-      return transactionId.getAndIncrement() & 0xFFFF;
+  public static class DefaultTransactionSequence implements TransactionSequence {
+
+    private final int low;
+    private final int high;
+
+    private final AtomicReference<Integer> transactionId = new AtomicReference<>(0);
+
+    public DefaultTransactionSequence() {
+      this(0, 65535);
+    }
+
+    public DefaultTransactionSequence(int low, int high) {
+      this.low = low;
+      this.high = high;
+
+      transactionId.set(low);
+    }
+
+    @Override
+    public int next() {
+      while (true) {
+        Integer id = transactionId.get();
+        Integer nextId = id >= high ? low : id + 1;
+
+        if (transactionId.compareAndSet(id, nextId)) {
+          return id;
+        }
+      }
     }
 
   }

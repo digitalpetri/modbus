@@ -2,14 +2,14 @@ package com.digitalpetri.modbus.client;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-import com.digitalpetri.modbus.client.ModbusTcpClient.TransactionSequence;
+import com.digitalpetri.modbus.client.ModbusTcpClient.DefaultTransactionSequence;
 import org.junit.jupiter.api.Test;
 
-class TransactionSequenceTest {
+class DefaultTransactionSequenceTest {
 
   @Test
   void rollover() {
-    TransactionSequence sequence = new TransactionSequence();
+    DefaultTransactionSequence sequence = new DefaultTransactionSequence();
 
     // Assert that transactions are generated in the range [0, 65535]
     // and that they roll over back to 0.
