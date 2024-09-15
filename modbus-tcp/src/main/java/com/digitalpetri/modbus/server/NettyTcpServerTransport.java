@@ -73,12 +73,16 @@ public class NettyTcpServerTransport implements ModbusTcpServerTransport {
                 })
                 .addLast(new ModbusTcpCodec())
                 .addLast(new ModbusTcpFrameHandler());
+
+            config.pipelineCustomizer().accept(ch.pipeline());
           }
         });
 
     bootstrap.group(config.eventLoopGroup());
     bootstrap.option(ChannelOption.SO_REUSEADDR, Boolean.TRUE);
     bootstrap.childOption(ChannelOption.TCP_NODELAY, Boolean.TRUE);
+
+    config.bootstrapCustomizer().accept(bootstrap);
 
     bootstrap.bind(config.bindAddress(), config.port())
         .addListener((ChannelFutureListener) channelFuture -> {

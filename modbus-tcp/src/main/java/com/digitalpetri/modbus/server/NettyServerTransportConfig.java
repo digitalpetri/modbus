@@ -2,6 +2,8 @@ package com.digitalpetri.modbus.server;
 
 import com.digitalpetri.modbus.Modbus;
 import com.digitalpetri.modbus.Netty;
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
@@ -13,12 +15,18 @@ import java.util.function.Consumer;
  * @param port the port to bind to.
  * @param eventLoopGroup the {@link EventLoopGroup} to use.
  * @param executor the {@link ExecutorService} to use.
+ * @param bootstrapCustomizer a {@link Consumer} that can be used to customize the Netty
+ *     {@link ServerBootstrap}.
+ * @param pipelineCustomizer a {@link Consumer} that can be used to customize the Netty
+ *     {@link ChannelPipeline}.
  */
 public record NettyServerTransportConfig(
     String bindAddress,
     int port,
     EventLoopGroup eventLoopGroup,
-    ExecutorService executor
+    ExecutorService executor,
+    Consumer<ServerBootstrap> bootstrapCustomizer,
+    Consumer<ChannelPipeline> pipelineCustomizer
 ) {
 
   /**
@@ -56,6 +64,16 @@ public record NettyServerTransportConfig(
      */
     public ExecutorService executor;
 
+    /**
+     * A {@link Consumer} that can be used to customize the Netty {@link ServerBootstrap}.
+     */
+    public Consumer<ServerBootstrap> bootstrapCustomizer = b -> {};
+
+    /**
+     * A {@link Consumer} that can be used to customize the Netty {@link ChannelPipeline}.
+     */
+    public Consumer<ChannelPipeline> pipelineCustomizer = p -> {};
+
     public NettyServerTransportConfig build() {
       if (eventLoopGroup == null) {
         eventLoopGroup = Netty.sharedEventLoop();
@@ -68,7 +86,9 @@ public record NettyServerTransportConfig(
           bindAddress,
           port,
           eventLoopGroup,
-          executor
+          executor,
+          bootstrapCustomizer,
+          pipelineCustomizer
       );
     }
   }

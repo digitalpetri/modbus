@@ -72,6 +72,8 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
                     }
                   })
                   .addLast(new ModbusRtuServerFrameReceiver());
+
+              config.pipelineCustomizer().accept(ch.pipeline());
             } else {
               ch.close();
             }
@@ -81,6 +83,8 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
     bootstrap.group(config.eventLoopGroup());
     bootstrap.option(ChannelOption.SO_REUSEADDR, Boolean.TRUE);
     bootstrap.childOption(ChannelOption.TCP_NODELAY, Boolean.TRUE);
+
+    config.bootstrapCustomizer().accept(bootstrap);
 
     bootstrap.bind(config.bindAddress(), config.port())
         .addListener((ChannelFutureListener) channelFuture -> {
