@@ -7,6 +7,7 @@ import com.digitalpetri.modbus.internal.util.ExecutionQueue;
 import com.digitalpetri.modbus.tcp.ModbusTcpCodec;
 import com.digitalpetri.netty.fsm.ChannelActions;
 import com.digitalpetri.netty.fsm.ChannelFsm;
+import com.digitalpetri.netty.fsm.ChannelFsm.TransitionListener;
 import com.digitalpetri.netty.fsm.ChannelFsmConfig;
 import com.digitalpetri.netty.fsm.ChannelFsmFactory;
 import com.digitalpetri.netty.fsm.Event;
@@ -65,16 +66,24 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
         (from, to, via) -> {
           logger.debug("onStateTransition: {} -> {} via {}", from, to, via);
 
-          executionQueue.submit(() -> handleStateTransition(from, to, via));
+          maybeNotifyConnectionListeners(from, to);
         }
     );
   }
 
-  private void handleStateTransition(State from, State to, Event via) {
+  private void maybeNotifyConnectionListeners(State from, State to) {
+    if (connectionListeners.isEmpty()) {
+      return;
+    }
+
     if (from != State.Connected && to == State.Connected) {
-      connectionListeners.forEach(ConnectionListener::onConnection);
+      executionQueue.submit(() ->
+          connectionListeners.forEach(ConnectionListener::onConnection)
+      );
     } else if (from == State.Connected && to != State.Connected) {
-      connectionListeners.forEach(ConnectionListener::onConnectionLost);
+      executionQueue.submit(() ->
+          connectionListeners.forEach(ConnectionListener::onConnectionLost)
+      );
     }
   }
 
@@ -113,6 +122,18 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
   @Override
   public boolean isConnected() {
     return channelFsm.getState() == State.Connected;
+  }
+
+  /**
+   * Get the {@link ChannelFsm} used by this transport.
+   *
+   * <p>This should not generally be used by client code except perhaps to add a
+   * {@link TransitionListener} to receive more detailed callbacks about the connection status.
+   *
+   * @return the {@link ChannelFsm} used by this transport.
+   */
+  public ChannelFsm getChannelFsm() {
+    return channelFsm;
   }
 
   /**
