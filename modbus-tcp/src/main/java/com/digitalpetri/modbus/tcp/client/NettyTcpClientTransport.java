@@ -223,7 +223,7 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
     /**
      * Callback invoked when the transport has disconnected.
      *
-     * <p> Note that implementations do not need to initiate a reconnect, as this is handled
+     * <p>Note that implementations do not need to initiate a reconnect, as this is handled
      * automatically by {@link NettyTcpClientTransport}.
      */
     void onConnectionLost();
