@@ -20,8 +20,10 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
@@ -36,6 +38,8 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
   private final Logger logger = LoggerFactory.getLogger(getClass());
 
   private final AtomicReference<Consumer<ModbusTcpFrame>> frameReceiver = new AtomicReference<>();
+
+  private final List<ConnectionListener> connectionListeners = new CopyOnWriteArrayList<>();
 
   private final ChannelFsm channelFsm;
   private final ExecutionQueue executionQueue;
@@ -55,12 +59,23 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
             .build()
     );
 
-    channelFsm.addTransitionListener(
-        (from, to, via) ->
-            logger.debug("onStateTransition: {} -> {} via {}", from, to, via)
-    );
-
     executionQueue = new ExecutionQueue(config.executor());
+
+    channelFsm.addTransitionListener(
+        (from, to, via) -> {
+          logger.debug("onStateTransition: {} -> {} via {}", from, to, via);
+
+          executionQueue.submit(() -> handleStateTransition(from, to, via));
+        }
+    );
+  }
+
+  private void handleStateTransition(State from, State to, Event via) {
+    if (from != State.Connected && to == State.Connected) {
+      connectionListeners.forEach(ConnectionListener::onConnection);
+    } else if (from == State.Connected && to != State.Connected) {
+      connectionListeners.forEach(ConnectionListener::onConnectionLost);
+    }
   }
 
   @Override
@@ -98,6 +113,24 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
   @Override
   public boolean isConnected() {
     return channelFsm.getState() == State.Connected;
+  }
+
+  /**
+   * Add a {@link ConnectionListener} to this transport.
+   *
+   * @param listener the listener to add.
+   */
+  public void addConnectionListener(ConnectionListener listener) {
+    connectionListeners.add(listener);
+  }
+
+  /**
+   * Remove a {@link ConnectionListener} from this transport.
+   *
+   * @param listener the listener to remove.
+   */
+  public void removeConnectionListener(ConnectionListener listener) {
+    connectionListeners.remove(listener);
   }
 
   private class ModbusTcpFrameHandler extends SimpleChannelInboundHandler<ModbusTcpFrame> {
@@ -178,6 +211,20 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
     var config = NettyClientTransportConfig.create(configure);
 
     return new NettyTcpClientTransport(config);
+  }
+
+  public interface ConnectionListener {
+
+    /**
+     * Callback invoked when the transport has connected.
+     */
+    void onConnection();
+
+    /**
+     * Callback invoked when the transport has disconnected.
+     */
+    void onConnectionLost();
+
   }
 
 }
