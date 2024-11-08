@@ -122,7 +122,7 @@
           <plugin>
             <groupId>org.apache.maven.plugins</groupId>
             <artifactId>maven-jar-plugin</artifactId>
-            <version>3.2.0</version>
+            <version>3.4.2</version>
             <configuration>
               <archive>
                 <manifest>
@@ -131,7 +131,6 @@
                 <manifestEntries>
                   <Automatic-Module-Name>${javaModuleName}</Automatic-Module-Name>
                 </manifestEntries>
-                <manifestFile>${project.build.outputDirectory}/META-INF/MANIFEST.MF</manifestFile>
               </archive>
             </configuration>
           </plugin>
@@ -179,6 +178,7 @@
           <plugin>
             <groupId>org.sonatype.plugins</groupId>
             <artifactId>nexus-staging-maven-plugin</artifactId>
+            <version>1.7.0</version>
             <inherited>false</inherited>
           </plugin>
         </plugins>
@@ -198,6 +198,21 @@
             <arg>-Werror</arg>
             <arg>-Xlint:all</arg>
           </compilerArgs>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.4.2</version>
+        <configuration>
+          <archive>
+            <manifest>
+              <addDefaultImplementationEntries>true</addDefaultImplementationEntries>
+            </manifest>
+            <manifestEntries>
+              <Automatic-Module-Name>${javaModuleName}</Automatic-Module-Name>
+            </manifestEntries>
+          </archive>
         </configuration>
       </plugin>
       <plugin>
