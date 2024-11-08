@@ -1,7 +1,7 @@
 package com.digitalpetri.modbus.server;
 
 import com.digitalpetri.modbus.Modbus;
-import com.digitalpetri.modbus.Netty;
+import com.digitalpetri.modbus.tcp.Netty;
 import io.netty.channel.EventLoopGroup;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;

@@ -1,7 +1,7 @@
 package com.digitalpetri.modbus.client;
 
 import com.digitalpetri.modbus.Modbus;
-import com.digitalpetri.modbus.Netty;
+import com.digitalpetri.modbus.tcp.Netty;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;

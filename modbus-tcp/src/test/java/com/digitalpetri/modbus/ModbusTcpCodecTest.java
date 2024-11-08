@@ -2,6 +2,7 @@ package com.digitalpetri.modbus;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.digitalpetri.modbus.tcp.ModbusTcpCodec;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.embedded.EmbeddedChannel;

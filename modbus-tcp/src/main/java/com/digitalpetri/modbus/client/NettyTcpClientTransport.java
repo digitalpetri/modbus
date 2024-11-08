@@ -1,7 +1,7 @@
 package com.digitalpetri.modbus.client;
 
 import com.digitalpetri.fsm.FsmContext;
-import com.digitalpetri.modbus.ModbusTcpCodec;
+import com.digitalpetri.modbus.tcp.ModbusTcpCodec;
 import com.digitalpetri.modbus.ModbusTcpFrame;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
 import com.digitalpetri.netty.fsm.ChannelActions;

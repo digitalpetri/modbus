@@ -1,6 +1,6 @@
 package com.digitalpetri.modbus.server;
 
-import com.digitalpetri.modbus.ModbusTcpCodec;
+import com.digitalpetri.modbus.tcp.ModbusTcpCodec;
 import com.digitalpetri.modbus.ModbusTcpFrame;
 import com.digitalpetri.modbus.exceptions.UnknownUnitIdException;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;

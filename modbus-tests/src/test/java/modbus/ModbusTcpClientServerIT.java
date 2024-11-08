@@ -1,7 +1,7 @@
 package modbus;
 
 import com.digitalpetri.modbus.ModbusPduSerializer.DefaultRequestSerializer;
-import com.digitalpetri.modbus.Netty;
+import com.digitalpetri.modbus.tcp.Netty;
 import com.digitalpetri.modbus.client.ModbusClient;
 import com.digitalpetri.modbus.client.ModbusTcpClient;
 import com.digitalpetri.modbus.client.NettyTcpClientTransport;
