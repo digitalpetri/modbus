@@ -1,5 +1,7 @@
-package com.digitalpetri.modbus;
+package com.digitalpetri.modbus.tcp;
 
+import com.digitalpetri.modbus.MbapHeader;
+import com.digitalpetri.modbus.ModbusTcpFrame;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageCodec;

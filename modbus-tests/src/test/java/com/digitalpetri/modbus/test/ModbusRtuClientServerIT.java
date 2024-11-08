@@ -1,13 +1,13 @@
-package modbus;
+package com.digitalpetri.modbus.test;
 
 import com.digitalpetri.modbus.client.ModbusClient;
 import com.digitalpetri.modbus.client.ModbusRtuClient;
-import com.digitalpetri.modbus.client.SerialPortClientTransport;
+import com.digitalpetri.modbus.serial.client.SerialPortClientTransport;
+import com.digitalpetri.modbus.serial.server.SerialPortServerTransport;
 import com.digitalpetri.modbus.server.ModbusRtuServer;
 import com.digitalpetri.modbus.server.ModbusServer;
 import com.digitalpetri.modbus.server.ProcessImage;
 import com.digitalpetri.modbus.server.ReadWriteModbusServices;
-import com.digitalpetri.modbus.server.SerialPortServerTransport;
 import com.fazecast.jSerialComm.SerialPort;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;

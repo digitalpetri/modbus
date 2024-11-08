@@ -1,13 +1,13 @@
-package modbus;
+package com.digitalpetri.modbus.test;
 
 import com.digitalpetri.modbus.client.ModbusClient;
 import com.digitalpetri.modbus.client.ModbusRtuClient;
-import com.digitalpetri.modbus.client.NettyRtuClientTransport;
 import com.digitalpetri.modbus.server.ModbusRtuServer;
 import com.digitalpetri.modbus.server.ModbusServer;
-import com.digitalpetri.modbus.server.NettyRtuServerTransport;
 import com.digitalpetri.modbus.server.ProcessImage;
 import com.digitalpetri.modbus.server.ReadWriteModbusServices;
+import com.digitalpetri.modbus.tcp.client.NettyRtuClientTransport;
+import com.digitalpetri.modbus.tcp.server.NettyRtuServerTransport;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;

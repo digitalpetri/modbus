@@ -1,15 +1,11 @@
-package com.digitalpetri.modbus.server;
+package com.digitalpetri.modbus.tcp.server;
 
-import com.digitalpetri.modbus.ModbusRtuFrame;
-import com.digitalpetri.modbus.ModbusRtuRequestFrameParser;
-import com.digitalpetri.modbus.ModbusRtuRequestFrameParser.Accumulated;
-import com.digitalpetri.modbus.ModbusRtuRequestFrameParser.ParseError;
-import com.digitalpetri.modbus.ModbusRtuRequestFrameParser.ParserState;
+import com.digitalpetri.modbus.ModbusTcpFrame;
 import com.digitalpetri.modbus.exceptions.UnknownUnitIdException;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
+import com.digitalpetri.modbus.server.ModbusTcpServerTransport;
+import com.digitalpetri.modbus.tcp.ModbusTcpCodec;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
@@ -21,40 +17,44 @@ import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import java.net.SocketAddress;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Modbus RTU/TCP server transport; a {@link ModbusRtuServerTransport} that sends and receives
- * {@link ModbusRtuFrame}s over TCP.
+ * Modbus/TCP transport; a {@link ModbusTcpServerTransport} that sends and receives
+ * {@link ModbusTcpFrame}s over TCP.
  */
-public class NettyRtuServerTransport implements ModbusRtuServerTransport {
+public class NettyTcpServerTransport implements ModbusTcpServerTransport {
 
   private final Logger logger = LoggerFactory.getLogger(getClass());
 
-  private final AtomicReference<FrameReceiver<ModbusRtuRequestContext, ModbusRtuFrame>>
+  private final AtomicReference<FrameReceiver<ModbusTcpRequestContext, ModbusTcpFrame>>
       frameReceiver = new AtomicReference<>();
-  private final ModbusRtuRequestFrameParser frameParser = new ModbusRtuRequestFrameParser();
 
   private final AtomicReference<ServerSocketChannel> serverChannel = new AtomicReference<>();
-
-  private final AtomicReference<Channel> clientChannel = new AtomicReference<>();
+  private final List<Channel> clientChannels = new CopyOnWriteArrayList<>();
 
   private final ExecutionQueue executionQueue;
   private final NettyServerTransportConfig config;
 
-  public NettyRtuServerTransport(NettyServerTransportConfig config) {
+  public NettyTcpServerTransport(NettyServerTransportConfig config) {
     this.config = config;
 
     executionQueue = new ExecutionQueue(config.executor(), 1);
   }
 
   @Override
-  public CompletionStage<Void> bind() {
+  public void receive(FrameReceiver<ModbusTcpRequestContext, ModbusTcpFrame> frameReceiver) {
+    this.frameReceiver.set(frameReceiver);
+  }
+
+  @Override
+  public CompletableFuture<Void> bind() {
     final var future = new CompletableFuture<Void>();
 
     var bootstrap = new ServerBootstrap();
@@ -63,18 +63,17 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
         .childHandler(new ChannelInitializer<SocketChannel>() {
           @Override
           protected void initChannel(SocketChannel ch) {
-            if (clientChannel.compareAndSet(null, ch)) {
-              ch.pipeline()
-                  .addLast(new ChannelInboundHandlerAdapter() {
-                    @Override
-                    public void channelInactive(ChannelHandlerContext ctx) {
-                      clientChannel.set(null);
-                    }
-                  })
-                  .addLast(new ModbusRtuServerFrameReceiver());
-            } else {
-              ch.close();
-            }
+            clientChannels.add(ch);
+
+            ch.pipeline()
+                .addLast(new ChannelInboundHandlerAdapter() {
+                  @Override
+                  public void channelInactive(ChannelHandlerContext ctx) {
+                    clientChannels.remove(ctx.channel());
+                  }
+                })
+                .addLast(new ModbusTcpCodec())
+                .addLast(new ModbusTcpFrameHandler());
           }
         });
 
@@ -97,16 +96,14 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
   }
 
   @Override
-  public CompletionStage<Void> unbind() {
+  public CompletableFuture<Void> unbind() {
     ServerSocketChannel channel = serverChannel.getAndSet(null);
 
     if (channel != null) {
       var future = new CompletableFuture<Void>();
       channel.close().addListener((ChannelFutureListener) cf -> {
-        Channel ch = clientChannel.getAndSet(null);
-        if (ch != null) {
-          ch.close();
-        }
+        clientChannels.forEach(Channel::close);
+        clientChannels.clear();
 
         if (cf.isSuccess()) {
           future.complete(null);
@@ -120,52 +117,23 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
     }
   }
 
-  @Override
-  public void receive(FrameReceiver<ModbusRtuRequestContext, ModbusRtuFrame> frameReceiver) {
-    this.frameReceiver.set(frameReceiver);
-  }
-
-  private class ModbusRtuServerFrameReceiver extends SimpleChannelInboundHandler<ByteBuf> {
+  private class ModbusTcpFrameHandler extends SimpleChannelInboundHandler<ModbusTcpFrame> {
 
     @Override
-    protected void channelRead0(ChannelHandlerContext ctx, ByteBuf buffer) {
-      byte[] data = new byte[buffer.readableBytes()];
-      buffer.readBytes(data);
-
-      ParserState state = frameParser.parse(data);
-
-      if (state instanceof Accumulated a) {
-        try {
-          onFrameReceived(ctx, a.frame());
-        } finally {
-          frameParser.reset();
-        }
-      } else if (state instanceof ParseError e) {
-        logger.error("Error parsing frame: {}", e.message());
-
-        frameParser.reset();
-        ctx.close();
-      }
-    }
-
-    private void onFrameReceived(ChannelHandlerContext ctx, ModbusRtuFrame requestFrame) {
-      FrameReceiver<ModbusRtuRequestContext, ModbusRtuFrame> frameReceiver =
-          NettyRtuServerTransport.this.frameReceiver.get();
+    protected void channelRead0(ChannelHandlerContext ctx, ModbusTcpFrame requestFrame) {
+      FrameReceiver<ModbusTcpRequestContext, ModbusTcpFrame> frameReceiver =
+          NettyTcpServerTransport.this.frameReceiver.get();
 
       if (frameReceiver != null) {
         executionQueue.submit(() -> {
           try {
-            ModbusRtuFrame responseFrame =
+            ModbusTcpFrame responseFrame =
                 frameReceiver.receive(requestContext(ctx), requestFrame);
 
-            ByteBuf buffer = Unpooled.buffer();
-            buffer.writeByte(responseFrame.unitId());
-            buffer.writeBytes(responseFrame.pdu());
-            buffer.writeBytes(responseFrame.crc());
-
-            ctx.channel().writeAndFlush(buffer);
+            ctx.channel().writeAndFlush(responseFrame);
           } catch (UnknownUnitIdException e) {
-            logger.debug("Ignoring request for unknown unit id: {}", requestFrame.unitId());
+            logger.debug(
+                "Ignoring request for unknown unit id: {}", requestFrame.header().unitId());
           } catch (Exception e) {
             logger.error("Error handling frame: {}", e.getMessage(), e);
 
@@ -173,11 +141,10 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
           }
         });
       }
-
     }
 
-    private static ModbusRtuTcpRequestContext requestContext(ChannelHandlerContext ctx) {
-      return new ModbusRtuTcpRequestContext() {
+    private static ModbusTcpRequestContext requestContext(ChannelHandlerContext ctx) {
+      return new ModbusTcpRequestContext() {
         @Override
         public SocketAddress localAddress() {
           return ctx.channel().localAddress();
@@ -193,20 +160,20 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
   }
 
   /**
-   * Create a new {@link NettyRtuServerTransport} with a callback that allows customizing the
+   * Create a new {@link NettyTcpServerTransport} with a callback that allows customizing the
    * configuration.
    *
    * @param configure a {@link Consumer} that accepts a
    *     {@link NettyServerTransportConfig.Builder} instance to configure.
-   * @return a new {@link NettyRtuServerTransport}.
+   * @return a new {@link NettyTcpServerTransport}.
    */
-  public static NettyRtuServerTransport create(
+  public static NettyTcpServerTransport create(
       Consumer<NettyServerTransportConfig.Builder> configure
   ) {
 
     var builder = new NettyServerTransportConfig.Builder();
     configure.accept(builder);
-    return new NettyRtuServerTransport(builder.build());
+    return new NettyTcpServerTransport(builder.build());
   }
 
 }

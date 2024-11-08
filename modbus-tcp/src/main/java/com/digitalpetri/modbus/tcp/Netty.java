@@ -1,4 +1,4 @@
-package com.digitalpetri.modbus;
+package com.digitalpetri.modbus.tcp;
 
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.util.HashedWheelTimer;

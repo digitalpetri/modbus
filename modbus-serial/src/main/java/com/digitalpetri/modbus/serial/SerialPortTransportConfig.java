@@ -1,6 +1,7 @@
-package com.digitalpetri.modbus;
+package com.digitalpetri.modbus.serial;
 
-import com.digitalpetri.modbus.client.SerialPortClientTransport;
+import com.digitalpetri.modbus.Modbus;
+import com.digitalpetri.modbus.serial.client.SerialPortClientTransport;
 import com.fazecast.jSerialComm.SerialPort;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;

@@ -1,13 +1,12 @@
-package com.digitalpetri.modbus.server;
+package com.digitalpetri.modbus.serial.client;
 
 import com.digitalpetri.modbus.ModbusRtuFrame;
-import com.digitalpetri.modbus.ModbusRtuRequestFrameParser;
-import com.digitalpetri.modbus.ModbusRtuRequestFrameParser.Accumulated;
-import com.digitalpetri.modbus.ModbusRtuRequestFrameParser.ParserState;
-import com.digitalpetri.modbus.SerialPortTransportConfig;
-import com.digitalpetri.modbus.SerialPortTransportConfig.Builder;
-import com.digitalpetri.modbus.exceptions.UnknownUnitIdException;
+import com.digitalpetri.modbus.ModbusRtuResponseFrameParser;
+import com.digitalpetri.modbus.ModbusRtuResponseFrameParser.Accumulated;
+import com.digitalpetri.modbus.ModbusRtuResponseFrameParser.ParserState;
+import com.digitalpetri.modbus.client.ModbusRtuClientTransport;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
+import com.digitalpetri.modbus.serial.SerialPortTransportConfig;
 import com.fazecast.jSerialComm.SerialPort;
 import com.fazecast.jSerialComm.SerialPortDataListener;
 import com.fazecast.jSerialComm.SerialPortEvent;
@@ -16,20 +15,15 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 /**
- * Modbus RTU/Serial server transport; a {@link ModbusRtuServerTransport} that sends and receives
+ * Modbus RTU/Serial client transport; a {@link ModbusRtuClientTransport} that sends and receives
  * {@link ModbusRtuFrame}s over a serial port.
  */
-public class SerialPortServerTransport implements ModbusRtuServerTransport {
+public class SerialPortClientTransport implements ModbusRtuClientTransport {
 
-  private final Logger logger = LoggerFactory.getLogger(getClass());
-
-  private final ModbusRtuRequestFrameParser frameParser = new ModbusRtuRequestFrameParser();
-  private final AtomicReference<FrameReceiver<ModbusRtuRequestContext, ModbusRtuFrame>>
-      frameReceiver = new AtomicReference<>();
+  private final ModbusRtuResponseFrameParser frameParser = new ModbusRtuResponseFrameParser();
+  private final AtomicReference<Consumer<ModbusRtuFrame>> frameReceiver = new AtomicReference<>();
 
   private final ExecutionQueue executionQueue;
 
@@ -37,7 +31,7 @@ public class SerialPortServerTransport implements ModbusRtuServerTransport {
 
   private final SerialPortTransportConfig config;
 
-  public SerialPortServerTransport(SerialPortTransportConfig config) {
+  public SerialPortClientTransport(SerialPortTransportConfig config) {
     this.config = config;
 
     serialPort = SerialPort.getCommPort(config.serialPort());
@@ -54,13 +48,14 @@ public class SerialPortServerTransport implements ModbusRtuServerTransport {
   }
 
   @Override
-  public CompletionStage<Void> bind() {
+  public synchronized CompletableFuture<Void> connect() {
     if (serialPort.isOpen()) {
       return CompletableFuture.completedFuture(null);
     } else {
       if (serialPort.openPort()) {
         frameParser.reset();
 
+        // note: no-op if already added from previous connect()
         serialPort.addDataListener(new ModbusRtuDataListener());
 
         return CompletableFuture.completedFuture(null);
@@ -75,7 +70,7 @@ public class SerialPortServerTransport implements ModbusRtuServerTransport {
   }
 
   @Override
-  public CompletionStage<Void> unbind() {
+  public synchronized CompletableFuture<Void> disconnect() {
     if (serialPort.isOpen()) {
       if (serialPort.closePort()) {
         frameParser.reset();
@@ -94,8 +89,49 @@ public class SerialPortServerTransport implements ModbusRtuServerTransport {
   }
 
   @Override
-  public void receive(FrameReceiver<ModbusRtuRequestContext, ModbusRtuFrame> frameReceiver) {
+  public boolean isConnected() {
+    return serialPort.isOpen();
+  }
+
+  @Override
+  public CompletionStage<Void> send(ModbusRtuFrame frame) {
+    ByteBuffer buffer = ByteBuffer.allocate(256);
+
+    try {
+      buffer.put((byte) frame.unitId());
+      buffer.put(frame.pdu());
+      buffer.put(frame.crc());
+
+      byte[] data = new byte[buffer.position()];
+      buffer.flip();
+      buffer.get(data);
+
+      int totalWritten = 0;
+      while (totalWritten < data.length) {
+        int written = serialPort.writeBytes(data, data.length - totalWritten, totalWritten);
+        if (written == -1) {
+          int errorCode = serialPort.getLastErrorCode();
+          throw new Exception(
+              "failed to write to port '%s', lastErrorCode=%d"
+                  .formatted(config.serialPort(), errorCode));
+        }
+        totalWritten += written;
+      }
+
+      return CompletableFuture.completedFuture(null);
+    } catch (Exception e) {
+      return CompletableFuture.failedFuture(e);
+    }
+  }
+
+  @Override
+  public void receive(Consumer<ModbusRtuFrame> frameReceiver) {
     this.frameReceiver.set(frameReceiver);
+  }
+
+  @Override
+  public void resetFrameParser() {
+    frameParser.reset();
   }
 
   private class ModbusRtuDataListener implements SerialPortDataListener {
@@ -131,61 +167,30 @@ public class SerialPortServerTransport implements ModbusRtuServerTransport {
       }
     }
 
-    private void onFrameReceived(ModbusRtuFrame requestFrame) {
-      FrameReceiver<ModbusRtuRequestContext, ModbusRtuFrame> frameReceiver =
-          SerialPortServerTransport.this.frameReceiver.get();
-
+    private void onFrameReceived(ModbusRtuFrame frame) {
+      Consumer<ModbusRtuFrame> frameReceiver = SerialPortClientTransport.this.frameReceiver.get();
       if (frameReceiver != null) {
-        executionQueue.submit(() -> {
-          try {
-            ModbusRtuFrame responseFrame =
-                frameReceiver.receive(new ModbusRtuRequestContext() {}, requestFrame);
-
-            int unitId = responseFrame.unitId();
-            ByteBuffer pdu = responseFrame.pdu();
-            ByteBuffer crc = responseFrame.crc();
-
-            byte[] data = new byte[1 + pdu.remaining() + crc.remaining()];
-            data[0] = (byte) unitId;
-            pdu.get(data, 1, pdu.remaining());
-            crc.get(data, data.length - 2, crc.remaining());
-
-            int totalWritten = 0;
-            while (totalWritten < data.length) {
-              int written = serialPort.writeBytes(data, data.length - totalWritten, totalWritten);
-              if (written == -1) {
-                logger.error("Error writing frame to serial port");
-
-                return;
-              }
-              totalWritten += written;
-            }
-          } catch (UnknownUnitIdException e) {
-            logger.debug("Ignoring request for unknown unit id: {}", requestFrame.unitId());
-          } catch (Exception e) {
-            logger.error("Error handling frame: {}", e.getMessage(), e);
-          }
-        });
+        executionQueue.submit(() -> frameReceiver.accept(frame));
       }
     }
 
   }
 
   /**
-   * Create a new {@link SerialPortServerTransport} with a callback that allows customizing the
+   * Create a new {@link SerialPortClientTransport} with a callback that allows customizing the
    * configuration.
    *
    * @param configure a {@link Consumer} that accepts a
    *     {@link SerialPortTransportConfig.Builder} instance to configure.
-   * @return a new {@link SerialPortServerTransport}.
+   * @return a new {@link SerialPortClientTransport}.
    */
-  public static SerialPortServerTransport create(
-      Consumer<Builder> configure
+  public static SerialPortClientTransport create(
+      Consumer<SerialPortTransportConfig.Builder> configure
   ) {
 
     var builder = new SerialPortTransportConfig.Builder();
     configure.accept(builder);
-    return new SerialPortServerTransport(builder.build());
+    return new SerialPortClientTransport(builder.build());
   }
 
 }
