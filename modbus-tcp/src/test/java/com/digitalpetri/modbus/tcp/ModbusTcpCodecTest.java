@@ -1,7 +1,9 @@
-package com.digitalpetri.modbus;
+package com.digitalpetri.modbus.tcp;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import com.digitalpetri.modbus.MbapHeader;
+import com.digitalpetri.modbus.ModbusTcpFrame;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.embedded.EmbeddedChannel;

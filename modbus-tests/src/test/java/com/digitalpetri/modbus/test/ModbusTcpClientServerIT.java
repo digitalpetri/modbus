@@ -1,18 +1,18 @@
-package modbus;
+package com.digitalpetri.modbus.test;
 
 import com.digitalpetri.modbus.ModbusPduSerializer.DefaultRequestSerializer;
-import com.digitalpetri.modbus.Netty;
 import com.digitalpetri.modbus.client.ModbusClient;
 import com.digitalpetri.modbus.client.ModbusTcpClient;
-import com.digitalpetri.modbus.client.NettyTcpClientTransport;
-import com.digitalpetri.modbus.client.NettyTimeoutScheduler;
 import com.digitalpetri.modbus.internal.util.Hex;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersRequest;
 import com.digitalpetri.modbus.server.ModbusServer;
 import com.digitalpetri.modbus.server.ModbusTcpServer;
-import com.digitalpetri.modbus.server.NettyTcpServerTransport;
 import com.digitalpetri.modbus.server.ProcessImage;
 import com.digitalpetri.modbus.server.ReadWriteModbusServices;
+import com.digitalpetri.modbus.tcp.Netty;
+import com.digitalpetri.modbus.tcp.client.NettyTcpClientTransport;
+import com.digitalpetri.modbus.tcp.client.NettyTimeoutScheduler;
+import com.digitalpetri.modbus.tcp.server.NettyTcpServerTransport;
 import java.nio.ByteBuffer;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;

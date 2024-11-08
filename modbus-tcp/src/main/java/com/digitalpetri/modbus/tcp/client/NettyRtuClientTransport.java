@@ -1,4 +1,4 @@
-package com.digitalpetri.modbus.client;
+package com.digitalpetri.modbus.tcp.client;
 
 import com.digitalpetri.fsm.FsmContext;
 import com.digitalpetri.modbus.ModbusRtuFrame;
@@ -6,6 +6,7 @@ import com.digitalpetri.modbus.ModbusRtuResponseFrameParser;
 import com.digitalpetri.modbus.ModbusRtuResponseFrameParser.Accumulated;
 import com.digitalpetri.modbus.ModbusRtuResponseFrameParser.ParseError;
 import com.digitalpetri.modbus.ModbusRtuResponseFrameParser.ParserState;
+import com.digitalpetri.modbus.client.ModbusRtuClientTransport;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
 import com.digitalpetri.netty.fsm.ChannelActions;
 import com.digitalpetri.netty.fsm.ChannelFsm;
