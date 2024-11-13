@@ -1,5 +1,7 @@
 package com.digitalpetri.modbus.test;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
 import com.digitalpetri.modbus.ModbusPduSerializer.DefaultRequestSerializer;
 import com.digitalpetri.modbus.client.ModbusClient;
 import com.digitalpetri.modbus.client.ModbusTcpClient;
@@ -11,10 +13,13 @@ import com.digitalpetri.modbus.server.ProcessImage;
 import com.digitalpetri.modbus.server.ReadWriteModbusServices;
 import com.digitalpetri.modbus.tcp.Netty;
 import com.digitalpetri.modbus.tcp.client.NettyTcpClientTransport;
+import com.digitalpetri.modbus.tcp.client.NettyTcpClientTransport.ConnectionListener;
 import com.digitalpetri.modbus.tcp.client.NettyTimeoutScheduler;
 import com.digitalpetri.modbus.tcp.server.NettyTcpServerTransport;
 import java.nio.ByteBuffer;
 import java.util.Optional;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,6 +28,8 @@ public class ModbusTcpClientServerIT extends ClientServerIT {
 
   ModbusTcpClient client;
   ModbusTcpServer server;
+
+  NettyTcpClientTransport clientTransport;
 
   @BeforeEach
   void setup() throws Exception {
@@ -59,7 +66,7 @@ public class ModbusTcpClientServerIT extends ClientServerIT {
     }
 
     final var port = serverPort;
-    var clientTransport = NettyTcpClientTransport.create(
+    clientTransport = NettyTcpClientTransport.create(
         cfg -> {
           cfg.hostname = "localhost";
           cfg.port = port;
@@ -110,6 +117,30 @@ public class ModbusTcpClientServerIT extends ClientServerIT {
     byte[] responsePduBytes = client.sendRaw(0, requestedPduBytes);
 
     System.out.println("responsePduBytes: " + Hex.format(responsePduBytes));
+  }
+
+  @Test
+  void connectionListener() throws Exception {
+    var onConnection = new CountDownLatch(1);
+    var onConnectionLost = new CountDownLatch(1);
+
+    clientTransport.addConnectionListener(new ConnectionListener() {
+      @Override
+      public void onConnection() {
+        onConnection.countDown();
+      }
+
+      @Override
+      public void onConnectionLost() {
+        onConnectionLost.countDown();
+      }
+    });
+
+    client.disconnect();
+    assertTrue(onConnectionLost.await(1, TimeUnit.SECONDS));
+
+    client.connect();
+    assertTrue(onConnection.await(1, TimeUnit.SECONDS));
   }
 
 }
