@@ -1,4 +1,4 @@
-package com.digitalpetri.modbus.client;
+package com.digitalpetri.modbus.tcp.client;
 
 import com.digitalpetri.modbus.TimeoutScheduler;
 import io.netty.util.HashedWheelTimer;

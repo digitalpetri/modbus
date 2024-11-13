@@ -1,4 +1,4 @@
-package com.digitalpetri.modbus.server;
+package com.digitalpetri.modbus.tcp.server;
 
 import com.digitalpetri.modbus.ModbusRtuFrame;
 import com.digitalpetri.modbus.ModbusRtuRequestFrameParser;
@@ -7,6 +7,7 @@ import com.digitalpetri.modbus.ModbusRtuRequestFrameParser.ParseError;
 import com.digitalpetri.modbus.ModbusRtuRequestFrameParser.ParserState;
 import com.digitalpetri.modbus.exceptions.UnknownUnitIdException;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
+import com.digitalpetri.modbus.server.ModbusRtuServerTransport;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;

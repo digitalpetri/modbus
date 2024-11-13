@@ -1,9 +1,10 @@
-package com.digitalpetri.modbus.server;
+package com.digitalpetri.modbus.tcp.server;
 
-import com.digitalpetri.modbus.ModbusTcpCodec;
 import com.digitalpetri.modbus.ModbusTcpFrame;
 import com.digitalpetri.modbus.exceptions.UnknownUnitIdException;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
+import com.digitalpetri.modbus.server.ModbusTcpServerTransport;
+import com.digitalpetri.modbus.tcp.ModbusTcpCodec;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
