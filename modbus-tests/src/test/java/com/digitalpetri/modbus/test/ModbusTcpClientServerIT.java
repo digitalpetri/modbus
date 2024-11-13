@@ -136,6 +136,8 @@ public class ModbusTcpClientServerIT extends ClientServerIT {
       }
     });
 
+    assertTrue(client.isConnected());
+
     client.disconnect();
     assertTrue(onConnectionLost.await(1, TimeUnit.SECONDS));
 
