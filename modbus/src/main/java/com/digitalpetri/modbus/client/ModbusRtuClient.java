@@ -3,6 +3,7 @@ package com.digitalpetri.modbus.client;
 import com.digitalpetri.modbus.Crc16;
 import com.digitalpetri.modbus.ModbusRtuFrame;
 import com.digitalpetri.modbus.TimeoutScheduler.TimeoutHandle;
+import com.digitalpetri.modbus.exceptions.ModbusCrcException;
 import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
@@ -169,7 +170,7 @@ public class ModbusRtuClient extends ModbusClient {
       if (!verifyCrc16(frame)) {
         transport.resetFrameParser();
 
-        promise.future.completeExceptionally(new ModbusException("CRC mismatch"));
+        promise.future.completeExceptionally(new ModbusCrcException(frame));
         return;
       }
 
