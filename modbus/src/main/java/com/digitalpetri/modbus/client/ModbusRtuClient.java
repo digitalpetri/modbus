@@ -81,7 +81,7 @@ public class ModbusRtuClient extends ModbusClient {
         // The frame parser needs to be reset!
         // It could be "stuck" in Accumulating or ParseError states if the timeout was caused by
         // an incomplete or invalid response rather than no response.
-        transport.resetFrameParser();
+        resetFrameParser();
 
         promise.future.completeExceptionally(
             new TimeoutException("request timed out after %sms".formatted(timeoutMillis))
@@ -168,7 +168,7 @@ public class ModbusRtuClient extends ModbusClient {
       }
 
       if (!verifyCrc16(frame)) {
-        transport.resetFrameParser();
+        resetFrameParser();
 
         promise.future.completeExceptionally(new ModbusCrcException(frame));
         return;
@@ -231,12 +231,39 @@ public class ModbusRtuClient extends ModbusClient {
   }
 
   /**
+   * Reset the transport's frame parser.
+   */
+  protected void resetFrameParser() {
+    transport.resetFrameParser();
+  }
+
+  /**
+   * Calculate the CRC-16 for the given frame (unit ID and PDU).
+   *
+   * @param unitId the unit ID.
+   * @param pdu the PDU.
+   * @return a {@link ByteBuffer} containing the calculated CRC-16.
+   */
+  protected ByteBuffer calculateCrc16(int unitId, ByteBuffer pdu) {
+    var crc16 = new Crc16();
+    crc16.update(unitId);
+    crc16.update(pdu);
+
+    ByteBuffer crc = ByteBuffer.allocate(2);
+    // write crc in little-endian order
+    crc.put((byte) (crc16.getValue() & 0xFF));
+    crc.put((byte) ((crc16.getValue() >> 8) & 0xFF));
+
+    return crc.flip();
+  }
+
+  /**
    * Verify the reported CRC-16 matches the calculated CRC-16.
    *
    * @param frame the frame to verify.
    * @return {@code true} if the CRC-16 matches, {@code false} otherwise.
    */
-  private static boolean verifyCrc16(ModbusRtuFrame frame) {
+  protected boolean verifyCrc16(ModbusRtuFrame frame) {
     var crc16 = new Crc16();
     crc16.update(frame.unitId());
     crc16.update(frame.pdu());
@@ -248,19 +275,6 @@ public class ModbusRtuClient extends ModbusClient {
     int reported = (high << 8) | low;
 
     return expected == reported;
-  }
-
-  private ByteBuffer calculateCrc16(int unitId, ByteBuffer pdu) {
-    var crc16 = new Crc16();
-    crc16.update(unitId);
-    crc16.update(pdu);
-
-    ByteBuffer crc = ByteBuffer.allocate(2);
-    // write crc in little-endian order
-    crc.put((byte) (crc16.getValue() & 0xFF));
-    crc.put((byte) ((crc16.getValue() >> 8) & 0xFF));
-
-    return crc.flip();
   }
 
   /**
