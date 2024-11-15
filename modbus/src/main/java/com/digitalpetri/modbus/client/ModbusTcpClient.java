@@ -35,25 +35,16 @@ public class ModbusTcpClient extends ModbusClient {
 
   private final Map<Integer, ResponsePromise> promises = new ConcurrentHashMap<>();
 
+  private final AtomicReference<TransactionSequence> transactionSequence = new AtomicReference<>();
+
   private final ModbusClientConfig config;
   private final ModbusTcpClientTransport transport;
-  private final TransactionSequence transactionSequence;
 
   public ModbusTcpClient(ModbusClientConfig config, ModbusTcpClientTransport transport) {
-    this(config, transport, new DefaultTransactionSequence());
-  }
-
-  public ModbusTcpClient(
-      ModbusClientConfig config,
-      ModbusTcpClientTransport transport,
-      TransactionSequence transactionSequence
-  ) {
-
     super(transport);
 
     this.config = config;
     this.transport = transport;
-    this.transactionSequence = transactionSequence;
 
     transport.receive(this::onFrameReceived);
   }
@@ -116,7 +107,10 @@ public class ModbusTcpClient extends ModbusClient {
   }
 
   private CompletionStage<ByteBuffer> sendBufferAsync(int unitId, ByteBuffer buffer) {
-    int transactionId = transactionSequence.next();
+    TransactionSequence sequence = transactionSequence.updateAndGet(
+        ts -> ts != null ? ts : createTransactionSequence()
+    );
+    int transactionId = sequence.next();
 
     var header = new MbapHeader(
         transactionId,
@@ -190,6 +184,16 @@ public class ModbusTcpClient extends ModbusClient {
   }
 
   /**
+   * Create and return the {@link TransactionSequence} that will be used to generate transaction
+   * ids.
+   *
+   * @return the {@link TransactionSequence} that will be used to generate transaction ids.
+   */
+  protected TransactionSequence createTransactionSequence() {
+    return new DefaultTransactionSequence();
+  }
+
+  /**
    * Create a new {@link ModbusTcpClient} using the given {@link ModbusTcpClientTransport} and a
    * {@link ModbusClientConfig} with the default values.
    *
@@ -238,6 +242,8 @@ public class ModbusTcpClient extends ModbusClient {
 
     /**
      * Return the next 2-byte transaction identifier. Range is [0, 65535] by default.
+     *
+     * <p>Implementations must be safe for use by multiple threads.
      *
      * @return the next 2-byte transaction identifier.
      */
