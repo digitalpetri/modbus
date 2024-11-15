@@ -243,6 +243,8 @@ public class ModbusTcpClient extends ModbusClient {
     /**
      * Return the next 2-byte transaction identifier. Range is [0, 65535] by default.
      *
+     * <p>Implementations must be safe for use by multiple threads.
+     *
      * @return the next 2-byte transaction identifier.
      */
     int next();
