@@ -31,7 +31,7 @@ public final class Netty {
         }
       };
 
-      EVENT_LOOP = new NioEventLoopGroup(0, threadFactory);
+      EVENT_LOOP = new NioEventLoopGroup(1, threadFactory);
     }
 
     return EVENT_LOOP;
