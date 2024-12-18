@@ -90,10 +90,7 @@ public final class Modbus {
         }
       };
 
-      ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(
-          Runtime.getRuntime().availableProcessors(),
-          threadFactory
-      );
+      var executor = new ScheduledThreadPoolExecutor(1, threadFactory);
 
       executor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
 

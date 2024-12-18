@@ -64,7 +64,10 @@ public record ModbusClientConfig(
      */
     public ModbusClientConfig build() {
       if (timeoutScheduler == null) {
-        timeoutScheduler = TimeoutScheduler.fromScheduledExecutor(Modbus.sharedScheduledExecutor());
+        timeoutScheduler = TimeoutScheduler.create(
+            Modbus.sharedExecutor(),
+            Modbus.sharedScheduledExecutor()
+        );
       }
 
       return new ModbusClientConfig(
