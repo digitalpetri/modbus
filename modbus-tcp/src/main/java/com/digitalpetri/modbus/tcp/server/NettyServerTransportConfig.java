@@ -5,8 +5,11 @@ import com.digitalpetri.modbus.tcp.Netty;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.TrustManagerFactory;
 
 /**
  * Configuration for a {@link NettyRtuServerTransport}.
@@ -26,7 +29,10 @@ public record NettyServerTransportConfig(
     EventLoopGroup eventLoopGroup,
     ExecutorService executor,
     Consumer<ServerBootstrap> bootstrapCustomizer,
-    Consumer<ChannelPipeline> pipelineCustomizer
+    Consumer<ChannelPipeline> pipelineCustomizer,
+    boolean tlsEnabled,
+    Optional<KeyManagerFactory> keyManagerFactory,
+    Optional<TrustManagerFactory> trustManagerFactory
 ) {
 
   /**
@@ -52,7 +58,7 @@ public record NettyServerTransportConfig(
     /**
      * The port to bind to.
      */
-    public int port = 502;
+    public int port = -1;
 
     /**
      * The {@link EventLoopGroup} to use.
@@ -74,7 +80,14 @@ public record NettyServerTransportConfig(
      */
     public Consumer<ChannelPipeline> pipelineCustomizer = p -> {};
 
+    public boolean tlsEnabled = false;
+    public KeyManagerFactory keyManagerFactory = null;
+    public TrustManagerFactory trustManagerFactory = null;
+
     public NettyServerTransportConfig build() {
+      if (port == -1) {
+        port = tlsEnabled ? 802 : 502;
+      }
       if (eventLoopGroup == null) {
         eventLoopGroup = Netty.sharedEventLoop();
       }
@@ -88,7 +101,10 @@ public record NettyServerTransportConfig(
           eventLoopGroup,
           executor,
           bootstrapCustomizer,
-          pipelineCustomizer
+          pipelineCustomizer,
+          tlsEnabled,
+          Optional.ofNullable(keyManagerFactory),
+          Optional.ofNullable(trustManagerFactory)
       );
     }
   }

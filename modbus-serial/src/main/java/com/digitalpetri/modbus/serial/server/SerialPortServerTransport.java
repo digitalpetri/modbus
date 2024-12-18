@@ -8,6 +8,7 @@ import com.digitalpetri.modbus.exceptions.UnknownUnitIdException;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
 import com.digitalpetri.modbus.serial.SerialPortTransportConfig;
 import com.digitalpetri.modbus.serial.SerialPortTransportConfig.Builder;
+import com.digitalpetri.modbus.server.ModbusRequestContext.ModbusRtuRequestContext;
 import com.digitalpetri.modbus.server.ModbusRtuServerTransport;
 import com.fazecast.jSerialComm.SerialPort;
 import com.fazecast.jSerialComm.SerialPortDataListener;

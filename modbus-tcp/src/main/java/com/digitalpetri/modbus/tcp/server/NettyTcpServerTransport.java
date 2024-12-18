@@ -3,6 +3,8 @@ package com.digitalpetri.modbus.tcp.server;
 import com.digitalpetri.modbus.ModbusTcpFrame;
 import com.digitalpetri.modbus.exceptions.UnknownUnitIdException;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
+import com.digitalpetri.modbus.server.ModbusRequestContext.ModbusTcpRequestContext;
+import com.digitalpetri.modbus.server.ModbusRequestContext.ModbusTcpTlsRequestContext;
 import com.digitalpetri.modbus.server.ModbusTcpServerTransport;
 import com.digitalpetri.modbus.tcp.ModbusTcpCodec;
 import io.netty.bootstrap.ServerBootstrap;
@@ -16,8 +18,14 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.ssl.ClientAuth;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SslProtocols;
 import java.net.SocketAddress;
+import java.security.cert.X509Certificate;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
@@ -62,10 +70,21 @@ public class NettyTcpServerTransport implements ModbusTcpServerTransport {
     bootstrap.channel(NioServerSocketChannel.class)
         .childHandler(new ChannelInitializer<SocketChannel>() {
           @Override
-          protected void initChannel(SocketChannel ch) {
-            clientChannels.add(ch);
+          protected void initChannel(SocketChannel channel) throws Exception {
+            clientChannels.add(channel);
 
-            ch.pipeline()
+            if (config.tlsEnabled()) {
+              SslContext sslContext =
+                  SslContextBuilder.forServer(config.keyManagerFactory().orElseThrow())
+                      .clientAuth(ClientAuth.REQUIRE)
+                      .trustManager(config.trustManagerFactory().orElseThrow())
+                      .protocols(SslProtocols.TLS_v1_2, SslProtocols.TLS_v1_3)
+                      .build();
+
+              channel.pipeline().addLast(sslContext.newHandler(channel.alloc()));
+            }
+
+            channel.pipeline()
                 .addLast(new ChannelInboundHandlerAdapter() {
                   @Override
                   public void channelInactive(ChannelHandlerContext ctx) {
@@ -75,7 +94,7 @@ public class NettyTcpServerTransport implements ModbusTcpServerTransport {
                 .addLast(new ModbusTcpCodec())
                 .addLast(new ModbusTcpFrameHandler());
 
-            config.pipelineCustomizer().accept(ch.pipeline());
+            config.pipelineCustomizer().accept(channel.pipeline());
           }
         });
 
@@ -147,18 +166,42 @@ public class NettyTcpServerTransport implements ModbusTcpServerTransport {
       }
     }
 
-    private static ModbusTcpRequestContext requestContext(ChannelHandlerContext ctx) {
-      return new ModbusTcpRequestContext() {
-        @Override
-        public SocketAddress localAddress() {
-          return ctx.channel().localAddress();
-        }
+    private ModbusTcpRequestContext requestContext(ChannelHandlerContext ctx) {
+      if (config.tlsEnabled()) {
+        return new ModbusTcpTlsRequestContext() {
+          @Override
+          public Optional<String> clientRole() {
+            return Optional.empty(); // TODO
+          }
 
-        @Override
-        public SocketAddress remoteAddress() {
-          return ctx.channel().remoteAddress();
-        }
-      };
+          @Override
+          public X509Certificate[] clientCertificateChain() {
+            return new X509Certificate[0]; // TODO
+          }
+
+          @Override
+          public SocketAddress localAddress() {
+            return ctx.channel().localAddress();
+          }
+
+          @Override
+          public SocketAddress remoteAddress() {
+            return ctx.channel().remoteAddress();
+          }
+        };
+      } else {
+        return new ModbusTcpRequestContext() {
+          @Override
+          public SocketAddress localAddress() {
+            return ctx.channel().localAddress();
+          }
+
+          @Override
+          public SocketAddress remoteAddress() {
+            return ctx.channel().remoteAddress();
+          }
+        };
+      }
     }
 
   }

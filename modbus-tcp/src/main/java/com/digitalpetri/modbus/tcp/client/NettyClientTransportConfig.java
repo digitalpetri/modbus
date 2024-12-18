@@ -6,8 +6,11 @@ import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import java.time.Duration;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.TrustManagerFactory;
 
 /**
  * Configuration for a {@link NettyTcpClientTransport}.
@@ -23,6 +26,9 @@ import java.util.function.Consumer;
  *     {@link Bootstrap}.
  * @param pipelineCustomizer a {@link Consumer} that can be used to customize the Netty
  *     {@link ChannelPipeline}.
+ * @param tlsEnabled whether to enable TLS (Modbus/TCP Security).
+ * @param keyManagerFactory the {@link KeyManagerFactory} to use if TLS is enabled.
+ * @param trustManagerFactory the {@link TrustManagerFactory} to use if TLS is enabled.
  */
 public record NettyClientTransportConfig(
     String hostname,
@@ -33,9 +39,12 @@ public record NettyClientTransportConfig(
     EventLoopGroup eventLoopGroup,
     ExecutorService executor,
     Consumer<Bootstrap> bootstrapCustomizer,
-    Consumer<ChannelPipeline> pipelineCustomizer
+    Consumer<ChannelPipeline> pipelineCustomizer,
+    boolean tlsEnabled,
+    Optional<KeyManagerFactory> keyManagerFactory,
+    Optional<TrustManagerFactory> trustManagerFactory
 ) {
-
+  
   /**
    * Create a new {@link NettyClientTransportConfig} with a callback that allows customizing the
    * configuration.
@@ -59,7 +68,7 @@ public record NettyClientTransportConfig(
     /**
      * The port to connect to.
      */
-    public int port = 502;
+    public int port = -1;
 
     /**
      * The connect timeout.
@@ -100,15 +109,41 @@ public record NettyClientTransportConfig(
      */
     public Consumer<ChannelPipeline> pipelineCustomizer = p -> {};
 
+    /**
+     * Whether to enable TLS (Modbus/TCP Security).
+     */
+    public boolean tlsEnabled = false;
+
+    /**
+     * The {@link KeyManagerFactory} to use if TLS is enabled.
+     */
+    public KeyManagerFactory keyManagerFactory = null;
+
+    /**
+     * The {@link TrustManagerFactory} to use if TLS is enabled.
+     */
+    public TrustManagerFactory trustManagerFactory = null;
+
     public NettyClientTransportConfig build() {
       if (hostname == null) {
         throw new NullPointerException("hostname must not be null");
+      }
+      if (port == -1) {
+        port = tlsEnabled ? 802 : 502;
       }
       if (eventLoopGroup == null) {
         eventLoopGroup = Netty.sharedEventLoop();
       }
       if (executor == null) {
         executor = Modbus.sharedExecutor();
+      }
+      if (tlsEnabled) {
+        if (keyManagerFactory == null) {
+          throw new NullPointerException("keyManagerFactory must not be null");
+        }
+        if (trustManagerFactory == null) {
+          throw new NullPointerException("trustManagerFactory must not be null");
+        }
       }
 
       return new NettyClientTransportConfig(
@@ -120,7 +155,10 @@ public record NettyClientTransportConfig(
           eventLoopGroup,
           executor,
           bootstrapCustomizer,
-          pipelineCustomizer
+          pipelineCustomizer,
+          tlsEnabled,
+          Optional.ofNullable(keyManagerFactory),
+          Optional.ofNullable(trustManagerFactory)
       );
     }
 

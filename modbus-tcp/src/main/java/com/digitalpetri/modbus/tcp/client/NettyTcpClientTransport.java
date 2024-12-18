@@ -21,6 +21,10 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.ssl.ClientAuth;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SslProtocols;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -174,15 +178,7 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
           .group(config.eventLoopGroup())
           .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) config.connectTimeout().toMillis())
           .option(ChannelOption.TCP_NODELAY, Boolean.TRUE)
-          .handler(new ChannelInitializer<SocketChannel>() {
-            @Override
-            protected void initChannel(SocketChannel channel) {
-              channel.pipeline().addLast(new ModbusTcpCodec());
-              channel.pipeline().addLast(new ModbusTcpFrameHandler());
-
-              config.pipelineCustomizer().accept(channel.pipeline());
-            }
-          });
+          .handler(newChannelInitializer());
 
       config.bootstrapCustomizer().accept(bootstrap);
 
@@ -199,6 +195,31 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
       );
 
       return future;
+    }
+
+    private ChannelInitializer<SocketChannel> newChannelInitializer() {
+      return new ChannelInitializer<>() {
+        @Override
+        protected void initChannel(SocketChannel channel) throws Exception {
+          if (config.tlsEnabled()) {
+            SslContext sslContext = SslContextBuilder.forClient()
+                .clientAuth(ClientAuth.REQUIRE)
+                .keyManager(config.keyManagerFactory().orElseThrow())
+                .trustManager(config.trustManagerFactory().orElseThrow())
+                .protocols(SslProtocols.TLS_v1_2, SslProtocols.TLS_v1_3)
+                .build();
+
+            channel.pipeline().addLast(
+                sslContext.newHandler(channel.alloc(), config.hostname(), config.port())
+            );
+          }
+
+          channel.pipeline().addLast(new ModbusTcpCodec());
+          channel.pipeline().addLast(new ModbusTcpFrameHandler());
+
+          config.pipelineCustomizer().accept(channel.pipeline());
+        }
+      };
     }
 
     @Override

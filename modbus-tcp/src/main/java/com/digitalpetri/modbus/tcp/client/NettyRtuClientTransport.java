@@ -25,6 +25,10 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.ssl.ClientAuth;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SslProtocols;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
@@ -158,7 +162,20 @@ public class NettyRtuClientTransport implements ModbusRtuClientTransport {
           .option(ChannelOption.TCP_NODELAY, Boolean.TRUE)
           .handler(new ChannelInitializer<SocketChannel>() {
             @Override
-            protected void initChannel(SocketChannel channel) {
+            protected void initChannel(SocketChannel channel) throws Exception {
+              if (config.tlsEnabled()) {
+                SslContext sslContext = SslContextBuilder.forClient()
+                    .clientAuth(ClientAuth.REQUIRE)
+                    .keyManager(config.keyManagerFactory().orElseThrow())
+                    .trustManager(config.trustManagerFactory().orElseThrow())
+                    .protocols(SslProtocols.TLS_v1_2, SslProtocols.TLS_v1_3)
+                    .build();
+
+                channel.pipeline().addLast(
+                    sslContext.newHandler(channel.alloc(), config.hostname(), config.port())
+                );
+              }
+
               channel.pipeline().addLast(new ModbusRtuClientFrameReceiver());
 
               config.pipelineCustomizer().accept(channel.pipeline());

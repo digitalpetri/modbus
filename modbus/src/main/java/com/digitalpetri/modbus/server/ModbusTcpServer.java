@@ -17,7 +17,7 @@ import com.digitalpetri.modbus.pdu.WriteMultipleCoilsRequest;
 import com.digitalpetri.modbus.pdu.WriteMultipleRegistersRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleCoilRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterRequest;
-import com.digitalpetri.modbus.server.ModbusTcpServerTransport.ModbusTcpRequestContext;
+import com.digitalpetri.modbus.server.ModbusRequestContext.ModbusTcpRequestContext;
 import java.nio.ByteBuffer;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
