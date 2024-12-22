@@ -1,6 +1,15 @@
 package com.digitalpetri.modbus.server.authz;
 
-import java.util.Optional;
+import com.digitalpetri.modbus.pdu.MaskWriteRegisterRequest;
+import com.digitalpetri.modbus.pdu.ReadCoilsRequest;
+import com.digitalpetri.modbus.pdu.ReadDiscreteInputsRequest;
+import com.digitalpetri.modbus.pdu.ReadHoldingRegistersRequest;
+import com.digitalpetri.modbus.pdu.ReadInputRegistersRequest;
+import com.digitalpetri.modbus.pdu.ReadWriteMultipleRegistersRequest;
+import com.digitalpetri.modbus.pdu.WriteMultipleCoilsRequest;
+import com.digitalpetri.modbus.pdu.WriteMultipleRegistersRequest;
+import com.digitalpetri.modbus.pdu.WriteSingleCoilRequest;
+import com.digitalpetri.modbus.pdu.WriteSingleRegisterRequest;
 
 /**
  * Callback interface that handles authorization of Modbus operations.
@@ -10,117 +19,116 @@ public interface AuthzHandler {
   /**
    * Authorizes the reading of coils.
    *
-   * @param clientRole the role of the client attempting the operation, if available.
+   * @param authzContext the {@link AuthzContext}.
    * @param unitId the unit identifier of the Modbus device.
-   * @param address the starting address of the coils to read.
-   * @param quantity the number of coils to read.
+   * @param request the {@link ReadCoilsRequest} being authorized.
    * @return the result of the authorization check.
    */
-  AuthzResult authorizeReadCoils(Optional<String> clientRole, int unitId, int address, int quantity);
+  AuthzResult authorizeReadCoils(AuthzContext authzContext, int unitId, ReadCoilsRequest request);
 
   /**
    * Authorizes the reading of discrete inputs.
    *
-   * @param clientRole the role of the client attempting the operation, if available.
+   * @param authzContext the {@link AuthzContext}.
    * @param unitId the unit identifier of the Modbus device.
-   * @param address the starting address of the discrete inputs to read.
-   * @param quantity the number of discrete inputs to read.
+   * @param request the {@link ReadDiscreteInputsRequest} being authorized.
    * @return the result of the authorization check.
    */
-  AuthzResult authorizeReadDiscreteInputs(Optional<String> clientRole, int unitId, int address, int quantity);
+  AuthzResult authorizeReadDiscreteInputs(AuthzContext authzContext, int unitId,
+      ReadDiscreteInputsRequest request);
 
   /**
    * Authorizes the reading of holding registers.
    *
-   * @param clientRole the role of the client attempting the operation, if available.
+   * @param authzContext the {@link AuthzContext}.
    * @param unitId the unit identifier of the Modbus device.
-   * @param address the starting address of the holding registers to read.
-   * @param quantity the number of holding registers to read.
+   * @param request the {@link ReadHoldingRegistersRequest} being authorized.
    * @return the result of the authorization check.
    */
-  AuthzResult authorizeReadHoldingRegisters(Optional<String> clientRole, int unitId, int address, int quantity);
+  AuthzResult authorizeReadHoldingRegisters(AuthzContext authzContext, int unitId,
+      ReadHoldingRegistersRequest request);
 
   /**
    * Authorizes the reading of input registers.
    *
-   * @param clientRole the role of the client attempting the operation, if available.
+   * @param authzContext the {@link AuthzContext}.
    * @param unitId the unit identifier of the Modbus device.
-   * @param address the starting address of the input registers to read.
-   * @param quantity the number of input registers to read.
+   * @param request the {@link ReadInputRegistersRequest} being authorized.
    * @return the result of the authorization check.
    */
-  AuthzResult authorizeReadInputRegisters(Optional<String> clientRole, int unitId, int address, int quantity);
+  AuthzResult authorizeReadInputRegisters(AuthzContext authzContext, int unitId,
+      ReadInputRegistersRequest request);
 
   /**
-   * Authorizes the writing of single coil.
+   * Authorizes the writing of a single coil.
    *
-   * @param clientRole the role of the client attempting the operation, if available.
+   * @param authzContext the {@link AuthzContext}.
    * @param unitId the unit identifier of the Modbus device.
-   * @param address the address of the coil to write.
+   * @param request the {@link WriteSingleCoilRequest} being authorized.
    * @return the result of the authorization check.
    */
-  AuthzResult authorizeWriteSingleCoil(Optional<String> clientRole, int unitId, int address);
+  AuthzResult authorizeWriteSingleCoil(AuthzContext authzContext, int unitId,
+      WriteSingleCoilRequest request);
 
   /**
-   * Authorizes the writing of single register.
+   * Authorizes the writing of a single register.
    *
-   * @param clientRole the role of the client attempting the operation, if available.
+   * @param authzContext the {@link AuthzContext}.
    * @param unitId the unit identifier of the Modbus device.
-   * @param address the address of the register to write.
+   * @param request the {@link WriteSingleRegisterRequest} being authorized.
    * @return the result of the authorization check.
    */
-  AuthzResult authorizeWriteSingleRegister(Optional<String> clientRole, int unitId, int address);
+  AuthzResult authorizeWriteSingleRegister(AuthzContext authzContext, int unitId,
+      WriteSingleRegisterRequest request);
 
   /**
    * Authorizes the writing of multiple coils.
    *
-   * @param clientRole the role of the client attempting the operation, if available.
+   * @param authzContext the {@link AuthzContext}.
    * @param unitId the unit identifier of the Modbus device.
-   * @param address the starting address of the coils to write.
+   * @param request the {@link WriteMultipleCoilsRequest} being authorized.
    * @return the result of the authorization check.
    */
-  AuthzResult authorizeWriteMultipleCoils(Optional<String> clientRole, int unitId, int address);
+  AuthzResult authorizeWriteMultipleCoils(AuthzContext authzContext, int unitId,
+      WriteMultipleCoilsRequest request);
 
   /**
    * Authorizes the writing of multiple registers.
    *
-   * @param clientRole the role of the client attempting the operation, if available.
+   * @param authzContext the {@link AuthzContext}.
    * @param unitId the unit identifier of the Modbus device.
-   * @param address the starting address of the registers to write.
+   * @param request the {@link WriteMultipleRegistersRequest} being authorized.
    * @return the result of the authorization check.
    */
-  AuthzResult authorizeWriteMultipleRegisters(Optional<String> clientRole, int unitId, int address);
+  AuthzResult authorizeWriteMultipleRegisters(AuthzContext authzContext, int unitId,
+      WriteMultipleRegistersRequest request);
 
   /**
-   * Authorizes the mask writing of a register.
+   * Authorizes the mask write register operation.
    *
-   * @param clientRole the role of the client attempting the operation, if available.
+   * @param authzContext the {@link AuthzContext}.
    * @param unitId the unit identifier of the Modbus device.
-   * @param address the address of the register to mask write.
-   * @param andMask the AND mask to apply to the register.
-   * @param orMask the OR mask to apply to the register.
+   * @param request the {@link MaskWriteRegisterRequest} being authorized.
    * @return the result of the authorization check.
    */
-  AuthzResult authorizeMaskWriteRegister(Optional<String> clientRole, int unitId, int address, int andMask, int orMask);
+  AuthzResult authorizeMaskWriteRegister(AuthzContext authzContext, int unitId,
+      MaskWriteRegisterRequest request);
 
   /**
-   * Authorizes the reading and writing of multiple registers.
+   * Authorizes the read-write-multiple registers operation.
    *
-   * @param clientRole the role of the client attempting the operation, if available.
+   * @param authzContext the {@link AuthzContext}.
    * @param unitId the unit identifier of the Modbus device.
-   * @param readAddress the starting address of the registers to read.
-   * @param readQuantity the number of registers to read.
-   * @param writeAddress the starting address of the registers to write.
-   * @param writeQuantity the number of registers to write.
+   * @param request the {@link ReadWriteMultipleRegistersRequest} being authorized.
    * @return the result of the authorization check.
    */
-  AuthzResult authorizeReadWriteMultipleRegisters(Optional<String> clientRole, int unitId, int readAddress,
-      int readQuantity, int writeAddress, int writeQuantity);
-  
+  AuthzResult authorizeReadWriteMultipleRegisters(AuthzContext authzContext, int unitId,
+      ReadWriteMultipleRegistersRequest request);
+
   /**
    * Enumeration representing the result of an authorization check.
    */
-  public enum AuthzResult {
+  enum AuthzResult {
 
     /**
      * Indicates that the operation is allowed.
@@ -131,7 +139,7 @@ public interface AuthzHandler {
      * Indicates that the operation is denied.
      */
     DENIED
-    
+
   }
 
 }

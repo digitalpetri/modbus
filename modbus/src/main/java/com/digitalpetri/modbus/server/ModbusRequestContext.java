@@ -3,9 +3,8 @@ package com.digitalpetri.modbus.server;
 
 import com.digitalpetri.modbus.server.ModbusRequestContext.ModbusRtuRequestContext;
 import com.digitalpetri.modbus.server.ModbusRequestContext.ModbusTcpRequestContext;
+import com.digitalpetri.modbus.server.authz.AuthzContext;
 import java.net.SocketAddress;
-import java.security.cert.X509Certificate;
-import java.util.Optional;
 
 /**
  * A transport-agnostic super-interface that transport implementations can subclass to smuggle
@@ -32,23 +31,7 @@ public sealed interface ModbusRequestContext
 
   }
 
-  interface ModbusTcpTlsRequestContext extends ModbusTcpRequestContext {
-
-    /**
-     * Get the client's Role from its X509 certificate.
-     *
-     * @return the client's Role from its X509 certificate.
-     */
-    Optional<String> clientRole();
-
-    /**
-     * Get the client's X509 certificate chain.
-     *
-     * @return the client's X509 certificate chain.
-     */
-    X509Certificate[] clientCertificateChain();
-
-  }
+  interface ModbusTcpTlsRequestContext extends ModbusTcpRequestContext, AuthzContext {}
 
   non-sealed interface ModbusRtuRequestContext extends ModbusRequestContext {}
 

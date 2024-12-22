@@ -115,9 +115,7 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
     try {
       KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
       keyStore.load(null, null);
-      if (certificate != null) {
-        keyStore.setCertificateEntry("alias", certificate);
-      }
+      keyStore.setCertificateEntry("alias", certificate);
 
       TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(
           TrustManagerFactory.getDefaultAlgorithm());
