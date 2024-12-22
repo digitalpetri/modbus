@@ -8,13 +8,30 @@ import com.digitalpetri.modbus.server.ProcessImage;
 import com.digitalpetri.modbus.server.ReadWriteModbusServices;
 import com.digitalpetri.modbus.tcp.client.NettyTcpClientTransport;
 import com.digitalpetri.modbus.tcp.server.NettyTcpServerTransport;
+import com.digitalpetri.modbus.test.CertificateUtil.KeyMaterial;
+import com.digitalpetri.modbus.test.CertificateUtil.Role;
+import java.security.KeyPair;
+import java.security.KeyStore;
+import java.security.cert.X509Certificate;
 import java.util.Optional;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.TrustManagerFactory;
 import org.junit.jupiter.api.BeforeEach;
 
 public class ModbusTcpTlsClientServerIT extends ClientServerIT {
 
   ModbusTcpClient client;
   ModbusTcpServer server;
+
+  KeyMaterial clientKeyMaterial =
+      CertificateUtil.generateSelfSignedClientCertificate(Role.CLIENT);
+  KeyPair clientKeyPair = clientKeyMaterial.keyPair();
+  X509Certificate clientCertificate = clientKeyMaterial.certificate();
+
+  KeyMaterial serverKeyMaterial =
+      CertificateUtil.generateSelfSignedClientCertificate(Role.SERVER);
+  KeyPair serverKeyPair = serverKeyMaterial.keyPair();
+  X509Certificate serverCertificate = serverKeyMaterial.certificate();
 
   NettyTcpClientTransport clientTransport;
 
@@ -38,8 +55,8 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
           cfg.port = port;
 
           cfg.tlsEnabled = true;
-          cfg.keyManagerFactory = null; // TODO
-          cfg.trustManagerFactory = null; // TODO
+          cfg.keyManagerFactory = createKeyManagerFactory(serverKeyPair, serverCertificate);
+          cfg.trustManagerFactory = createTrustManagerFactory(clientCertificate);
         });
 
         System.out.println("trying port " + port);
@@ -54,13 +71,13 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
 
     final var port = serverPort;
     clientTransport = NettyTcpClientTransport.create(cfg -> {
-      cfg.hostname= "localhost";
+      cfg.hostname = "localhost";
       cfg.port = port;
       cfg.connectPersistent = false;
 
       cfg.tlsEnabled = true;
-      cfg.keyManagerFactory = null; // TODO
-      cfg.trustManagerFactory = null; // TODO
+      cfg.keyManagerFactory = createKeyManagerFactory(clientKeyPair, clientCertificate);
+      cfg.trustManagerFactory = createTrustManagerFactory(serverCertificate);
     });
 
     client = ModbusTcpClient.create(clientTransport);
@@ -75,6 +92,41 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
   @Override
   ModbusServer getServer() {
     return server;
+  }
+
+  private KeyManagerFactory createKeyManagerFactory(KeyPair keyPair, X509Certificate certificate) {
+    try {
+      KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+      keyStore.load(null, null);
+      keyStore.setKeyEntry("alias", keyPair.getPrivate(), new char[0],
+          new X509Certificate[]{certificate});
+
+      KeyManagerFactory keyManagerFactory = KeyManagerFactory.getInstance(
+          KeyManagerFactory.getDefaultAlgorithm());
+      keyManagerFactory.init(keyStore, new char[0]);
+
+      return keyManagerFactory;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private TrustManagerFactory createTrustManagerFactory(X509Certificate certificate) {
+    try {
+      KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+      keyStore.load(null, null);
+      if (certificate != null) {
+        keyStore.setCertificateEntry("alias", certificate);
+      }
+
+      TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(
+          TrustManagerFactory.getDefaultAlgorithm());
+      trustManagerFactory.init(keyStore);
+
+      return trustManagerFactory;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
 }
