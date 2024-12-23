@@ -8,7 +8,7 @@ import com.digitalpetri.modbus.server.ProcessImage;
 import com.digitalpetri.modbus.server.ReadWriteModbusServices;
 import com.digitalpetri.modbus.tcp.client.NettyTcpClientTransport;
 import com.digitalpetri.modbus.tcp.server.NettyTcpServerTransport;
-import com.digitalpetri.modbus.test.CertificateUtil.KeyMaterial;
+import com.digitalpetri.modbus.test.CertificateUtil.KeyPairCert;
 import com.digitalpetri.modbus.test.CertificateUtil.Role;
 import java.security.KeyPair;
 import java.security.KeyStore;
@@ -23,15 +23,13 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
   ModbusTcpClient client;
   ModbusTcpServer server;
 
-  KeyMaterial clientKeyMaterial =
-      CertificateUtil.generateSelfSignedClientCertificate(Role.CLIENT);
-  KeyPair clientKeyPair = clientKeyMaterial.keyPair();
-  X509Certificate clientCertificate = clientKeyMaterial.certificate();
+  KeyPairCert authorityKeyPairCert = CertificateUtil.generateCaCertificate();
 
-  KeyMaterial serverKeyMaterial =
-      CertificateUtil.generateSelfSignedClientCertificate(Role.SERVER);
-  KeyPair serverKeyPair = serverKeyMaterial.keyPair();
-  X509Certificate serverCertificate = serverKeyMaterial.certificate();
+  KeyPairCert clientKeyPairCert =
+      CertificateUtil.generateCaSignedCertificate(Role.CLIENT, authorityKeyPairCert);
+
+  KeyPairCert serverKeyPairCert =
+      CertificateUtil.generateCaSignedCertificate(Role.SERVER, authorityKeyPairCert);
 
   NettyTcpClientTransport clientTransport;
 
@@ -55,8 +53,9 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
           cfg.port = port;
 
           cfg.tlsEnabled = true;
-          cfg.keyManagerFactory = createKeyManagerFactory(serverKeyPair, serverCertificate);
-          cfg.trustManagerFactory = createTrustManagerFactory(clientCertificate);
+          cfg.keyManagerFactory = createKeyManagerFactory(serverKeyPairCert.keyPair(),
+              serverKeyPairCert.certificate());
+          cfg.trustManagerFactory = createTrustManagerFactory(authorityKeyPairCert.certificate());
         });
 
         System.out.println("trying port " + port);
@@ -76,8 +75,9 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
       cfg.connectPersistent = false;
 
       cfg.tlsEnabled = true;
-      cfg.keyManagerFactory = createKeyManagerFactory(clientKeyPair, clientCertificate);
-      cfg.trustManagerFactory = createTrustManagerFactory(serverCertificate);
+      cfg.keyManagerFactory = createKeyManagerFactory(clientKeyPairCert.keyPair(),
+          clientKeyPairCert.certificate());
+      cfg.trustManagerFactory = createTrustManagerFactory(authorityKeyPairCert.certificate());
     });
 
     client = ModbusTcpClient.create(clientTransport);
@@ -94,7 +94,8 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
     return server;
   }
 
-  private KeyManagerFactory createKeyManagerFactory(KeyPair keyPair, X509Certificate certificate) {
+  private static KeyManagerFactory createKeyManagerFactory(KeyPair keyPair,
+      X509Certificate certificate) {
     try {
       KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
       keyStore.load(null, null);
@@ -111,7 +112,7 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
     }
   }
 
-  private TrustManagerFactory createTrustManagerFactory(X509Certificate certificate) {
+  private static TrustManagerFactory createTrustManagerFactory(X509Certificate certificate) {
     try {
       KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
       keyStore.load(null, null);
