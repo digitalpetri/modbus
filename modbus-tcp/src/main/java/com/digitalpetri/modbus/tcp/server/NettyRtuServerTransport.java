@@ -27,14 +27,17 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslProtocols;
 import java.net.SocketAddress;
 import java.security.cert.X509Certificate;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import javax.net.ssl.SSLPeerUnverifiedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -206,12 +209,28 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
         return new ModbusRtuTlsRequestContext() {
           @Override
           public Optional<String> clientRole() {
-            return Optional.empty(); // TODO
+            X509Certificate x509Certificate = clientCertificateChain()[0];
+
+            byte[] bs = x509Certificate.getExtensionValue("1.3.6.1.4.1.50316.802.1");
+            if (bs != null) {
+              // Strip the leading tag and length bytes.
+              return Optional.of(new String(bs, 2, bs.length - 2));
+            } else {
+              return Optional.empty();
+            }
           }
 
           @Override
           public X509Certificate[] clientCertificateChain() {
-            return new X509Certificate[0]; // TODO
+            try {
+              SslHandler handler = ctx.channel().pipeline().get(SslHandler.class);
+
+              return Arrays.stream(handler.engine().getSession().getPeerCertificates())
+                  .map(cert -> (X509Certificate) cert)
+                  .toArray(X509Certificate[]::new);
+            } catch (SSLPeerUnverifiedException e) {
+              throw new RuntimeException(e);
+            }
           }
 
           @Override
