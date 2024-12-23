@@ -61,7 +61,7 @@ public class AuthzModbusServices implements ModbusServices {
 
       if (result == AuthzResult.DENIED) {
         throw new ModbusResponseException(FunctionCode.READ_COILS,
-            ExceptionCode.ILLEGAL_DATA_ADDRESS);
+            ExceptionCode.ILLEGAL_FUNCTION);
       }
     }
 
@@ -80,7 +80,7 @@ public class AuthzModbusServices implements ModbusServices {
 
       if (result == AuthzResult.DENIED) {
         throw new ModbusResponseException(FunctionCode.READ_DISCRETE_INPUTS,
-            ExceptionCode.ILLEGAL_DATA_ADDRESS);
+            ExceptionCode.ILLEGAL_FUNCTION);
       }
     }
 
@@ -99,7 +99,7 @@ public class AuthzModbusServices implements ModbusServices {
 
       if (result == AuthzResult.DENIED) {
         throw new ModbusResponseException(FunctionCode.READ_HOLDING_REGISTERS,
-            ExceptionCode.ILLEGAL_DATA_ADDRESS);
+            ExceptionCode.ILLEGAL_FUNCTION);
       }
     }
 
@@ -118,7 +118,7 @@ public class AuthzModbusServices implements ModbusServices {
 
       if (result == AuthzResult.DENIED) {
         throw new ModbusResponseException(FunctionCode.READ_INPUT_REGISTERS,
-            ExceptionCode.ILLEGAL_DATA_ADDRESS);
+            ExceptionCode.ILLEGAL_FUNCTION);
       }
     }
 
@@ -137,7 +137,7 @@ public class AuthzModbusServices implements ModbusServices {
 
       if (result == AuthzResult.DENIED) {
         throw new ModbusResponseException(FunctionCode.WRITE_SINGLE_COIL,
-            ExceptionCode.ILLEGAL_DATA_ADDRESS);
+            ExceptionCode.ILLEGAL_FUNCTION);
       }
     }
 
@@ -156,7 +156,7 @@ public class AuthzModbusServices implements ModbusServices {
 
       if (result == AuthzResult.DENIED) {
         throw new ModbusResponseException(FunctionCode.WRITE_SINGLE_REGISTER,
-            ExceptionCode.ILLEGAL_DATA_ADDRESS);
+            ExceptionCode.ILLEGAL_FUNCTION);
       }
     }
 
@@ -175,7 +175,7 @@ public class AuthzModbusServices implements ModbusServices {
 
       if (result == AuthzResult.DENIED) {
         throw new ModbusResponseException(FunctionCode.WRITE_MULTIPLE_COILS,
-            ExceptionCode.ILLEGAL_DATA_ADDRESS);
+            ExceptionCode.ILLEGAL_FUNCTION);
       }
     }
 
@@ -194,7 +194,7 @@ public class AuthzModbusServices implements ModbusServices {
 
       if (result == AuthzResult.DENIED) {
         throw new ModbusResponseException(FunctionCode.WRITE_MULTIPLE_REGISTERS,
-            ExceptionCode.ILLEGAL_DATA_ADDRESS);
+            ExceptionCode.ILLEGAL_FUNCTION);
       }
     }
 
@@ -213,7 +213,7 @@ public class AuthzModbusServices implements ModbusServices {
 
       if (result == AuthzResult.DENIED) {
         throw new ModbusResponseException(FunctionCode.MASK_WRITE_REGISTER,
-            ExceptionCode.ILLEGAL_DATA_ADDRESS);
+            ExceptionCode.ILLEGAL_FUNCTION);
       }
     }
 
@@ -232,11 +232,11 @@ public class AuthzModbusServices implements ModbusServices {
 
       if (result == AuthzResult.DENIED) {
         throw new ModbusResponseException(FunctionCode.READ_WRITE_MULTIPLE_REGISTERS,
-            ExceptionCode.ILLEGAL_DATA_ADDRESS);
+            ExceptionCode.ILLEGAL_FUNCTION);
       }
     }
 
     return modbusServices.readWriteMultipleRegisters(context, unitId, request);
   }
-  
+
 }
