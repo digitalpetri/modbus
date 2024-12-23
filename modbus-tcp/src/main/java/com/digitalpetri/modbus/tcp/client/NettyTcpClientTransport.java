@@ -24,6 +24,7 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslProtocols;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -167,6 +168,13 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
         executionQueue.submit(() -> frameReceiver.accept(frame));
       }
     }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+      logger.error("Exception caught", cause);
+      ctx.close();
+    }
+
   }
 
   private class ModbusTcpChannelActions implements ChannelActions {
@@ -187,7 +195,21 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
       bootstrap.connect(config.hostname(), config.port()).addListener(
           (ChannelFutureListener) channelFuture -> {
             if (channelFuture.isSuccess()) {
-              future.complete(channelFuture.channel());
+              Channel channel = channelFuture.channel();
+
+              if (config.tlsEnabled()) {
+                channel.pipeline().get(SslHandler.class).handshakeFuture().addListener(
+                    handshakeFuture -> {
+                      if (handshakeFuture.isSuccess()) {
+                        future.complete(channel);
+                      } else {
+                        future.completeExceptionally(handshakeFuture.cause());
+                      }
+                    }
+                );
+              } else {
+                future.complete(channel);
+              }
             } else {
               future.completeExceptionally(channelFuture.cause());
             }

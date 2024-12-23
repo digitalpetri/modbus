@@ -143,6 +143,12 @@ public class NettyTcpServerTransport implements ModbusTcpServerTransport {
   private class ModbusTcpFrameHandler extends SimpleChannelInboundHandler<ModbusTcpFrame> {
 
     @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+      logger.error("Exception caught", cause);
+      ctx.close();
+    }
+
+    @Override
     protected void channelRead0(ChannelHandlerContext ctx, ModbusTcpFrame requestFrame) {
       FrameReceiver<ModbusTcpRequestContext, ModbusTcpFrame> frameReceiver =
           NettyTcpServerTransport.this.frameReceiver.get();
@@ -164,6 +170,7 @@ public class NettyTcpServerTransport implements ModbusTcpServerTransport {
           }
         });
       }
+
     }
 
     private ModbusTcpRequestContext requestContext(ChannelHandlerContext ctx) {
