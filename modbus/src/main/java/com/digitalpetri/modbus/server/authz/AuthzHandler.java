@@ -131,14 +131,14 @@ public interface AuthzHandler {
   enum AuthzResult {
 
     /**
-     * Indicates that the operation is allowed.
+     * Indicates that the operation is authorized.
      */
-    ALLOWED,
+    AUTHORIZED,
 
     /**
-     * Indicates that the operation is denied.
+     * Indicates that the operation is not authorized.
      */
-    DENIED
+    NOT_AUTHORIZED
 
   }
 

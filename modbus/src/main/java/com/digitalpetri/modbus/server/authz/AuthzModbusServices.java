@@ -59,7 +59,7 @@ public class AuthzModbusServices implements ModbusServices {
     if (context instanceof ModbusTcpTlsRequestContext ctx) {
       AuthzResult result = authzHandler.authorizeReadCoils(ctx, unitId, request);
 
-      if (result == AuthzResult.DENIED) {
+      if (result == AuthzResult.NOT_AUTHORIZED) {
         throw new ModbusResponseException(FunctionCode.READ_COILS,
             ExceptionCode.ILLEGAL_FUNCTION);
       }
@@ -78,7 +78,7 @@ public class AuthzModbusServices implements ModbusServices {
     if (context instanceof ModbusTcpTlsRequestContext ctx) {
       AuthzResult result = authzHandler.authorizeReadDiscreteInputs(ctx, unitId, request);
 
-      if (result == AuthzResult.DENIED) {
+      if (result == AuthzResult.NOT_AUTHORIZED) {
         throw new ModbusResponseException(FunctionCode.READ_DISCRETE_INPUTS,
             ExceptionCode.ILLEGAL_FUNCTION);
       }
@@ -97,7 +97,7 @@ public class AuthzModbusServices implements ModbusServices {
     if (context instanceof ModbusTcpTlsRequestContext ctx) {
       AuthzResult result = authzHandler.authorizeReadHoldingRegisters(ctx, unitId, request);
 
-      if (result == AuthzResult.DENIED) {
+      if (result == AuthzResult.NOT_AUTHORIZED) {
         throw new ModbusResponseException(FunctionCode.READ_HOLDING_REGISTERS,
             ExceptionCode.ILLEGAL_FUNCTION);
       }
@@ -116,7 +116,7 @@ public class AuthzModbusServices implements ModbusServices {
     if (context instanceof ModbusTcpTlsRequestContext ctx) {
       AuthzResult result = authzHandler.authorizeReadInputRegisters(ctx, unitId, request);
 
-      if (result == AuthzResult.DENIED) {
+      if (result == AuthzResult.NOT_AUTHORIZED) {
         throw new ModbusResponseException(FunctionCode.READ_INPUT_REGISTERS,
             ExceptionCode.ILLEGAL_FUNCTION);
       }
@@ -135,7 +135,7 @@ public class AuthzModbusServices implements ModbusServices {
     if (context instanceof ModbusTcpTlsRequestContext ctx) {
       AuthzResult result = authzHandler.authorizeWriteSingleCoil(ctx, unitId, request);
 
-      if (result == AuthzResult.DENIED) {
+      if (result == AuthzResult.NOT_AUTHORIZED) {
         throw new ModbusResponseException(FunctionCode.WRITE_SINGLE_COIL,
             ExceptionCode.ILLEGAL_FUNCTION);
       }
@@ -154,7 +154,7 @@ public class AuthzModbusServices implements ModbusServices {
     if (context instanceof ModbusTcpTlsRequestContext ctx) {
       AuthzResult result = authzHandler.authorizeWriteSingleRegister(ctx, unitId, request);
 
-      if (result == AuthzResult.DENIED) {
+      if (result == AuthzResult.NOT_AUTHORIZED) {
         throw new ModbusResponseException(FunctionCode.WRITE_SINGLE_REGISTER,
             ExceptionCode.ILLEGAL_FUNCTION);
       }
@@ -173,7 +173,7 @@ public class AuthzModbusServices implements ModbusServices {
     if (context instanceof ModbusTcpTlsRequestContext ctx) {
       AuthzResult result = authzHandler.authorizeWriteMultipleCoils(ctx, unitId, request);
 
-      if (result == AuthzResult.DENIED) {
+      if (result == AuthzResult.NOT_AUTHORIZED) {
         throw new ModbusResponseException(FunctionCode.WRITE_MULTIPLE_COILS,
             ExceptionCode.ILLEGAL_FUNCTION);
       }
@@ -192,7 +192,7 @@ public class AuthzModbusServices implements ModbusServices {
     if (context instanceof ModbusTcpTlsRequestContext ctx) {
       AuthzResult result = authzHandler.authorizeWriteMultipleRegisters(ctx, unitId, request);
 
-      if (result == AuthzResult.DENIED) {
+      if (result == AuthzResult.NOT_AUTHORIZED) {
         throw new ModbusResponseException(FunctionCode.WRITE_MULTIPLE_REGISTERS,
             ExceptionCode.ILLEGAL_FUNCTION);
       }
@@ -211,7 +211,7 @@ public class AuthzModbusServices implements ModbusServices {
     if (context instanceof ModbusTcpTlsRequestContext ctx) {
       AuthzResult result = authzHandler.authorizeMaskWriteRegister(ctx, unitId, request);
 
-      if (result == AuthzResult.DENIED) {
+      if (result == AuthzResult.NOT_AUTHORIZED) {
         throw new ModbusResponseException(FunctionCode.MASK_WRITE_REGISTER,
             ExceptionCode.ILLEGAL_FUNCTION);
       }
@@ -230,7 +230,7 @@ public class AuthzModbusServices implements ModbusServices {
     if (context instanceof ModbusTcpTlsRequestContext ctx) {
       AuthzResult result = authzHandler.authorizeReadWriteMultipleRegisters(ctx, unitId, request);
 
-      if (result == AuthzResult.DENIED) {
+      if (result == AuthzResult.NOT_AUTHORIZED) {
         throw new ModbusResponseException(FunctionCode.READ_WRITE_MULTIPLE_REGISTERS,
             ExceptionCode.ILLEGAL_FUNCTION);
       }
