@@ -46,8 +46,8 @@ public class CertificateUtil {
 
       var certSerialNumber = new BigInteger(Long.toString(System.currentTimeMillis()));
 
-      SubjectPublicKeyInfo subjectPublicKeyInfo = SubjectPublicKeyInfo.getInstance(
-          keyPair.getPublic().getEncoded());
+      SubjectPublicKeyInfo subjectPublicKeyInfo =
+          SubjectPublicKeyInfo.getInstance(keyPair.getPublic().getEncoded());
 
       var certificateBuilder = new X509v3CertificateBuilder(
           name,
@@ -55,7 +55,8 @@ public class CertificateUtil {
           new Date(),
           new Date(System.currentTimeMillis() + 365 * 24 * 60 * 60 * 1000L),
           name,
-          subjectPublicKeyInfo);
+          subjectPublicKeyInfo
+      );
 
       var basicConstraints = new BasicConstraints(false);
       certificateBuilder.addExtension(Extension.basicConstraints, false, basicConstraints);
@@ -64,35 +65,42 @@ public class CertificateUtil {
       certificateBuilder.addExtension(
           Extension.keyUsage,
           false,
-          new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment));
+          new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment)
+      );
 
       // Extended Key Usage
       certificateBuilder.addExtension(
           Extension.extendedKeyUsage,
           false,
           new ExtendedKeyUsage(
-              role == Role.CLIENT ? KeyPurposeId.id_kp_clientAuth : KeyPurposeId.id_kp_serverAuth));
+              role == Role.CLIENT
+                  ? KeyPurposeId.id_kp_clientAuth : KeyPurposeId.id_kp_serverAuth
+          )
+      );
 
       // Authority Key Identifier
       certificateBuilder.addExtension(
           Extension.authorityKeyIdentifier,
           false,
           new JcaX509ExtensionUtils()
-              .createAuthorityKeyIdentifier(keyPair.getPublic()));
+              .createAuthorityKeyIdentifier(keyPair.getPublic())
+      );
 
       // Subject Key Identifier
       certificateBuilder.addExtension(
           Extension.subjectKeyIdentifier,
           false,
           new JcaX509ExtensionUtils()
-              .createSubjectKeyIdentifier(keyPair.getPublic()));
+              .createSubjectKeyIdentifier(keyPair.getPublic())
+      );
 
       // Subject Alternative Name
       if (role == Role.SERVER) {
         certificateBuilder.addExtension(
             Extension.subjectAlternativeName,
             false,
-            new GeneralNames(new GeneralName[]{new GeneralName(GeneralName.dNSName, "localhost")}));
+            new GeneralNames(new GeneralName[]{new GeneralName(GeneralName.dNSName, "localhost")})
+        );
       }
 
       // Modbus Security Role OID
@@ -100,7 +108,8 @@ public class CertificateUtil {
         certificateBuilder.addExtension(
             new ASN1ObjectIdentifier("1.3.6.1.4.1.50316.802.1"),
             false,
-            new DEROctetString("Operator".getBytes()));
+            new DEROctetString("Operator".getBytes())
+        );
       }
 
       var contentSigner = new JcaContentSignerBuilder("SHA256withRSA")
@@ -109,8 +118,8 @@ public class CertificateUtil {
 
       X509CertificateHolder certificateHolder = certificateBuilder.build(contentSigner);
 
-      X509Certificate certificate = new JcaX509CertificateConverter().getCertificate(
-          certificateHolder);
+      X509Certificate certificate =
+          new JcaX509CertificateConverter().getCertificate(certificateHolder);
 
       return new KeyPairCert(keyPair, certificate);
     } catch (Exception e) {
@@ -134,8 +143,8 @@ public class CertificateUtil {
 
       var certSerialNumber = new BigInteger(Long.toString(System.currentTimeMillis()));
 
-      SubjectPublicKeyInfo subjectPublicKeyInfo = SubjectPublicKeyInfo.getInstance(
-          keyPair.getPublic().getEncoded());
+      SubjectPublicKeyInfo subjectPublicKeyInfo =
+          SubjectPublicKeyInfo.getInstance(keyPair.getPublic().getEncoded());
 
       var certificateBuilder = new X509v3CertificateBuilder(
           new X500Name(caKeyPairCert.certificate().getSubjectX500Principal().getName()),
@@ -143,7 +152,8 @@ public class CertificateUtil {
           new Date(),
           new Date(System.currentTimeMillis() + 365 * 24 * 60 * 60 * 1000L),
           name,
-          subjectPublicKeyInfo);
+          subjectPublicKeyInfo
+      );
 
       var basicConstraints = new BasicConstraints(false);
       certificateBuilder.addExtension(Extension.basicConstraints, false, basicConstraints);
@@ -152,35 +162,42 @@ public class CertificateUtil {
       certificateBuilder.addExtension(
           Extension.keyUsage,
           false,
-          new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment));
+          new KeyUsage(KeyUsage.digitalSignature | KeyUsage.keyEncipherment)
+      );
 
       // Extended Key Usage
       certificateBuilder.addExtension(
           Extension.extendedKeyUsage,
           false,
           new ExtendedKeyUsage(
-              role == Role.CLIENT ? KeyPurposeId.id_kp_clientAuth : KeyPurposeId.id_kp_serverAuth));
+              role == Role.CLIENT
+                  ? KeyPurposeId.id_kp_clientAuth : KeyPurposeId.id_kp_serverAuth
+          )
+      );
 
       // Authority Key Identifier
       certificateBuilder.addExtension(
           Extension.authorityKeyIdentifier,
           false,
           new JcaX509ExtensionUtils()
-              .createAuthorityKeyIdentifier(caKeyPairCert.certificate()));
+              .createAuthorityKeyIdentifier(caKeyPairCert.certificate())
+      );
 
       // Subject Key Identifier
       certificateBuilder.addExtension(
           Extension.subjectKeyIdentifier,
           false,
           new JcaX509ExtensionUtils()
-              .createSubjectKeyIdentifier(keyPair.getPublic()));
+              .createSubjectKeyIdentifier(keyPair.getPublic())
+      );
 
       // Subject Alternative Name
       if (role == Role.SERVER) {
         certificateBuilder.addExtension(
             Extension.subjectAlternativeName,
             false,
-            new GeneralNames(new GeneralName[]{new GeneralName(GeneralName.dNSName, "localhost")}));
+            new GeneralNames(new GeneralName[]{new GeneralName(GeneralName.dNSName, "localhost")})
+        );
       }
 
       // Modbus Security Role OID
@@ -188,7 +205,8 @@ public class CertificateUtil {
         certificateBuilder.addExtension(
             new ASN1ObjectIdentifier("1.3.6.1.4.1.50316.802.1"),
             false,
-            new DEROctetString("Operator".getBytes()));
+            new DEROctetString("Operator".getBytes())
+        );
       }
 
       var contentSigner = new JcaContentSignerBuilder("SHA256withRSA")
@@ -197,8 +215,8 @@ public class CertificateUtil {
 
       X509CertificateHolder certificateHolder = certificateBuilder.build(contentSigner);
 
-      X509Certificate certificate = new JcaX509CertificateConverter().getCertificate(
-          certificateHolder);
+      X509Certificate certificate =
+          new JcaX509CertificateConverter().getCertificate(certificateHolder);
 
       return new KeyPairCert(keyPair, certificate);
     } catch (Exception e) {
@@ -218,8 +236,8 @@ public class CertificateUtil {
 
       var certSerialNumber = new BigInteger(Long.toString(System.currentTimeMillis()));
 
-      SubjectPublicKeyInfo subjectPublicKeyInfo = SubjectPublicKeyInfo.getInstance(
-          keyPair.getPublic().getEncoded());
+      SubjectPublicKeyInfo subjectPublicKeyInfo =
+          SubjectPublicKeyInfo.getInstance(keyPair.getPublic().getEncoded());
 
       var certificateBuilder = new X509v3CertificateBuilder(
           name,
@@ -228,7 +246,8 @@ public class CertificateUtil {
           new Date(System.currentTimeMillis() + 365 * 24 * 60 * 60 * 1000L),
           Locale.ENGLISH,
           name,
-          subjectPublicKeyInfo);
+          subjectPublicKeyInfo
+      );
 
       var basicConstraints = new BasicConstraints(true);
       certificateBuilder.addExtension(Extension.basicConstraints, true, basicConstraints);
@@ -237,21 +256,24 @@ public class CertificateUtil {
       certificateBuilder.addExtension(
           Extension.keyUsage,
           true,
-          new KeyUsage(KeyUsage.keyCertSign | KeyUsage.cRLSign));
+          new KeyUsage(KeyUsage.keyCertSign | KeyUsage.cRLSign)
+      );
 
       // Authority Key Identifier
       certificateBuilder.addExtension(
           Extension.authorityKeyIdentifier,
           false,
           new JcaX509ExtensionUtils()
-              .createAuthorityKeyIdentifier(keyPair.getPublic()));
+              .createAuthorityKeyIdentifier(keyPair.getPublic())
+      );
 
       // Subject Key Identifier
       certificateBuilder.addExtension(
           Extension.subjectKeyIdentifier,
           false,
           new JcaX509ExtensionUtils()
-              .createSubjectKeyIdentifier(keyPair.getPublic()));
+              .createSubjectKeyIdentifier(keyPair.getPublic())
+      );
 
       var contentSigner = new JcaContentSignerBuilder("SHA256withRSA")
           .setProvider(new BouncyCastleProvider())
@@ -259,8 +281,8 @@ public class CertificateUtil {
 
       X509CertificateHolder certificateHolder = certificateBuilder.build(contentSigner);
 
-      X509Certificate certificate = new JcaX509CertificateConverter().getCertificate(
-          certificateHolder);
+      X509Certificate certificate =
+          new JcaX509CertificateConverter().getCertificate(certificateHolder);
 
       return new KeyPairCert(keyPair, certificate);
     } catch (Exception e) {

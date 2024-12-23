@@ -53,8 +53,10 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
           cfg.port = port;
 
           cfg.tlsEnabled = true;
-          cfg.keyManagerFactory = createKeyManagerFactory(serverKeyPairCert.keyPair(),
-              serverKeyPairCert.certificate());
+          cfg.keyManagerFactory = createKeyManagerFactory(
+              serverKeyPairCert.keyPair(),
+              serverKeyPairCert.certificate()
+          );
           cfg.trustManagerFactory = createTrustManagerFactory(authorityKeyPairCert.certificate());
         });
 
@@ -75,8 +77,10 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
       cfg.connectPersistent = false;
 
       cfg.tlsEnabled = true;
-      cfg.keyManagerFactory = createKeyManagerFactory(clientKeyPairCert.keyPair(),
-          clientKeyPairCert.certificate());
+      cfg.keyManagerFactory = createKeyManagerFactory(
+          clientKeyPairCert.keyPair(),
+          clientKeyPairCert.certificate()
+      );
       cfg.trustManagerFactory = createTrustManagerFactory(authorityKeyPairCert.certificate());
     });
 
@@ -94,8 +98,11 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
     return server;
   }
 
-  private static KeyManagerFactory createKeyManagerFactory(KeyPair keyPair,
-      X509Certificate certificate) {
+  private static KeyManagerFactory createKeyManagerFactory(
+      KeyPair keyPair,
+      X509Certificate certificate
+  ) {
+
     try {
       KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
       keyStore.load(null, null);

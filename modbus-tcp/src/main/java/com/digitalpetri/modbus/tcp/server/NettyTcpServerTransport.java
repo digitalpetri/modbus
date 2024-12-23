@@ -184,9 +184,10 @@ public class NettyTcpServerTransport implements ModbusTcpServerTransport {
             X509Certificate x509Certificate = clientCertificateChain()[0];
 
             byte[] bs = x509Certificate.getExtensionValue("1.3.6.1.4.1.50316.802.1");
+            
             if (bs != null) {
               // Strip the leading tag and length bytes.
-              return Optional.of(new String(bs, 2, bs.length - 2));
+              return Optional.of(new String(bs, 4, bs.length - 4));
             } else {
               return Optional.empty();
             }
