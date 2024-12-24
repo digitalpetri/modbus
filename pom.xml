@@ -49,15 +49,15 @@
 
     <!-- Dependencies -->
     <jserialcomm.version>2.11.0</jserialcomm.version>
-    <netty.version>4.1.112.Final</netty.version>
+    <netty.version>4.1.116.Final</netty.version>
     <netty-channel-fsm.version>1.0.0</netty-channel-fsm.version>
     <slf4j.version>2.0.16</slf4j.version>
 
     <!-- Test Dependencies -->
-    <junit.version>5.10.2</junit.version>
+    <junit.version>5.11.4</junit.version>
 
     <!-- Plugin Dependencies -->
-    <checkstyle.version>10.17.0</checkstyle.version>
+    <checkstyle.version>10.21.0</checkstyle.version>
     <maven-checkstyle-plugin.version>3.4.0</maven-checkstyle-plugin.version>
     <maven-compiler-plugin.version>3.13.0</maven-compiler-plugin.version>
     <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
