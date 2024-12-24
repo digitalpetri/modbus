@@ -1,5 +1,7 @@
 package com.digitalpetri.modbus;
 
+import com.digitalpetri.modbus.internal.util.ExecutionQueue;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -23,9 +25,10 @@ public interface TimeoutScheduler {
 
   }
 
-  static TimeoutScheduler fromScheduledExecutor(ScheduledExecutorService ses) {
+  static TimeoutScheduler create(Executor executor, ScheduledExecutorService scheduledExecutor) {
     return (task, delay, unit) -> {
       final var ref = new AtomicReference<ScheduledFuture<?>>();
+      final ExecutionQueue queue = new ExecutionQueue(executor);
 
       var handle = new TimeoutHandle() {
         @Override
@@ -44,7 +47,12 @@ public interface TimeoutScheduler {
       };
 
       synchronized (ref) {
-        ref.set(ses.schedule(() -> task.run(handle), delay, unit));
+        ScheduledFuture<?> future = scheduledExecutor.schedule(
+            () -> queue.submit(() -> task.run(handle)),
+            delay,
+            unit
+        );
+        ref.set(future);
       }
 
       return handle;
