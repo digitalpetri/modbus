@@ -8,8 +8,6 @@ import com.digitalpetri.modbus.ModbusRtuRequestFrameParser.ParserState;
 import com.digitalpetri.modbus.exceptions.UnknownUnitIdException;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
 import com.digitalpetri.modbus.server.ModbusRequestContext.ModbusRtuRequestContext;
-import com.digitalpetri.modbus.server.ModbusRequestContext.ModbusRtuTcpRequestContext;
-import com.digitalpetri.modbus.server.ModbusRequestContext.ModbusRtuTlsRequestContext;
 import com.digitalpetri.modbus.server.ModbusRtuServerTransport;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
@@ -27,17 +25,11 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
-import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslProtocols;
-import java.net.SocketAddress;
-import java.security.cert.X509Certificate;
-import java.util.Arrays;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
-import javax.net.ssl.SSLPeerUnverifiedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -184,7 +176,7 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
         executionQueue.submit(() -> {
           try {
             ModbusRtuFrame responseFrame =
-                frameReceiver.receive(requestContext(ctx), requestFrame);
+                frameReceiver.receive(new NettyRequestContext(ctx), requestFrame);
 
             ByteBuf buffer = Unpooled.buffer();
             buffer.writeByte(responseFrame.unitId());
@@ -202,61 +194,6 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
         });
       }
 
-    }
-
-    private ModbusRtuRequestContext requestContext(ChannelHandlerContext ctx) {
-      if (config.tlsEnabled()) {
-        return new ModbusRtuTlsRequestContext() {
-          @Override
-          public Optional<String> clientRole() {
-            X509Certificate x509Certificate = clientCertificateChain()[0];
-
-            byte[] bs = x509Certificate.getExtensionValue("1.3.6.1.4.1.50316.802.1");
-
-            if (bs != null) {
-              // Strip the leading tag and length bytes.
-              return Optional.of(new String(bs, 4, bs.length - 4));
-            } else {
-              return Optional.empty();
-            }
-          }
-
-          @Override
-          public X509Certificate[] clientCertificateChain() {
-            try {
-              SslHandler handler = ctx.channel().pipeline().get(SslHandler.class);
-
-              return Arrays.stream(handler.engine().getSession().getPeerCertificates())
-                  .map(cert -> (X509Certificate) cert)
-                  .toArray(X509Certificate[]::new);
-            } catch (SSLPeerUnverifiedException e) {
-              throw new RuntimeException(e);
-            }
-          }
-
-          @Override
-          public SocketAddress localAddress() {
-            return ctx.channel().localAddress();
-          }
-
-          @Override
-          public SocketAddress remoteAddress() {
-            return ctx.channel().remoteAddress();
-          }
-        };
-      } else {
-        return new ModbusRtuTcpRequestContext() {
-          @Override
-          public SocketAddress localAddress() {
-            return ctx.channel().localAddress();
-          }
-
-          @Override
-          public SocketAddress remoteAddress() {
-            return ctx.channel().remoteAddress();
-          }
-        };
-      }
     }
 
   }
