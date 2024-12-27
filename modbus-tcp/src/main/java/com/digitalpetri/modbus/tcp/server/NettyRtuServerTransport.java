@@ -7,6 +7,7 @@ import com.digitalpetri.modbus.ModbusRtuRequestFrameParser.ParseError;
 import com.digitalpetri.modbus.ModbusRtuRequestFrameParser.ParserState;
 import com.digitalpetri.modbus.exceptions.UnknownUnitIdException;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
+import com.digitalpetri.modbus.server.ModbusRequestContext.ModbusRtuRequestContext;
 import com.digitalpetri.modbus.server.ModbusRtuServerTransport;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.ByteBuf;
@@ -21,7 +22,10 @@ import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
-import java.net.SocketAddress;
+import io.netty.handler.ssl.ClientAuth;
+import io.netty.handler.ssl.SslContext;
+import io.netty.handler.ssl.SslContextBuilder;
+import io.netty.handler.ssl.SslProtocols;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
@@ -63,9 +67,20 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
     bootstrap.channel(NioServerSocketChannel.class)
         .childHandler(new ChannelInitializer<SocketChannel>() {
           @Override
-          protected void initChannel(SocketChannel ch) {
-            if (clientChannel.compareAndSet(null, ch)) {
-              ch.pipeline()
+          protected void initChannel(SocketChannel channel) throws Exception {
+            if (clientChannel.compareAndSet(null, channel)) {
+              if (config.tlsEnabled()) {
+                SslContext sslContext =
+                    SslContextBuilder.forServer(config.keyManagerFactory().orElseThrow())
+                        .clientAuth(ClientAuth.REQUIRE)
+                        .trustManager(config.trustManagerFactory().orElseThrow())
+                        .protocols(SslProtocols.TLS_v1_2, SslProtocols.TLS_v1_3)
+                        .build();
+
+                channel.pipeline().addLast(sslContext.newHandler(channel.alloc()));
+              }
+
+              channel.pipeline()
                   .addLast(new ChannelInboundHandlerAdapter() {
                     @Override
                     public void channelInactive(ChannelHandlerContext ctx) {
@@ -74,9 +89,9 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
                   })
                   .addLast(new ModbusRtuServerFrameReceiver());
 
-              config.pipelineCustomizer().accept(ch.pipeline());
+              config.pipelineCustomizer().accept(channel.pipeline());
             } else {
-              ch.close();
+              channel.close();
             }
           }
         });
@@ -161,7 +176,7 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
         executionQueue.submit(() -> {
           try {
             ModbusRtuFrame responseFrame =
-                frameReceiver.receive(requestContext(ctx), requestFrame);
+                frameReceiver.receive(new NettyRequestContext(ctx), requestFrame);
 
             ByteBuf buffer = Unpooled.buffer();
             buffer.writeByte(responseFrame.unitId());
@@ -179,20 +194,6 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
         });
       }
 
-    }
-
-    private static ModbusRtuTcpRequestContext requestContext(ChannelHandlerContext ctx) {
-      return new ModbusRtuTcpRequestContext() {
-        @Override
-        public SocketAddress localAddress() {
-          return ctx.channel().localAddress();
-        }
-
-        @Override
-        public SocketAddress remoteAddress() {
-          return ctx.channel().remoteAddress();
-        }
-      };
     }
 
   }

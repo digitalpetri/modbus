@@ -10,7 +10,7 @@ import com.digitalpetri.modbus.pdu.ReadHoldingRegistersRequest;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersResponse;
 import com.digitalpetri.modbus.pdu.ReadInputRegistersRequest;
 import com.digitalpetri.modbus.pdu.ReadInputRegistersResponse;
-import com.digitalpetri.modbus.server.ModbusTcpServerTransport.ModbusTcpRequestContext;
+import com.digitalpetri.modbus.server.ModbusRequestContext.ModbusTcpRequestContext;
 import java.net.SocketAddress;
 import java.util.Optional;
 import java.util.Random;
