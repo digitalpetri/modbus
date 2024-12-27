@@ -25,7 +25,6 @@ import com.digitalpetri.modbus.pdu.WriteSingleCoilResponse;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterResponse;
 import com.digitalpetri.modbus.server.ModbusRequestContext;
-import com.digitalpetri.modbus.server.ModbusRequestContext.ModbusTcpTlsRequestContext;
 import com.digitalpetri.modbus.server.ModbusServices;
 import com.digitalpetri.modbus.server.authz.AuthzHandler.AuthzResult;
 
@@ -56,7 +55,7 @@ public class AuthzModbusServices implements ModbusServices {
       ReadCoilsRequest request
   ) throws ModbusResponseException, UnknownUnitIdException {
 
-    if (context instanceof ModbusTcpTlsRequestContext ctx) {
+    if (context instanceof AuthzContext ctx) {
       AuthzResult result = authzHandler.authorizeReadCoils(ctx, unitId, request);
 
       if (result != AuthzResult.AUTHORIZED) {
@@ -75,7 +74,7 @@ public class AuthzModbusServices implements ModbusServices {
       ReadDiscreteInputsRequest request
   ) throws ModbusResponseException, UnknownUnitIdException {
 
-    if (context instanceof ModbusTcpTlsRequestContext ctx) {
+    if (context instanceof AuthzContext ctx) {
       AuthzResult result = authzHandler.authorizeReadDiscreteInputs(ctx, unitId, request);
 
       if (result != AuthzResult.AUTHORIZED) {
@@ -94,7 +93,7 @@ public class AuthzModbusServices implements ModbusServices {
       ReadHoldingRegistersRequest request
   ) throws ModbusResponseException, UnknownUnitIdException {
 
-    if (context instanceof ModbusTcpTlsRequestContext ctx) {
+    if (context instanceof AuthzContext ctx) {
       AuthzResult result = authzHandler.authorizeReadHoldingRegisters(ctx, unitId, request);
 
       if (result != AuthzResult.AUTHORIZED) {
@@ -113,7 +112,7 @@ public class AuthzModbusServices implements ModbusServices {
       ReadInputRegistersRequest request
   ) throws ModbusResponseException, UnknownUnitIdException {
 
-    if (context instanceof ModbusTcpTlsRequestContext ctx) {
+    if (context instanceof AuthzContext ctx) {
       AuthzResult result = authzHandler.authorizeReadInputRegisters(ctx, unitId, request);
 
       if (result != AuthzResult.AUTHORIZED) {
@@ -132,7 +131,7 @@ public class AuthzModbusServices implements ModbusServices {
       WriteSingleCoilRequest request
   ) throws ModbusResponseException, UnknownUnitIdException {
 
-    if (context instanceof ModbusTcpTlsRequestContext ctx) {
+    if (context instanceof AuthzContext ctx) {
       AuthzResult result = authzHandler.authorizeWriteSingleCoil(ctx, unitId, request);
 
       if (result != AuthzResult.AUTHORIZED) {
@@ -151,7 +150,7 @@ public class AuthzModbusServices implements ModbusServices {
       WriteSingleRegisterRequest request
   ) throws ModbusResponseException, UnknownUnitIdException {
 
-    if (context instanceof ModbusTcpTlsRequestContext ctx) {
+    if (context instanceof AuthzContext ctx) {
       AuthzResult result = authzHandler.authorizeWriteSingleRegister(ctx, unitId, request);
 
       if (result != AuthzResult.AUTHORIZED) {
@@ -170,7 +169,7 @@ public class AuthzModbusServices implements ModbusServices {
       WriteMultipleCoilsRequest request
   ) throws ModbusResponseException, UnknownUnitIdException {
 
-    if (context instanceof ModbusTcpTlsRequestContext ctx) {
+    if (context instanceof AuthzContext ctx) {
       AuthzResult result = authzHandler.authorizeWriteMultipleCoils(ctx, unitId, request);
 
       if (result != AuthzResult.AUTHORIZED) {
@@ -189,7 +188,7 @@ public class AuthzModbusServices implements ModbusServices {
       WriteMultipleRegistersRequest request
   ) throws ModbusResponseException, UnknownUnitIdException {
 
-    if (context instanceof ModbusTcpTlsRequestContext ctx) {
+    if (context instanceof AuthzContext ctx) {
       AuthzResult result = authzHandler.authorizeWriteMultipleRegisters(ctx, unitId, request);
 
       if (result != AuthzResult.AUTHORIZED) {
@@ -208,7 +207,7 @@ public class AuthzModbusServices implements ModbusServices {
       MaskWriteRegisterRequest request
   ) throws ModbusResponseException, UnknownUnitIdException {
 
-    if (context instanceof ModbusTcpTlsRequestContext ctx) {
+    if (context instanceof AuthzContext ctx) {
       AuthzResult result = authzHandler.authorizeMaskWriteRegister(ctx, unitId, request);
 
       if (result != AuthzResult.AUTHORIZED) {
@@ -227,7 +226,7 @@ public class AuthzModbusServices implements ModbusServices {
       ReadWriteMultipleRegistersRequest request
   ) throws ModbusResponseException, UnknownUnitIdException {
 
-    if (context instanceof ModbusTcpTlsRequestContext ctx) {
+    if (context instanceof AuthzContext ctx) {
       AuthzResult result = authzHandler.authorizeReadWriteMultipleRegisters(ctx, unitId, request);
 
       if (result != AuthzResult.AUTHORIZED) {
