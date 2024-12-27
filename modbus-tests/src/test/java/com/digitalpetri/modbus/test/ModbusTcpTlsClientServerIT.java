@@ -7,10 +7,13 @@ import com.digitalpetri.modbus.server.ModbusTcpServer;
 import com.digitalpetri.modbus.server.ProcessImage;
 import com.digitalpetri.modbus.server.ReadWriteModbusServices;
 import com.digitalpetri.modbus.tcp.client.NettyTcpClientTransport;
+import com.digitalpetri.modbus.tcp.security.SecurityUtil;
 import com.digitalpetri.modbus.tcp.server.NettyTcpServerTransport;
 import com.digitalpetri.modbus.test.CertificateUtil.KeyPairCert;
 import com.digitalpetri.modbus.test.CertificateUtil.Role;
 import java.util.Optional;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.TrustManagerFactory;
 import org.junit.jupiter.api.BeforeEach;
 
 public class ModbusTcpTlsClientServerIT extends ClientServerIT {
@@ -38,6 +41,14 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
       }
     };
 
+    KeyManagerFactory serverKeyManagerFactory = SecurityUtil.createKeyManagerFactory(
+        serverKeyPairCert.keyPair().getPrivate(),
+        serverKeyPairCert.certificate()
+    );
+    TrustManagerFactory serverTrustManagerFactory = SecurityUtil.createTrustManagerFactory(
+        authorityKeyPairCert.certificate()
+    );
+
     int serverPort = -1;
 
     for (int i = 50200; i < 65536; i++) {
@@ -48,12 +59,8 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
           cfg.port = port;
 
           cfg.tlsEnabled = true;
-          cfg.keyManagerFactory = CertificateUtil.createKeyManagerFactory(
-              serverKeyPairCert.keyPair(),
-              serverKeyPairCert.certificate()
-          );
-          cfg.trustManagerFactory = CertificateUtil.createTrustManagerFactory(
-              authorityKeyPairCert.certificate());
+          cfg.keyManagerFactory = serverKeyManagerFactory;
+          cfg.trustManagerFactory = serverTrustManagerFactory;
         });
 
         System.out.println("trying port " + port);
@@ -66,6 +73,14 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
       }
     }
 
+    KeyManagerFactory clientKeyManagerFactory = SecurityUtil.createKeyManagerFactory(
+        clientKeyPairCert.keyPair().getPrivate(),
+        clientKeyPairCert.certificate()
+    );
+    TrustManagerFactory clientTrustManagerFactory = SecurityUtil.createTrustManagerFactory(
+        authorityKeyPairCert.certificate()
+    );
+
     final var port = serverPort;
     clientTransport = NettyTcpClientTransport.create(cfg -> {
       cfg.hostname = "localhost";
@@ -73,12 +88,8 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
       cfg.connectPersistent = false;
 
       cfg.tlsEnabled = true;
-      cfg.keyManagerFactory = CertificateUtil.createKeyManagerFactory(
-          clientKeyPairCert.keyPair(),
-          clientKeyPairCert.certificate()
-      );
-      cfg.trustManagerFactory = CertificateUtil.createTrustManagerFactory(
-          authorityKeyPairCert.certificate());
+      cfg.keyManagerFactory = clientKeyManagerFactory;
+      cfg.trustManagerFactory = clientTrustManagerFactory;
     });
 
     client = ModbusTcpClient.create(clientTransport);

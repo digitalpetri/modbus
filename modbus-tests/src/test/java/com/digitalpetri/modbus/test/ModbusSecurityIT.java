@@ -1,8 +1,5 @@
 package com.digitalpetri.modbus.test;
 
-import static com.digitalpetri.modbus.test.CertificateUtil.createKeyManagerFactory;
-import static com.digitalpetri.modbus.test.CertificateUtil.createTrustManagerFactory;
-
 import com.digitalpetri.modbus.client.ModbusClient;
 import com.digitalpetri.modbus.client.ModbusTcpClient;
 import com.digitalpetri.modbus.pdu.ReadCoilsRequest;
@@ -11,12 +8,15 @@ import com.digitalpetri.modbus.server.ModbusTcpServer;
 import com.digitalpetri.modbus.server.ProcessImage;
 import com.digitalpetri.modbus.server.ReadWriteModbusServices;
 import com.digitalpetri.modbus.tcp.client.NettyTcpClientTransport;
+import com.digitalpetri.modbus.tcp.security.SecurityUtil;
 import com.digitalpetri.modbus.tcp.server.NettyTcpServerTransport;
 import com.digitalpetri.modbus.test.CertificateUtil.KeyPairCert;
 import com.digitalpetri.modbus.test.CertificateUtil.Role;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
 import java.util.Optional;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.TrustManagerFactory;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 
@@ -113,42 +113,58 @@ public class ModbusSecurityIT {
     server.stop();
   }
 
-  ModbusClient setupClientWithKeys(KeyPairCert clientKeys, KeyPairCert... authorityKeys) {
+  ModbusClient setupClientWithKeys(
+      KeyPairCert clientKeys,
+      KeyPairCert... authorityKeys
+  ) throws Exception {
+
+    KeyManagerFactory keyManagerFactory = SecurityUtil.createKeyManagerFactory(
+        clientKeys.keyPair().getPrivate(),
+        clientKeys.certificate()
+    );
+
+    TrustManagerFactory trustManagerFactory = SecurityUtil.createTrustManagerFactory(
+        Arrays.stream(authorityKeys)
+            .map(KeyPairCert::certificate)
+            .toArray(X509Certificate[]::new)
+    );
+
     var transport = NettyTcpClientTransport.create(cfg -> {
       cfg.hostname = "localhost";
       cfg.port = 50200;
       cfg.connectPersistent = false;
 
       cfg.tlsEnabled = true;
-      cfg.keyManagerFactory = createKeyManagerFactory(
-          clientKeys.keyPair(),
-          clientKeys.certificate()
-      );
-      cfg.trustManagerFactory = createTrustManagerFactory(
-          Arrays.stream(authorityKeys)
-              .map(KeyPairCert::certificate)
-              .toArray(X509Certificate[]::new)
-      );
+      cfg.keyManagerFactory = keyManagerFactory;
+      cfg.trustManagerFactory = trustManagerFactory;
     });
 
     return ModbusTcpClient.create(transport);
   }
 
-  ModbusServer setupServerWithKeys(KeyPairCert serverKeys, KeyPairCert... authorityKeys) {
+  ModbusServer setupServerWithKeys(
+      KeyPairCert serverKeys,
+      KeyPairCert... authorityKeys
+  ) throws Exception {
+
+    KeyManagerFactory keyManagerFactory = SecurityUtil.createKeyManagerFactory(
+        serverKeys.keyPair().getPrivate(),
+        serverKeys.certificate()
+    );
+
+    TrustManagerFactory trustManagerFactory = SecurityUtil.createTrustManagerFactory(
+        Arrays.stream(authorityKeys)
+            .map(KeyPairCert::certificate)
+            .toArray(X509Certificate[]::new)
+    );
+
     var serverTransport = NettyTcpServerTransport.create(cfg -> {
       cfg.bindAddress = "localhost";
       cfg.port = 50200;
 
       cfg.tlsEnabled = true;
-      cfg.keyManagerFactory = createKeyManagerFactory(
-          serverKeys.keyPair(),
-          serverKeys.certificate()
-      );
-      cfg.trustManagerFactory = createTrustManagerFactory(
-          Arrays.stream(authorityKeys)
-              .map(KeyPairCert::certificate)
-              .toArray(X509Certificate[]::new)
-      );
+      cfg.keyManagerFactory = keyManagerFactory;
+      cfg.trustManagerFactory = trustManagerFactory;
     });
 
     var processImage = new ProcessImage();
