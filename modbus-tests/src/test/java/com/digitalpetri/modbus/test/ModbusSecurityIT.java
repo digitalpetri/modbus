@@ -35,6 +35,9 @@ public class ModbusSecurityIT {
   KeyPairCert server2Keys =
       CertificateUtil.generateCaSignedCertificate(Role.SERVER, authority2Keys);
 
+  KeyPairCert selfSignedClientKeys = CertificateUtil.generateSelfSignedCertificate(Role.CLIENT);
+  KeyPairCert selfSignedServerKeys = CertificateUtil.generateSelfSignedCertificate(Role.SERVER);
+
   @Test
   void clientServerMutualTrust() throws Exception {
     ModbusClient client = setupClientWithKeys(client1Keys, authority1Keys);
@@ -108,6 +111,22 @@ public class ModbusSecurityIT {
           } finally {
             client.disconnect();
           }
+        });
+
+    server.stop();
+  }
+
+  @Test
+  void selfSignedClientAndServer() throws Exception {
+    ModbusClient client = setupClientWithKeys(selfSignedClientKeys, selfSignedServerKeys);
+    ModbusServer server = setupServerWithKeys(selfSignedServerKeys, selfSignedClientKeys);
+
+    server.start();
+
+    Assertions.assertDoesNotThrow(
+        () -> {
+          client.connect();
+          client.readCoils(1, new ReadCoilsRequest(0, 1));
         });
 
     server.stop();
