@@ -98,7 +98,7 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
     return server;
   }
 
-  private static KeyManagerFactory createKeyManagerFactory(
+  static KeyManagerFactory createKeyManagerFactory(
       KeyPair keyPair,
       X509Certificate certificate
   ) {
@@ -119,11 +119,16 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
     }
   }
 
-  private static TrustManagerFactory createTrustManagerFactory(X509Certificate certificate) {
+  static TrustManagerFactory createTrustManagerFactory(X509Certificate... certificates) {
     try {
       KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
       keyStore.load(null, null);
-      keyStore.setCertificateEntry("alias", certificate);
+
+      for (int i = 0; i < certificates.length; i++) {
+        X509Certificate certificate = certificates[i];
+
+        keyStore.setCertificateEntry("alias" + i, certificate);
+      }
 
       TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(
           TrustManagerFactory.getDefaultAlgorithm());
