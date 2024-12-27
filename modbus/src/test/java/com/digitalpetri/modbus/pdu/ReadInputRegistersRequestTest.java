@@ -18,12 +18,10 @@ class ReadInputRegistersRequestTest {
 
         buffer.flip();
 
-        ReadInputRegistersRequest decoded =
-            ReadInputRegistersRequest.Serializer.decode(buffer);
+        ReadInputRegistersRequest decoded = ReadInputRegistersRequest.Serializer.decode(buffer);
 
         assertEquals(request, decoded);
       }
     }
   }
-
 }

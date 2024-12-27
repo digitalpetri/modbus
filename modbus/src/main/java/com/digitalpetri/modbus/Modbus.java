@@ -45,22 +45,22 @@ public final class Modbus {
    */
   public static synchronized ExecutorService sharedExecutor() {
     if (EXECUTOR_SERVICE == null) {
-      ThreadFactory threadFactory = new ThreadFactory() {
-        private final AtomicLong threadNumber = new AtomicLong(0L);
+      ThreadFactory threadFactory =
+          new ThreadFactory() {
+            private final AtomicLong threadNumber = new AtomicLong(0L);
 
-        @Override
-        public Thread newThread(Runnable r) {
-          Thread thread = new Thread(r,
-              "modbus-shared-thread-pool-" + threadNumber.getAndIncrement());
-          thread.setDaemon(true);
-          thread.setUncaughtExceptionHandler(
-              (t, e) ->
-                  LoggerFactory.getLogger(Modbus.class).warn(
-                      "Uncaught Exception on shared stack ExecutorService thread", e)
-          );
-          return thread;
-        }
-      };
+            @Override
+            public Thread newThread(Runnable r) {
+              Thread thread =
+                  new Thread(r, "modbus-shared-thread-pool-" + threadNumber.getAndIncrement());
+              thread.setDaemon(true);
+              thread.setUncaughtExceptionHandler(
+                  (t, e) ->
+                      LoggerFactory.getLogger(Modbus.class)
+                          .warn("Uncaught Exception on shared stack ExecutorService thread", e));
+              return thread;
+            }
+          };
 
       EXECUTOR_SERVICE = Executors.newCachedThreadPool(threadFactory);
     }
@@ -73,22 +73,25 @@ public final class Modbus {
    */
   public static synchronized ScheduledExecutorService sharedScheduledExecutor() {
     if (SCHEDULED_EXECUTOR_SERVICE == null) {
-      ThreadFactory threadFactory = new ThreadFactory() {
-        private final AtomicLong threadNumber = new AtomicLong(0L);
+      ThreadFactory threadFactory =
+          new ThreadFactory() {
+            private final AtomicLong threadNumber = new AtomicLong(0L);
 
-        @Override
-        public Thread newThread(Runnable r) {
-          Thread thread = new Thread(r,
-              "modbus-shared-scheduled-executor-" + threadNumber.getAndIncrement());
-          thread.setDaemon(true);
-          thread.setUncaughtExceptionHandler(
-              (t, e) ->
-                  LoggerFactory.getLogger(Modbus.class).warn(
-                      "Uncaught Exception on shared stack ScheduledExecutorService thread", e)
-          );
-          return thread;
-        }
-      };
+            @Override
+            public Thread newThread(Runnable r) {
+              Thread thread =
+                  new Thread(
+                      r, "modbus-shared-scheduled-executor-" + threadNumber.getAndIncrement());
+              thread.setDaemon(true);
+              thread.setUncaughtExceptionHandler(
+                  (t, e) ->
+                      LoggerFactory.getLogger(Modbus.class)
+                          .warn(
+                              "Uncaught Exception on shared stack ScheduledExecutorService thread",
+                              e));
+              return thread;
+            }
+          };
 
       var executor = new ScheduledThreadPoolExecutor(1, threadFactory);
 
@@ -154,5 +157,4 @@ public final class Modbus {
       SCHEDULED_EXECUTOR_SERVICE = null;
     }
   }
-
 }

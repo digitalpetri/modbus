@@ -16,10 +16,9 @@ class ModbusTcpCodecTest {
   void encodeDecodeFrame() {
     var channel = new EmbeddedChannel(new ModbusTcpCodec());
 
-    var frame = new ModbusTcpFrame(
-        new MbapHeader(0, 0, 5, 0),
-        ByteBuffer.wrap(new byte[]{0x01, 0x02, 0x03, 0x04})
-    );
+    var frame =
+        new ModbusTcpFrame(
+            new MbapHeader(0, 0, 5, 0), ByteBuffer.wrap(new byte[] {0x01, 0x02, 0x03, 0x04}));
 
     channel.writeOutbound(frame);
     ByteBuf encoded = channel.readOutbound();
@@ -35,5 +34,4 @@ class ModbusTcpCodecTest {
 
     assertEquals(frame, decoded);
   }
-
 }

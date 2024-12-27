@@ -13,15 +13,12 @@ import java.util.function.Consumer;
  * @param responseSerializer the {@link ModbusPduSerializer} used to encode outgoing responses.
  */
 public record ModbusServerConfig(
-    ModbusPduSerializer requestSerializer,
-    ModbusPduSerializer responseSerializer
-) {
+    ModbusPduSerializer requestSerializer, ModbusPduSerializer responseSerializer) {
 
   /**
    * Create a new {@link ModbusServerConfig} instance.
    *
-   * @param configure a callback that accepts a {@link Builder} used to configure the new
-   *     instance.
+   * @param configure a callback that accepts a {@link Builder} used to configure the new instance.
    * @return a new {@link ModbusServerConfig} instance.
    */
   public static ModbusServerConfig create(Consumer<Builder> configure) {
@@ -32,14 +29,10 @@ public record ModbusServerConfig(
 
   public static class Builder {
 
-    /**
-     * The {@link ModbusPduSerializer} used to decode incoming requests.
-     */
+    /** The {@link ModbusPduSerializer} used to decode incoming requests. */
     public ModbusPduSerializer requestSerializer = DefaultRequestSerializer.INSTANCE;
 
-    /**
-     * The {@link ModbusPduSerializer} used to encode outgoing responses.
-     */
+    /** The {@link ModbusPduSerializer} used to encode outgoing responses. */
     public ModbusPduSerializer responseSerializer = DefaultResponseSerializer.INSTANCE;
 
     /**
@@ -48,7 +41,5 @@ public record ModbusServerConfig(
     public ModbusServerConfig build() {
       return new ModbusServerConfig(requestSerializer, responseSerializer);
     }
-
   }
-
 }

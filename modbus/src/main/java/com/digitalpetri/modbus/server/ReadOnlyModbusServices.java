@@ -19,84 +19,66 @@ public abstract class ReadOnlyModbusServices implements ModbusServices {
 
   @Override
   public ReadCoilsResponse readCoils(
-      ModbusRequestContext context,
-      int unitId,
-      ReadCoilsRequest request
-  ) throws UnknownUnitIdException {
+      ModbusRequestContext context, int unitId, ReadCoilsRequest request)
+      throws UnknownUnitIdException {
 
-    ProcessImage processImage = getProcessImage(unitId)
-        .orElseThrow(() -> new UnknownUnitIdException(unitId));
+    ProcessImage processImage =
+        getProcessImage(unitId).orElseThrow(() -> new UnknownUnitIdException(unitId));
 
     final int address = request.address();
     final int quantity = request.quantity();
 
-    byte[] coils = processImage.get(
-        tx ->
-            tx.readCoils(readBits(address, quantity))
-    );
+    byte[] coils = processImage.get(tx -> tx.readCoils(readBits(address, quantity)));
 
     return new ReadCoilsResponse(coils);
   }
 
   @Override
   public ReadDiscreteInputsResponse readDiscreteInputs(
-      ModbusRequestContext context,
-      int unitId,
-      ReadDiscreteInputsRequest request
-  ) throws UnknownUnitIdException {
+      ModbusRequestContext context, int unitId, ReadDiscreteInputsRequest request)
+      throws UnknownUnitIdException {
 
-    ProcessImage processImage = getProcessImage(unitId)
-        .orElseThrow(() -> new UnknownUnitIdException(unitId));
+    ProcessImage processImage =
+        getProcessImage(unitId).orElseThrow(() -> new UnknownUnitIdException(unitId));
 
     final int address = request.address();
     final int quantity = request.quantity();
 
-    byte[] inputs = processImage.get(
-        tx ->
-            tx.readDiscreteInputs(readBits(address, quantity))
-    );
+    byte[] inputs = processImage.get(tx -> tx.readDiscreteInputs(readBits(address, quantity)));
 
     return new ReadDiscreteInputsResponse(inputs);
   }
 
   @Override
   public ReadHoldingRegistersResponse readHoldingRegisters(
-      ModbusRequestContext context,
-      int unitId,
-      ReadHoldingRegistersRequest request
-  ) throws UnknownUnitIdException {
+      ModbusRequestContext context, int unitId, ReadHoldingRegistersRequest request)
+      throws UnknownUnitIdException {
 
-    ProcessImage processImage = getProcessImage(unitId)
-        .orElseThrow(() -> new UnknownUnitIdException(unitId));
+    ProcessImage processImage =
+        getProcessImage(unitId).orElseThrow(() -> new UnknownUnitIdException(unitId));
 
     final int address = request.address();
     final int quantity = request.quantity();
 
-    byte[] registers = processImage.get(
-        tx ->
-            tx.readHoldingRegisters(readRegisters(address, quantity))
-    );
+    byte[] registers =
+        processImage.get(tx -> tx.readHoldingRegisters(readRegisters(address, quantity)));
 
     return new ReadHoldingRegistersResponse(registers);
   }
 
   @Override
   public ReadInputRegistersResponse readInputRegisters(
-      ModbusRequestContext context,
-      int unitId,
-      ReadInputRegistersRequest request
-  ) throws UnknownUnitIdException {
+      ModbusRequestContext context, int unitId, ReadInputRegistersRequest request)
+      throws UnknownUnitIdException {
 
-    ProcessImage processImage = getProcessImage(unitId)
-        .orElseThrow(() -> new UnknownUnitIdException(unitId));
+    ProcessImage processImage =
+        getProcessImage(unitId).orElseThrow(() -> new UnknownUnitIdException(unitId));
 
     final int address = request.address();
     final int quantity = request.quantity();
 
-    byte[] registers = processImage.get(
-        tx ->
-            tx.readInputRegisters(readRegisters(address, quantity))
-    );
+    byte[] registers =
+        processImage.get(tx -> tx.readInputRegisters(readRegisters(address, quantity)));
 
     return new ReadInputRegistersResponse(registers);
   }
@@ -138,5 +120,4 @@ public abstract class ReadOnlyModbusServices implements ModbusServices {
       return registers;
     };
   }
-
 }

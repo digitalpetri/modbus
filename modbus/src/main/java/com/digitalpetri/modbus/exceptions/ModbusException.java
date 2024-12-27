@@ -4,8 +4,7 @@ import java.io.Serial;
 
 public class ModbusException extends Exception {
 
-  @Serial
-  private static final long serialVersionUID = 5355236996267676988L;
+  @Serial private static final long serialVersionUID = 5355236996267676988L;
 
   public ModbusException(String message) {
     super(message);
@@ -18,5 +17,4 @@ public class ModbusException extends Exception {
   public ModbusException(String message, Throwable cause) {
     super(message, cause);
   }
-
 }

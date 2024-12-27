@@ -63,18 +63,14 @@ public class ExecutionQueue {
     }
   }
 
-  /**
-   * Pause execution of queued {@link Runnable}s.
-   */
+  /** Pause execution of queued {@link Runnable}s. */
   public void pause() {
     synchronized (queueLock) {
       paused = true;
     }
   }
 
-  /**
-   * Resume execution of queued {@link Runnable}s.
-   */
+  /** Resume execution of queued {@link Runnable}s. */
   public void resume() {
     synchronized (queueLock) {
       paused = false;
@@ -159,5 +155,4 @@ public class ExecutionQueue {
       }
     }
   }
-
 }

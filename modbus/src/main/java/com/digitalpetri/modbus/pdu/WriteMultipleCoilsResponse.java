@@ -6,23 +6,19 @@ import java.nio.ByteBuffer;
 /**
  * A {@link FunctionCode#WRITE_MULTIPLE_COILS} response PDU.
  *
- * <p>The normal response returns the function code, starting address, and quantity of coils
- * forced.
+ * <p>The normal response returns the function code, starting address, and quantity of coils forced.
  *
  * @param address the starting address. 2 bytes, range [0x0000, 0xFFFF].
  * @param quantity the quantity of coils to write. 2 bytes, range [0x0001, 0x7B0].
  */
-public record WriteMultipleCoilsResponse(int address, int quantity)
-    implements ModbusResponsePdu {
+public record WriteMultipleCoilsResponse(int address, int quantity) implements ModbusResponsePdu {
 
   @Override
   public int getFunctionCode() {
     return FunctionCode.WRITE_MULTIPLE_COILS.getCode();
   }
 
-  /**
-   * Utility functions for encoding and decoding {@link WriteMultipleCoilsResponse}.
-   */
+  /** Utility functions for encoding and decoding {@link WriteMultipleCoilsResponse}. */
   public static final class Serializer {
 
     private Serializer() {}
@@ -54,7 +50,5 @@ public record WriteMultipleCoilsResponse(int address, int quantity)
 
       return new WriteMultipleCoilsResponse(address, quantity);
     }
-
   }
-
 }

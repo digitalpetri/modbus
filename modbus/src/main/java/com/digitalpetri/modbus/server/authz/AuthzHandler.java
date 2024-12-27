@@ -11,9 +11,7 @@ import com.digitalpetri.modbus.pdu.WriteMultipleRegistersRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleCoilRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterRequest;
 
-/**
- * Callback interface that handles authorization of Modbus operations.
- */
+/** Callback interface that handles authorization of Modbus operations. */
 public interface AuthzHandler {
 
   /**
@@ -34,8 +32,8 @@ public interface AuthzHandler {
    * @param request the {@link ReadDiscreteInputsRequest} being authorized.
    * @return the result of the authorization check.
    */
-  AuthzResult authorizeReadDiscreteInputs(AuthzContext authzContext, int unitId,
-      ReadDiscreteInputsRequest request);
+  AuthzResult authorizeReadDiscreteInputs(
+      AuthzContext authzContext, int unitId, ReadDiscreteInputsRequest request);
 
   /**
    * Authorizes the reading of holding registers.
@@ -45,8 +43,8 @@ public interface AuthzHandler {
    * @param request the {@link ReadHoldingRegistersRequest} being authorized.
    * @return the result of the authorization check.
    */
-  AuthzResult authorizeReadHoldingRegisters(AuthzContext authzContext, int unitId,
-      ReadHoldingRegistersRequest request);
+  AuthzResult authorizeReadHoldingRegisters(
+      AuthzContext authzContext, int unitId, ReadHoldingRegistersRequest request);
 
   /**
    * Authorizes the reading of input registers.
@@ -56,8 +54,8 @@ public interface AuthzHandler {
    * @param request the {@link ReadInputRegistersRequest} being authorized.
    * @return the result of the authorization check.
    */
-  AuthzResult authorizeReadInputRegisters(AuthzContext authzContext, int unitId,
-      ReadInputRegistersRequest request);
+  AuthzResult authorizeReadInputRegisters(
+      AuthzContext authzContext, int unitId, ReadInputRegistersRequest request);
 
   /**
    * Authorizes the writing of a single coil.
@@ -67,8 +65,8 @@ public interface AuthzHandler {
    * @param request the {@link WriteSingleCoilRequest} being authorized.
    * @return the result of the authorization check.
    */
-  AuthzResult authorizeWriteSingleCoil(AuthzContext authzContext, int unitId,
-      WriteSingleCoilRequest request);
+  AuthzResult authorizeWriteSingleCoil(
+      AuthzContext authzContext, int unitId, WriteSingleCoilRequest request);
 
   /**
    * Authorizes the writing of a single register.
@@ -78,8 +76,8 @@ public interface AuthzHandler {
    * @param request the {@link WriteSingleRegisterRequest} being authorized.
    * @return the result of the authorization check.
    */
-  AuthzResult authorizeWriteSingleRegister(AuthzContext authzContext, int unitId,
-      WriteSingleRegisterRequest request);
+  AuthzResult authorizeWriteSingleRegister(
+      AuthzContext authzContext, int unitId, WriteSingleRegisterRequest request);
 
   /**
    * Authorizes the writing of multiple coils.
@@ -89,8 +87,8 @@ public interface AuthzHandler {
    * @param request the {@link WriteMultipleCoilsRequest} being authorized.
    * @return the result of the authorization check.
    */
-  AuthzResult authorizeWriteMultipleCoils(AuthzContext authzContext, int unitId,
-      WriteMultipleCoilsRequest request);
+  AuthzResult authorizeWriteMultipleCoils(
+      AuthzContext authzContext, int unitId, WriteMultipleCoilsRequest request);
 
   /**
    * Authorizes the writing of multiple registers.
@@ -100,8 +98,8 @@ public interface AuthzHandler {
    * @param request the {@link WriteMultipleRegistersRequest} being authorized.
    * @return the result of the authorization check.
    */
-  AuthzResult authorizeWriteMultipleRegisters(AuthzContext authzContext, int unitId,
-      WriteMultipleRegistersRequest request);
+  AuthzResult authorizeWriteMultipleRegisters(
+      AuthzContext authzContext, int unitId, WriteMultipleRegistersRequest request);
 
   /**
    * Authorizes the mask write register operation.
@@ -111,8 +109,8 @@ public interface AuthzHandler {
    * @param request the {@link MaskWriteRegisterRequest} being authorized.
    * @return the result of the authorization check.
    */
-  AuthzResult authorizeMaskWriteRegister(AuthzContext authzContext, int unitId,
-      MaskWriteRegisterRequest request);
+  AuthzResult authorizeMaskWriteRegister(
+      AuthzContext authzContext, int unitId, MaskWriteRegisterRequest request);
 
   /**
    * Authorizes the read-write-multiple registers operation.
@@ -122,24 +120,16 @@ public interface AuthzHandler {
    * @param request the {@link ReadWriteMultipleRegistersRequest} being authorized.
    * @return the result of the authorization check.
    */
-  AuthzResult authorizeReadWriteMultipleRegisters(AuthzContext authzContext, int unitId,
-      ReadWriteMultipleRegistersRequest request);
+  AuthzResult authorizeReadWriteMultipleRegisters(
+      AuthzContext authzContext, int unitId, ReadWriteMultipleRegistersRequest request);
 
-  /**
-   * Enumeration representing the result of an authorization check.
-   */
+  /** Enumeration representing the result of an authorization check. */
   enum AuthzResult {
 
-    /**
-     * Indicates that the operation is authorized.
-     */
+    /** Indicates that the operation is authorized. */
     AUTHORIZED,
 
-    /**
-     * Indicates that the operation is not authorized.
-     */
+    /** Indicates that the operation is not authorized. */
     NOT_AUTHORIZED
-
   }
-
 }

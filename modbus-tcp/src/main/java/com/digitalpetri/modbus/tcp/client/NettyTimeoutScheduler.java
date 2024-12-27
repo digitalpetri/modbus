@@ -18,21 +18,22 @@ public class NettyTimeoutScheduler implements TimeoutScheduler {
   public TimeoutHandle newTimeout(Task task, long delay, TimeUnit unit) {
     final var ref = new AtomicReference<Timeout>();
 
-    var handle = new TimeoutHandle() {
-      @Override
-      public void cancel() {
-        synchronized (ref) {
-          ref.get().cancel();
-        }
-      }
+    var handle =
+        new TimeoutHandle() {
+          @Override
+          public void cancel() {
+            synchronized (ref) {
+              ref.get().cancel();
+            }
+          }
 
-      @Override
-      public boolean isCancelled() {
-        synchronized (ref) {
-          return ref.get().isCancelled();
-        }
-      }
-    };
+          @Override
+          public boolean isCancelled() {
+            synchronized (ref) {
+              return ref.get().isCancelled();
+            }
+          }
+        };
 
     synchronized (ref) {
       ref.set(wheelTimer.newTimeout(timeout -> task.run(handle), delay, unit));
@@ -40,5 +41,4 @@ public class NettyTimeoutScheduler implements TimeoutScheduler {
 
     return handle;
   }
-
 }

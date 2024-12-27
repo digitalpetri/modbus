@@ -53,9 +53,7 @@ public record ReadCoilsResponse(byte[] coils) implements ModbusResponsePdu {
         .toString();
   }
 
-  /**
-   * Utility functions for encoding and decoding {@link ReadCoilsResponse}.
-   */
+  /** Utility functions for encoding and decoding {@link ReadCoilsResponse}. */
   public static final class Serializer {
 
     private Serializer() {}
@@ -88,7 +86,5 @@ public record ReadCoilsResponse(byte[] coils) implements ModbusResponsePdu {
 
       return new ReadCoilsResponse(coils);
     }
-
   }
-
 }

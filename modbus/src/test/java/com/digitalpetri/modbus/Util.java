@@ -15,14 +15,13 @@ public class Util {
 
     int fullChunks = (size - 1) / partitionSize;
 
-    return IntStream.range(0, fullChunks + 1).mapToObj(n -> {
-      int fromIndex = n * partitionSize;
-      int toIndex = n == fullChunks
-          ? size
-          : (n + 1) * partitionSize;
+    return IntStream.range(0, fullChunks + 1)
+        .mapToObj(
+            n -> {
+              int fromIndex = n * partitionSize;
+              int toIndex = n == fullChunks ? size : (n + 1) * partitionSize;
 
-      return Arrays.copyOfRange(source, fromIndex, toIndex);
-    });
+              return Arrays.copyOfRange(source, fromIndex, toIndex);
+            });
   }
-
 }

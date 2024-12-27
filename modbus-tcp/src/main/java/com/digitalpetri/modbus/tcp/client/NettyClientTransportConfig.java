@@ -22,10 +22,10 @@ import javax.net.ssl.TrustManagerFactory;
  * @param reconnectLazy whether to reconnect lazily.
  * @param eventLoopGroup the {@link EventLoopGroup} to use.
  * @param executor the {@link ExecutorService} to use.
- * @param bootstrapCustomizer a {@link Consumer} that can be used to customize the Netty
- *     {@link Bootstrap}.
- * @param pipelineCustomizer a {@link Consumer} that can be used to customize the Netty
- *     {@link ChannelPipeline}.
+ * @param bootstrapCustomizer a {@link Consumer} that can be used to customize the Netty {@link
+ *     Bootstrap}.
+ * @param pipelineCustomizer a {@link Consumer} that can be used to customize the Netty {@link
+ *     ChannelPipeline}.
  * @param tlsEnabled whether to enable TLS (Modbus/TCP Security).
  * @param keyManagerFactory the {@link KeyManagerFactory} to use if TLS is enabled.
  * @param trustManagerFactory the {@link TrustManagerFactory} to use if TLS is enabled.
@@ -42,9 +42,8 @@ public record NettyClientTransportConfig(
     Consumer<ChannelPipeline> pipelineCustomizer,
     boolean tlsEnabled,
     Optional<KeyManagerFactory> keyManagerFactory,
-    Optional<TrustManagerFactory> trustManagerFactory
-) {
-  
+    Optional<TrustManagerFactory> trustManagerFactory) {
+
   /**
    * Create a new {@link NettyClientTransportConfig} with a callback that allows customizing the
    * configuration.
@@ -60,29 +59,19 @@ public record NettyClientTransportConfig(
 
   public static class Builder {
 
-    /**
-     * The hostname or IP address to connect to.
-     */
+    /** The hostname or IP address to connect to. */
     public String hostname;
 
-    /**
-     * The port to connect to.
-     */
+    /** The port to connect to. */
     public int port = -1;
 
-    /**
-     * The connect timeout.
-     */
+    /** The connect timeout. */
     public Duration connectTimeout = Duration.ofSeconds(5);
 
-    /**
-     * Whether to connect persistently.
-     */
+    /** Whether to connect persistently. */
     public boolean connectPersistent = true;
 
-    /**
-     * Whether to reconnect lazily.
-     */
+    /** Whether to reconnect lazily. */
     public boolean reconnectLazy = false;
 
     /**
@@ -99,29 +88,19 @@ public record NettyClientTransportConfig(
      */
     public ExecutorService executor;
 
-    /**
-     * A {@link Consumer} that can be used to customize the Netty {@link Bootstrap}.
-     */
+    /** A {@link Consumer} that can be used to customize the Netty {@link Bootstrap}. */
     public Consumer<Bootstrap> bootstrapCustomizer = b -> {};
 
-    /**
-     * A {@link Consumer} that can be used to customize the Netty {@link ChannelPipeline}.
-     */
+    /** A {@link Consumer} that can be used to customize the Netty {@link ChannelPipeline}. */
     public Consumer<ChannelPipeline> pipelineCustomizer = p -> {};
 
-    /**
-     * Whether to enable TLS (Modbus/TCP Security).
-     */
+    /** Whether to enable TLS (Modbus/TCP Security). */
     public boolean tlsEnabled = false;
 
-    /**
-     * The {@link KeyManagerFactory} to use if TLS is enabled.
-     */
+    /** The {@link KeyManagerFactory} to use if TLS is enabled. */
     public KeyManagerFactory keyManagerFactory = null;
 
-    /**
-     * The {@link TrustManagerFactory} to use if TLS is enabled.
-     */
+    /** The {@link TrustManagerFactory} to use if TLS is enabled. */
     public TrustManagerFactory trustManagerFactory = null;
 
     public NettyClientTransportConfig build() {
@@ -158,10 +137,7 @@ public record NettyClientTransportConfig(
           pipelineCustomizer,
           tlsEnabled,
           Optional.ofNullable(keyManagerFactory),
-          Optional.ofNullable(trustManagerFactory)
-      );
+          Optional.ofNullable(trustManagerFactory));
     }
-
   }
-
 }

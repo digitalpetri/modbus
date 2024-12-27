@@ -18,12 +18,10 @@ class ReadHoldingRegistersRequestTest {
 
         buffer.flip();
 
-        ReadHoldingRegistersRequest decoded =
-            ReadHoldingRegistersRequest.Serializer.decode(buffer);
+        ReadHoldingRegistersRequest decoded = ReadHoldingRegistersRequest.Serializer.decode(buffer);
 
         assertEquals(request, decoded);
       }
     }
   }
-
 }

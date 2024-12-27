@@ -21,5 +21,4 @@ class MbapHeaderTest {
       assertEquals(header, decoded);
     }
   }
-
 }

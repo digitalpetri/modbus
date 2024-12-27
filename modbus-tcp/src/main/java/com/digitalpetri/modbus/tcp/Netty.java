@@ -19,17 +19,18 @@ public final class Netty {
    */
   public static synchronized NioEventLoopGroup sharedEventLoop() {
     if (EVENT_LOOP == null) {
-      ThreadFactory threadFactory = new ThreadFactory() {
-        private final AtomicLong threadNumber = new AtomicLong(0L);
+      ThreadFactory threadFactory =
+          new ThreadFactory() {
+            private final AtomicLong threadNumber = new AtomicLong(0L);
 
-        @Override
-        public Thread newThread(Runnable r) {
-          Thread thread = new Thread(r,
-              "modbus-netty-event-loop-" + threadNumber.getAndIncrement());
-          thread.setDaemon(true);
-          return thread;
-        }
-      };
+            @Override
+            public Thread newThread(Runnable r) {
+              Thread thread =
+                  new Thread(r, "modbus-netty-event-loop-" + threadNumber.getAndIncrement());
+              thread.setDaemon(true);
+              return thread;
+            }
+          };
 
       EVENT_LOOP = new NioEventLoopGroup(1, threadFactory);
     }
@@ -37,17 +38,17 @@ public final class Netty {
     return EVENT_LOOP;
   }
 
-
   /**
    * @return a shared {@link HashedWheelTimer}.
    */
   public static synchronized HashedWheelTimer sharedWheelTimer() {
     if (WHEEL_TIMER == null) {
-      ThreadFactory threadFactory = r -> {
-        Thread thread = new Thread(r, "modbus-netty-wheel-timer");
-        thread.setDaemon(true);
-        return thread;
-      };
+      ThreadFactory threadFactory =
+          r -> {
+            Thread thread = new Thread(r, "modbus-netty-wheel-timer");
+            thread.setDaemon(true);
+            return thread;
+          };
 
       WHEEL_TIMER = new HashedWheelTimer(threadFactory);
     }
@@ -81,8 +82,7 @@ public final class Netty {
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
-        LoggerFactory.getLogger(Netty.class)
-            .warn("Interrupted awaiting event loop shutdown", e);
+        LoggerFactory.getLogger(Netty.class).warn("Interrupted awaiting event loop shutdown", e);
       }
       EVENT_LOOP = null;
     }
@@ -92,5 +92,4 @@ public final class Netty {
       WHEEL_TIMER = null;
     }
   }
-
 }

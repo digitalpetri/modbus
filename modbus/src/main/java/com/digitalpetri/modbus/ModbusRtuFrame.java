@@ -22,5 +22,4 @@ public record ModbusRtuFrame(int unitId, ByteBuffer pdu, ByteBuffer crc) {
         .add("crc=" + Hex.format(crc))
         .toString();
   }
-
 }

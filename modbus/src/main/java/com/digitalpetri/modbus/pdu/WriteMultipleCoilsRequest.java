@@ -31,7 +31,8 @@ public record WriteMultipleCoilsRequest(int address, int quantity, byte[] values
       return false;
     }
     WriteMultipleCoilsRequest that = (WriteMultipleCoilsRequest) o;
-    return Objects.equals(address, that.address) && Objects.equals(quantity, that.quantity)
+    return Objects.equals(address, that.address)
+        && Objects.equals(quantity, that.quantity)
         && Arrays.equals(values, that.values);
   }
 
@@ -52,9 +53,7 @@ public record WriteMultipleCoilsRequest(int address, int quantity, byte[] values
         .toString();
   }
 
-  /**
-   * Utility functions for encoding and decoding {@link WriteMultipleCoilsRequest}.
-   */
+  /** Utility functions for encoding and decoding {@link WriteMultipleCoilsRequest}. */
   public static final class Serializer {
 
     private Serializer() {}
@@ -94,7 +93,5 @@ public record WriteMultipleCoilsRequest(int address, int quantity, byte[] values
 
       return new WriteMultipleCoilsRequest(address, quantity, values);
     }
-
   }
-
 }

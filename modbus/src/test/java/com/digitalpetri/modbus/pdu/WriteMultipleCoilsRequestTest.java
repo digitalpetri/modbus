@@ -22,12 +22,10 @@ class WriteMultipleCoilsRequestTest {
 
         buffer.flip();
 
-        WriteMultipleCoilsRequest decoded =
-            WriteMultipleCoilsRequest.Serializer.decode(buffer);
+        WriteMultipleCoilsRequest decoded = WriteMultipleCoilsRequest.Serializer.decode(buffer);
 
         assertEquals(request, decoded);
       }
     }
   }
-
 }

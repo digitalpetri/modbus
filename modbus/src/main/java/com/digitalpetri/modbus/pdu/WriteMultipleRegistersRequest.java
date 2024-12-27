@@ -14,11 +14,8 @@ import java.util.StringJoiner;
  * @param quantity the number of registers to write. 2 bytes, range [0x0001, 0x007B].
  * @param values the values to write. Must be at least {@code 2 * quantity} bytes.
  */
-public record WriteMultipleRegistersRequest(
-    int address,
-    int quantity,
-    byte[] values
-) implements ModbusRequestPdu {
+public record WriteMultipleRegistersRequest(int address, int quantity, byte[] values)
+    implements ModbusRequestPdu {
 
   @Override
   public int getFunctionCode() {
@@ -34,7 +31,8 @@ public record WriteMultipleRegistersRequest(
       return false;
     }
     WriteMultipleRegistersRequest that = (WriteMultipleRegistersRequest) o;
-    return Objects.equals(address, that.address) && Objects.equals(quantity, that.quantity)
+    return Objects.equals(address, that.address)
+        && Objects.equals(quantity, that.quantity)
         && Arrays.equals(values, that.values);
   }
 
@@ -55,9 +53,7 @@ public record WriteMultipleRegistersRequest(
         .toString();
   }
 
-  /**
-   * Utility functions for encoding and decoding {@link WriteMultipleRegistersRequest}.
-   */
+  /** Utility functions for encoding and decoding {@link WriteMultipleRegistersRequest}. */
   public static final class Serializer {
 
     private Serializer() {}
@@ -97,7 +93,5 @@ public record WriteMultipleRegistersRequest(
 
       return new WriteMultipleRegistersRequest(address, quantity, values);
     }
-
   }
-
 }

@@ -45,9 +45,7 @@ public record ReadInputRegistersResponse(byte[] registers) implements ModbusResp
         .toString();
   }
 
-  /**
-   * Utility functions for encoding and decoding {@link ReadInputRegistersResponse}.
-   */
+  /** Utility functions for encoding and decoding {@link ReadInputRegistersResponse}. */
   public static final class Serializer {
 
     private Serializer() {}
@@ -80,7 +78,5 @@ public record ReadInputRegistersResponse(byte[] registers) implements ModbusResp
 
       return new ReadInputRegistersResponse(registers);
     }
-
   }
-
 }

@@ -22,6 +22,4 @@ public interface ModbusServer {
    * @param services the {@link ModbusServices} to use.
    */
   void setModbusServices(ModbusServices services);
-
-
 }

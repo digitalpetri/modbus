@@ -34,22 +34,25 @@ public class ModbusTcpClientServerIT extends ClientServerIT {
   @BeforeEach
   void setup() throws Exception {
     var processImage = new ProcessImage();
-    var modbusServices = new ReadWriteModbusServices() {
-      @Override
-      protected Optional<ProcessImage> getProcessImage(int unitId) {
-        return Optional.of(processImage);
-      }
-    };
+    var modbusServices =
+        new ReadWriteModbusServices() {
+          @Override
+          protected Optional<ProcessImage> getProcessImage(int unitId) {
+            return Optional.of(processImage);
+          }
+        };
 
     int serverPort = -1;
 
     for (int i = 50200; i < 65536; i++) {
       try {
         final var port = i;
-        var serverTransport = NettyTcpServerTransport.create(cfg -> {
-          cfg.bindAddress = "localhost";
-          cfg.port = port;
-        });
+        var serverTransport =
+            NettyTcpServerTransport.create(
+                cfg -> {
+                  cfg.bindAddress = "localhost";
+                  cfg.port = port;
+                });
 
         System.out.println("trying port " + port);
         server = ModbusTcpServer.create(serverTransport, modbusServices);
@@ -66,19 +69,18 @@ public class ModbusTcpClientServerIT extends ClientServerIT {
     }
 
     final var port = serverPort;
-    clientTransport = NettyTcpClientTransport.create(
-        cfg -> {
-          cfg.hostname = "localhost";
-          cfg.port = port;
-          cfg.connectPersistent = false;
-        }
-    );
+    clientTransport =
+        NettyTcpClientTransport.create(
+            cfg -> {
+              cfg.hostname = "localhost";
+              cfg.port = port;
+              cfg.connectPersistent = false;
+            });
 
-    client = ModbusTcpClient.create(
-        clientTransport,
-        cfg ->
-            cfg.timeoutScheduler = new NettyTimeoutScheduler(Netty.sharedWheelTimer())
-    );
+    client =
+        ModbusTcpClient.create(
+            clientTransport,
+            cfg -> cfg.timeoutScheduler = new NettyTimeoutScheduler(Netty.sharedWheelTimer()));
     client.connect();
   }
 
@@ -124,17 +126,18 @@ public class ModbusTcpClientServerIT extends ClientServerIT {
     var onConnection = new CountDownLatch(1);
     var onConnectionLost = new CountDownLatch(1);
 
-    clientTransport.addConnectionListener(new ConnectionListener() {
-      @Override
-      public void onConnection() {
-        onConnection.countDown();
-      }
+    clientTransport.addConnectionListener(
+        new ConnectionListener() {
+          @Override
+          public void onConnection() {
+            onConnection.countDown();
+          }
 
-      @Override
-      public void onConnectionLost() {
-        onConnectionLost.countDown();
-      }
-    });
+          @Override
+          public void onConnectionLost() {
+            onConnectionLost.countDown();
+          }
+        });
 
     assertTrue(client.isConnected());
 
@@ -144,5 +147,4 @@ public class ModbusTcpClientServerIT extends ClientServerIT {
     client.connect();
     assertTrue(onConnection.await(1, TimeUnit.SECONDS));
   }
-
 }

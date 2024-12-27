@@ -18,12 +18,10 @@ class ReadCoilsRequestTest {
 
         buffer.flip();
 
-        ReadCoilsRequest decoded =
-            ReadCoilsRequest.Serializer.decode(buffer);
+        ReadCoilsRequest decoded = ReadCoilsRequest.Serializer.decode(buffer);
 
         assertEquals(request, decoded);
       }
     }
   }
-
 }

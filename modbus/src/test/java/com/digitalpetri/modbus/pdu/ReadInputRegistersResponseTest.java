@@ -9,7 +9,7 @@ public class ReadInputRegistersResponseTest {
 
   @Test
   public void serializer() {
-    byte[] registers = new byte[]{0x01, 0x02, 0x03, 0x04};
+    byte[] registers = new byte[] {0x01, 0x02, 0x03, 0x04};
     var response = new ReadInputRegistersResponse(registers);
 
     ByteBuffer buffer = ByteBuffer.allocate(256);
@@ -17,10 +17,8 @@ public class ReadInputRegistersResponseTest {
 
     buffer.flip();
 
-    ReadInputRegistersResponse decoded =
-        ReadInputRegistersResponse.Serializer.decode(buffer);
+    ReadInputRegistersResponse decoded = ReadInputRegistersResponse.Serializer.decode(buffer);
 
     assertEquals(response, decoded);
   }
-
 }

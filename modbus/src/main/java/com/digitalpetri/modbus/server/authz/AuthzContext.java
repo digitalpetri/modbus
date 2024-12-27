@@ -18,5 +18,4 @@ public interface AuthzContext {
    * @return the client certificate chain.
    */
   X509Certificate[] clientCertificateChain();
-
 }

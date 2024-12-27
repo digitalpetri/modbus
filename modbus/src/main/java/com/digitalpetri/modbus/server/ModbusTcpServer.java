@@ -31,10 +31,7 @@ public class ModbusTcpServer implements ModbusServer {
       new AtomicReference<>(new ModbusServices() {});
 
   public ModbusTcpServer(
-      ModbusServerConfig config,
-      ModbusTcpServerTransport transport,
-      ModbusServices services
-  ) {
+      ModbusServerConfig config, ModbusTcpServerTransport transport, ModbusServices services) {
 
     this.config = config;
     this.transport = transport;
@@ -63,9 +60,7 @@ public class ModbusTcpServer implements ModbusServer {
   }
 
   protected ModbusTcpFrame handleModbusTcpFrame(
-      ModbusTcpFrame frame,
-      ModbusTcpRequestContext context
-  ) throws Exception {
+      ModbusTcpFrame frame, ModbusTcpRequestContext context) throws Exception {
 
     MbapHeader header = frame.header();
     ByteBuffer pdu = frame.pdu();
@@ -77,11 +72,8 @@ public class ModbusTcpServer implements ModbusServer {
   }
 
   protected ModbusTcpFrame handleModbusRequestPdu(
-      ModbusTcpRequestContext context,
-      int transactionId,
-      int unitId,
-      ModbusRequestPdu requestPdu
-  ) throws Exception {
+      ModbusTcpRequestContext context, int transactionId, int unitId, ModbusRequestPdu requestPdu)
+      throws Exception {
 
     try {
       int fcb = requestPdu.getFunctionCode();
@@ -89,88 +81,88 @@ public class ModbusTcpServer implements ModbusServer {
 
       if (functionCode == null) {
         throw new ModbusResponseException(
-            requestPdu.getFunctionCode(),
-            ExceptionCode.ILLEGAL_FUNCTION.getCode()
-        );
+            requestPdu.getFunctionCode(), ExceptionCode.ILLEGAL_FUNCTION.getCode());
       }
 
       ModbusServices services = this.services.get();
       assert services != null;
 
-      ModbusResponsePdu response = switch (functionCode) {
-        case READ_COILS -> {
-          if (requestPdu instanceof ReadCoilsRequest request) {
-            yield services.readCoils(context, unitId, request);
-          } else {
-            throw new IllegalArgumentException("expected ReadCoilsRequest");
-          }
-        }
-        case READ_DISCRETE_INPUTS -> {
-          if (requestPdu instanceof ReadDiscreteInputsRequest request) {
-            yield services.readDiscreteInputs(context, unitId, request);
-          } else {
-            throw new IllegalArgumentException("expected ReadDiscreteInputsRequest");
-          }
-        }
-        case READ_HOLDING_REGISTERS -> {
-          if (requestPdu instanceof ReadHoldingRegistersRequest request) {
-            yield services.readHoldingRegisters(context, unitId, request);
-          } else {
-            throw new IllegalArgumentException("expected ReadHoldingRegistersRequest");
-          }
-        }
-        case READ_INPUT_REGISTERS -> {
-          if (requestPdu instanceof ReadInputRegistersRequest request) {
-            yield services.readInputRegisters(context, unitId, request);
-          } else {
-            throw new IllegalArgumentException("expected ReadInputRegistersRequest");
-          }
-        }
-        case WRITE_SINGLE_COIL -> {
-          if (requestPdu instanceof WriteSingleCoilRequest request) {
-            yield services.writeSingleCoil(context, unitId, request);
-          } else {
-            throw new IllegalArgumentException("expected WriteSingleCoilRequest");
-          }
-        }
-        case WRITE_SINGLE_REGISTER -> {
-          if (requestPdu instanceof WriteSingleRegisterRequest request) {
-            yield services.writeSingleRegister(context, unitId, request);
-          } else {
-            throw new IllegalArgumentException("expected WriteSingleRegisterRequest");
-          }
-        }
-        case WRITE_MULTIPLE_COILS -> {
-          if (requestPdu instanceof WriteMultipleCoilsRequest request) {
-            yield services.writeMultipleCoils(context, unitId, request);
-          } else {
-            throw new IllegalArgumentException("expected WriteMultipleCoilsRequest");
-          }
-        }
-        case WRITE_MULTIPLE_REGISTERS -> {
-          if (requestPdu instanceof WriteMultipleRegistersRequest request) {
-            yield services.writeMultipleRegisters(context, unitId, request);
-          } else {
-            throw new IllegalArgumentException("expected WriteMultipleRegistersRequest");
-          }
-        }
-        case MASK_WRITE_REGISTER -> {
-          if (requestPdu instanceof MaskWriteRegisterRequest request) {
-            yield services.maskWriteRegister(context, unitId, request);
-          } else {
-            throw new IllegalArgumentException("expected MaskWriteRegisterRequest");
-          }
-        }
-        case READ_WRITE_MULTIPLE_REGISTERS -> {
-          if (requestPdu instanceof ReadWriteMultipleRegistersRequest request) {
-            yield services.readWriteMultipleRegisters(context, unitId, request);
-          } else {
-            throw new IllegalArgumentException("expected ReadWriteMultipleRegistersRequest");
-          }
-        }
-        default -> throw new ModbusResponseException(requestPdu.getFunctionCode(),
-            ExceptionCode.ILLEGAL_FUNCTION.getCode());
-      };
+      ModbusResponsePdu response =
+          switch (functionCode) {
+            case READ_COILS -> {
+              if (requestPdu instanceof ReadCoilsRequest request) {
+                yield services.readCoils(context, unitId, request);
+              } else {
+                throw new IllegalArgumentException("expected ReadCoilsRequest");
+              }
+            }
+            case READ_DISCRETE_INPUTS -> {
+              if (requestPdu instanceof ReadDiscreteInputsRequest request) {
+                yield services.readDiscreteInputs(context, unitId, request);
+              } else {
+                throw new IllegalArgumentException("expected ReadDiscreteInputsRequest");
+              }
+            }
+            case READ_HOLDING_REGISTERS -> {
+              if (requestPdu instanceof ReadHoldingRegistersRequest request) {
+                yield services.readHoldingRegisters(context, unitId, request);
+              } else {
+                throw new IllegalArgumentException("expected ReadHoldingRegistersRequest");
+              }
+            }
+            case READ_INPUT_REGISTERS -> {
+              if (requestPdu instanceof ReadInputRegistersRequest request) {
+                yield services.readInputRegisters(context, unitId, request);
+              } else {
+                throw new IllegalArgumentException("expected ReadInputRegistersRequest");
+              }
+            }
+            case WRITE_SINGLE_COIL -> {
+              if (requestPdu instanceof WriteSingleCoilRequest request) {
+                yield services.writeSingleCoil(context, unitId, request);
+              } else {
+                throw new IllegalArgumentException("expected WriteSingleCoilRequest");
+              }
+            }
+            case WRITE_SINGLE_REGISTER -> {
+              if (requestPdu instanceof WriteSingleRegisterRequest request) {
+                yield services.writeSingleRegister(context, unitId, request);
+              } else {
+                throw new IllegalArgumentException("expected WriteSingleRegisterRequest");
+              }
+            }
+            case WRITE_MULTIPLE_COILS -> {
+              if (requestPdu instanceof WriteMultipleCoilsRequest request) {
+                yield services.writeMultipleCoils(context, unitId, request);
+              } else {
+                throw new IllegalArgumentException("expected WriteMultipleCoilsRequest");
+              }
+            }
+            case WRITE_MULTIPLE_REGISTERS -> {
+              if (requestPdu instanceof WriteMultipleRegistersRequest request) {
+                yield services.writeMultipleRegisters(context, unitId, request);
+              } else {
+                throw new IllegalArgumentException("expected WriteMultipleRegistersRequest");
+              }
+            }
+            case MASK_WRITE_REGISTER -> {
+              if (requestPdu instanceof MaskWriteRegisterRequest request) {
+                yield services.maskWriteRegister(context, unitId, request);
+              } else {
+                throw new IllegalArgumentException("expected MaskWriteRegisterRequest");
+              }
+            }
+            case READ_WRITE_MULTIPLE_REGISTERS -> {
+              if (requestPdu instanceof ReadWriteMultipleRegistersRequest request) {
+                yield services.readWriteMultipleRegisters(context, unitId, request);
+              } else {
+                throw new IllegalArgumentException("expected ReadWriteMultipleRegistersRequest");
+              }
+            }
+            default ->
+                throw new ModbusResponseException(
+                    requestPdu.getFunctionCode(), ExceptionCode.ILLEGAL_FUNCTION.getCode());
+          };
 
       ByteBuffer pdu = ByteBuffer.allocate(256);
 
@@ -183,51 +175,43 @@ public class ModbusTcpServer implements ModbusServer {
       var header = new MbapHeader(transactionId, 0, 3, unitId);
       int fc = e.getFunctionCode() + 0x80;
       int ec = e.getExceptionCode();
-      ByteBuffer pdu = ByteBuffer.allocate(2)
-          .put((byte) fc)
-          .put((byte) ec)
-          .flip();
+      ByteBuffer pdu = ByteBuffer.allocate(2).put((byte) fc).put((byte) ec).flip();
 
       return new ModbusTcpFrame(header, pdu);
     }
   }
 
   /**
-   * Create a new {@link ModbusTcpServer} with the given {@link ModbusTcpServerTransport} and
-   * {@link ModbusServices}.
+   * Create a new {@link ModbusTcpServer} with the given {@link ModbusTcpServerTransport} and {@link
+   * ModbusServices}.
    *
    * @param transport the {@link ModbusTcpServerTransport} to use.
    * @param modbusServices the {@link ModbusServices} to use.
    * @return a new {@link ModbusTcpServer}.
    */
   public static ModbusTcpServer create(
-      ModbusTcpServerTransport transport,
-      ModbusServices modbusServices
-  ) {
+      ModbusTcpServerTransport transport, ModbusServices modbusServices) {
 
     return create(transport, modbusServices, b -> {});
   }
 
   /**
-   * Create a new {@link ModbusTcpServer} with the given {@link ModbusTcpServerTransport},
-   * {@link ModbusServices}, and a callback that can be used to configure a
-   * {@link ModbusServerConfig.Builder}.
+   * Create a new {@link ModbusTcpServer} with the given {@link ModbusTcpServerTransport}, {@link
+   * ModbusServices}, and a callback that can be used to configure a {@link
+   * ModbusServerConfig.Builder}.
    *
    * @param transport the {@link ModbusTcpServerTransport} to use.
    * @param modbusServices the {@link ModbusServices} to use.
-   * @param configure a callback that can be used to configure a
-   *     {@link ModbusServerConfig.Builder}.
+   * @param configure a callback that can be used to configure a {@link ModbusServerConfig.Builder}.
    * @return a new {@link ModbusTcpServer}.
    */
   public static ModbusTcpServer create(
       ModbusTcpServerTransport transport,
       ModbusServices modbusServices,
-      Consumer<ModbusServerConfig.Builder> configure
-  ) {
+      Consumer<ModbusServerConfig.Builder> configure) {
 
     ModbusServerConfig.Builder builder = new ModbusServerConfig.Builder();
     configure.accept(builder);
     return new ModbusTcpServer(builder.build(), transport, modbusServices);
   }
-
 }

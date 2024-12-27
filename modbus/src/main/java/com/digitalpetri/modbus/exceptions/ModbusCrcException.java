@@ -5,8 +5,7 @@ import java.io.Serial;
 
 public class ModbusCrcException extends ModbusException {
 
-  @Serial
-  private static final long serialVersionUID = -5350159787088895451L;
+  @Serial private static final long serialVersionUID = -5350159787088895451L;
 
   private final ModbusRtuFrame frame;
 
@@ -24,5 +23,4 @@ public class ModbusCrcException extends ModbusException {
   public ModbusRtuFrame getFrame() {
     return frame;
   }
-
 }

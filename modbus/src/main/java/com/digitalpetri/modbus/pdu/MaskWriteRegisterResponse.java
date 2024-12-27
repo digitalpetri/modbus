@@ -18,9 +18,7 @@ public record MaskWriteRegisterResponse(int address, int andMask, int orMask)
     return FunctionCode.MASK_WRITE_REGISTER.getCode();
   }
 
-  /**
-   * Utility functions for encoding and decoding {@link MaskWriteRegisterResponse}.
-   */
+  /** Utility functions for encoding and decoding {@link MaskWriteRegisterResponse}. */
   public static final class Serializer {
 
     private Serializer() {}
@@ -54,7 +52,5 @@ public record MaskWriteRegisterResponse(int address, int andMask, int orMask)
 
       return new MaskWriteRegisterResponse(address, andMask, orMask);
     }
-
   }
-
 }

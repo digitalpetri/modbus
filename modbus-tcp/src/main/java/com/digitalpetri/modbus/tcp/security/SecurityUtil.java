@@ -20,9 +20,8 @@ public class SecurityUtil {
    * @throws IOException if an error occurs.
    */
   public static KeyManagerFactory createKeyManagerFactory(
-      PrivateKey privateKey,
-      X509Certificate... certificates
-  ) throws GeneralSecurityException, IOException {
+      PrivateKey privateKey, X509Certificate... certificates)
+      throws GeneralSecurityException, IOException {
 
     KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
     keyStore.load(null, null);
@@ -41,9 +40,7 @@ public class SecurityUtil {
    * @throws GeneralSecurityException if an error occurs.
    */
   public static KeyManagerFactory createKeyManagerFactory(
-      KeyStore keyStore,
-      char[] keyStorePassword
-  ) throws GeneralSecurityException {
+      KeyStore keyStore, char[] keyStorePassword) throws GeneralSecurityException {
 
     KeyManagerFactory keyManagerFactory =
         KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
@@ -61,9 +58,8 @@ public class SecurityUtil {
    * @throws GeneralSecurityException if an error occurs.
    * @throws IOException if an error occurs.
    */
-  public static TrustManagerFactory createTrustManagerFactory(
-      X509Certificate... certificates
-  ) throws GeneralSecurityException, IOException {
+  public static TrustManagerFactory createTrustManagerFactory(X509Certificate... certificates)
+      throws GeneralSecurityException, IOException {
 
     KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
     keyStore.load(null, null);
@@ -82,9 +78,8 @@ public class SecurityUtil {
    * @return a {@link TrustManagerFactory}.
    * @throws GeneralSecurityException if an error occurs.
    */
-  public static TrustManagerFactory createTrustManagerFactory(
-      KeyStore keyStore
-  ) throws GeneralSecurityException {
+  public static TrustManagerFactory createTrustManagerFactory(KeyStore keyStore)
+      throws GeneralSecurityException {
 
     TrustManagerFactory trustManagerFactory =
         TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
@@ -93,5 +88,4 @@ public class SecurityUtil {
 
     return trustManagerFactory;
   }
-
 }

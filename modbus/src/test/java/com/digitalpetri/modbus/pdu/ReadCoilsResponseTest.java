@@ -20,10 +20,8 @@ class ReadCoilsResponseTest {
 
     buffer.flip();
 
-    ReadCoilsResponse decoded =
-        ReadCoilsResponse.Serializer.decode(buffer);
+    ReadCoilsResponse decoded = ReadCoilsResponse.Serializer.decode(buffer);
 
     assertEquals(response, decoded);
   }
-
 }

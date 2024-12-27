@@ -20,22 +20,25 @@ public class ModbusRtuTcpClientServerIT extends ClientServerIT {
   @BeforeEach
   void setup() throws Exception {
     var processImage = new ProcessImage();
-    var modbusServices = new ReadWriteModbusServices() {
-      @Override
-      protected Optional<ProcessImage> getProcessImage(int unitId) {
-        return Optional.of(processImage);
-      }
-    };
+    var modbusServices =
+        new ReadWriteModbusServices() {
+          @Override
+          protected Optional<ProcessImage> getProcessImage(int unitId) {
+            return Optional.of(processImage);
+          }
+        };
 
     int serverPort = -1;
 
     for (int i = 50200; i < 65536; i++) {
       try {
         final var port = i;
-        var serverTransport = NettyRtuServerTransport.create(cfg -> {
-          cfg.bindAddress = "localhost";
-          cfg.port = port;
-        });
+        var serverTransport =
+            NettyRtuServerTransport.create(
+                cfg -> {
+                  cfg.bindAddress = "localhost";
+                  cfg.port = port;
+                });
 
         System.out.println("trying port " + port);
         server = ModbusRtuServer.create(serverTransport, modbusServices);
@@ -53,15 +56,14 @@ public class ModbusRtuTcpClientServerIT extends ClientServerIT {
 
     final var port = serverPort;
 
-    client = ModbusRtuClient.create(
-        NettyRtuClientTransport.create(
-            cfg -> {
-              cfg.hostname = "localhost";
-              cfg.port = port;
-              cfg.connectPersistent = false;
-            }
-        )
-    );
+    client =
+        ModbusRtuClient.create(
+            NettyRtuClientTransport.create(
+                cfg -> {
+                  cfg.hostname = "localhost";
+                  cfg.port = port;
+                  cfg.connectPersistent = false;
+                }));
     client.connect();
   }
 
@@ -84,5 +86,4 @@ public class ModbusRtuTcpClientServerIT extends ClientServerIT {
   ModbusServer getServer() {
     return server;
   }
-
 }

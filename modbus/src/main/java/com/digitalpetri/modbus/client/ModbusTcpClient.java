@@ -26,9 +26,7 @@ import org.slf4j.LoggerFactory;
 
 public class ModbusTcpClient extends ModbusClient {
 
-  /**
-   * Fixed protocol ID identifying the protocol as Modbus in {@link MbapHeader}.
-   */
+  /** Fixed protocol ID identifying the protocol as Modbus in {@link MbapHeader}. */
   private static final int MODBUS_PROTOCOL_ID = 0;
 
   private final Logger logger = LoggerFactory.getLogger(getClass());
@@ -49,10 +47,8 @@ public class ModbusTcpClient extends ModbusClient {
     transport.receive(this::onFrameReceived);
   }
 
-  public byte[] sendRaw(
-      int unitId,
-      byte[] pduBytes
-  ) throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
+  public byte[] sendRaw(int unitId, byte[] pduBytes)
+      throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
 
     try {
       return sendRawAsync(unitId, pduBytes).toCompletableFuture().get();
@@ -72,16 +68,14 @@ public class ModbusTcpClient extends ModbusClient {
   }
 
   public CompletionStage<byte[]> sendRawAsync(int unitId, byte[] pduBytes) {
-    CompletionStage<ByteBuffer> cs = sendBufferAsync(
-        unitId,
-        ByteBuffer.wrap(pduBytes)
-    );
+    CompletionStage<ByteBuffer> cs = sendBufferAsync(unitId, ByteBuffer.wrap(pduBytes));
 
-    return cs.thenApply(buffer -> {
-      var bytes = new byte[buffer.remaining()];
-      buffer.get(bytes);
-      return bytes;
-    });
+    return cs.thenApply(
+        buffer -> {
+          var bytes = new byte[buffer.remaining()];
+          buffer.get(bytes);
+          return bytes;
+        });
   }
 
   @Override
@@ -96,54 +90,57 @@ public class ModbusTcpClient extends ModbusClient {
 
     CompletionStage<ByteBuffer> cs = sendBufferAsync(unitId, pduBytes.flip());
 
-    return cs.thenApply(buffer -> {
-      try {
-        ModbusPdu decoded = config.responseSerializer().decode(request.getFunctionCode(), buffer);
-        return (ModbusResponsePdu) decoded;
-      } catch (Exception e) {
-        throw new CompletionException(e);
-      }
-    });
+    return cs.thenApply(
+        buffer -> {
+          try {
+            ModbusPdu decoded =
+                config.responseSerializer().decode(request.getFunctionCode(), buffer);
+            return (ModbusResponsePdu) decoded;
+          } catch (Exception e) {
+            throw new CompletionException(e);
+          }
+        });
   }
 
   private CompletionStage<ByteBuffer> sendBufferAsync(int unitId, ByteBuffer buffer) {
-    TransactionSequence sequence = transactionSequence.updateAndGet(
-        ts -> ts != null ? ts : createTransactionSequence()
-    );
+    TransactionSequence sequence =
+        transactionSequence.updateAndGet(ts -> ts != null ? ts : createTransactionSequence());
     int transactionId = sequence.next();
 
-    var header = new MbapHeader(
-        transactionId,
-        MODBUS_PROTOCOL_ID,
-        1 + buffer.remaining(),
-        unitId
-    );
+    var header = new MbapHeader(transactionId, MODBUS_PROTOCOL_ID, 1 + buffer.remaining(), unitId);
 
     long timeoutMillis = config.requestTimeout().toMillis();
-    TimeoutHandle timeout = config.timeoutScheduler().newTimeout(t -> {
-      ResponsePromise promise = promises.remove(header.transactionId());
-      if (promise != null) {
-        promise.future.completeExceptionally(
-            new TimeoutException("request timed out after %sms".formatted(timeoutMillis))
-        );
-      }
-    }, timeoutMillis, TimeUnit.MILLISECONDS);
+    TimeoutHandle timeout =
+        config
+            .timeoutScheduler()
+            .newTimeout(
+                t -> {
+                  ResponsePromise promise = promises.remove(header.transactionId());
+                  if (promise != null) {
+                    promise.future.completeExceptionally(
+                        new TimeoutException(
+                            "request timed out after %sms".formatted(timeoutMillis)));
+                  }
+                },
+                timeoutMillis,
+                TimeUnit.MILLISECONDS);
 
     var pending = new ResponsePromise(buffer.get(0) & 0xFF, new CompletableFuture<>(), timeout);
 
     promises.put(header.transactionId(), pending);
 
-    transport.send(new ModbusTcpFrame(header, buffer)).whenComplete(
-        (v, ex) -> {
-          if (ex != null) {
-            ResponsePromise promise = promises.remove(header.transactionId());
-            if (promise != null) {
-              promise.timeout.cancel();
-              promise.future.completeExceptionally(ex);
-            }
-          }
-        }
-    );
+    transport
+        .send(new ModbusTcpFrame(header, buffer))
+        .whenComplete(
+            (v, ex) -> {
+              if (ex != null) {
+                ResponsePromise promise = promises.remove(header.transactionId());
+                if (promise != null) {
+                  promise.timeout.cancel();
+                  promise.future.completeExceptionally(ex);
+                }
+              }
+            });
 
     return pending.future;
   }
@@ -172,11 +169,7 @@ public class ModbusTcpClient extends ModbusClient {
             new ModbusResponseException(promise.functionCode, exceptionCode));
       } else {
         promise.future.completeExceptionally(
-            new ModbusException(
-                "unexpected function code: 0x%02X"
-                    .formatted(functionCode)
-            )
-        );
+            new ModbusException("unexpected function code: 0x%02X".formatted(functionCode)));
       }
     } else {
       logger.warn("No pending request for response frame: {}", frame);
@@ -213,9 +206,7 @@ public class ModbusTcpClient extends ModbusClient {
    * @return a new {@link ModbusTcpClient}.
    */
   public static ModbusTcpClient create(
-      ModbusTcpClientTransport transport,
-      Consumer<ModbusClientConfig.Builder> configure
-  ) {
+      ModbusTcpClientTransport transport, Consumer<ModbusClientConfig.Builder> configure) {
 
     var config = ModbusClientConfig.create(configure);
 
@@ -223,20 +214,15 @@ public class ModbusTcpClient extends ModbusClient {
   }
 
   /**
-   * The promise of some future response PDU bytes and the function code of the originating
-   * request.
+   * The promise of some future response PDU bytes and the function code of the originating request.
    *
    * @param functionCode the function code of the originating request.
    * @param future a {@link CompletableFuture} that completes successfully with the response PDU
    *     bytes, or completes exceptionally if no response is received.
-   * @param timeout a {@link TimeoutHandle} handle to be cancelled when the response is
-   *     received.
+   * @param timeout a {@link TimeoutHandle} handle to be cancelled when the response is received.
    */
   private record ResponsePromise(
-      int functionCode,
-      CompletableFuture<ByteBuffer> future,
-      TimeoutHandle timeout
-  ) {}
+      int functionCode, CompletableFuture<ByteBuffer> future, TimeoutHandle timeout) {}
 
   public interface TransactionSequence {
 
@@ -279,7 +265,5 @@ public class ModbusTcpClient extends ModbusClient {
         }
       }
     }
-
   }
-
 }

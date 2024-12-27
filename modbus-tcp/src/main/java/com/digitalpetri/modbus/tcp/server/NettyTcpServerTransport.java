@@ -30,8 +30,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Modbus/TCP transport; a {@link ModbusTcpServerTransport} that sends and receives
- * {@link ModbusTcpFrame}s over TCP.
+ * Modbus/TCP transport; a {@link ModbusTcpServerTransport} that sends and receives {@link
+ * ModbusTcpFrame}s over TCP.
  */
 public class NettyTcpServerTransport implements ModbusTcpServerTransport {
 
@@ -63,36 +63,40 @@ public class NettyTcpServerTransport implements ModbusTcpServerTransport {
 
     var bootstrap = new ServerBootstrap();
 
-    bootstrap.channel(NioServerSocketChannel.class)
-        .childHandler(new ChannelInitializer<SocketChannel>() {
-          @Override
-          protected void initChannel(SocketChannel channel) throws Exception {
-            clientChannels.add(channel);
+    bootstrap
+        .channel(NioServerSocketChannel.class)
+        .childHandler(
+            new ChannelInitializer<SocketChannel>() {
+              @Override
+              protected void initChannel(SocketChannel channel) throws Exception {
+                clientChannels.add(channel);
 
-            if (config.tlsEnabled()) {
-              SslContext sslContext =
-                  SslContextBuilder.forServer(config.keyManagerFactory().orElseThrow())
-                      .clientAuth(ClientAuth.REQUIRE)
-                      .trustManager(config.trustManagerFactory().orElseThrow())
-                      .protocols(SslProtocols.TLS_v1_2, SslProtocols.TLS_v1_3)
-                      .build();
+                if (config.tlsEnabled()) {
+                  SslContext sslContext =
+                      SslContextBuilder.forServer(config.keyManagerFactory().orElseThrow())
+                          .clientAuth(ClientAuth.REQUIRE)
+                          .trustManager(config.trustManagerFactory().orElseThrow())
+                          .protocols(SslProtocols.TLS_v1_2, SslProtocols.TLS_v1_3)
+                          .build();
 
-              channel.pipeline().addLast(sslContext.newHandler(channel.alloc()));
-            }
+                  channel.pipeline().addLast(sslContext.newHandler(channel.alloc()));
+                }
 
-            channel.pipeline()
-                .addLast(new ChannelInboundHandlerAdapter() {
-                  @Override
-                  public void channelInactive(ChannelHandlerContext ctx) {
-                    clientChannels.remove(ctx.channel());
-                  }
-                })
-                .addLast(new ModbusTcpCodec())
-                .addLast(new ModbusTcpFrameHandler());
+                channel
+                    .pipeline()
+                    .addLast(
+                        new ChannelInboundHandlerAdapter() {
+                          @Override
+                          public void channelInactive(ChannelHandlerContext ctx) {
+                            clientChannels.remove(ctx.channel());
+                          }
+                        })
+                    .addLast(new ModbusTcpCodec())
+                    .addLast(new ModbusTcpFrameHandler());
 
-            config.pipelineCustomizer().accept(channel.pipeline());
-          }
-        });
+                config.pipelineCustomizer().accept(channel.pipeline());
+              }
+            });
 
     bootstrap.group(config.eventLoopGroup());
     bootstrap.option(ChannelOption.SO_REUSEADDR, Boolean.TRUE);
@@ -100,16 +104,19 @@ public class NettyTcpServerTransport implements ModbusTcpServerTransport {
 
     config.bootstrapCustomizer().accept(bootstrap);
 
-    bootstrap.bind(config.bindAddress(), config.port())
-        .addListener((ChannelFutureListener) channelFuture -> {
-          if (channelFuture.isSuccess()) {
-            serverChannel.set((ServerSocketChannel) channelFuture.channel());
+    bootstrap
+        .bind(config.bindAddress(), config.port())
+        .addListener(
+            (ChannelFutureListener)
+                channelFuture -> {
+                  if (channelFuture.isSuccess()) {
+                    serverChannel.set((ServerSocketChannel) channelFuture.channel());
 
-            future.complete(null);
-          } else {
-            future.completeExceptionally(channelFuture.cause());
-          }
-        });
+                    future.complete(null);
+                  } else {
+                    future.completeExceptionally(channelFuture.cause());
+                  }
+                });
 
     return future;
   }
@@ -120,16 +127,20 @@ public class NettyTcpServerTransport implements ModbusTcpServerTransport {
 
     if (channel != null) {
       var future = new CompletableFuture<Void>();
-      channel.close().addListener((ChannelFutureListener) cf -> {
-        clientChannels.forEach(Channel::close);
-        clientChannels.clear();
+      channel
+          .close()
+          .addListener(
+              (ChannelFutureListener)
+                  cf -> {
+                    clientChannels.forEach(Channel::close);
+                    clientChannels.clear();
 
-        if (cf.isSuccess()) {
-          future.complete(null);
-        } else {
-          future.completeExceptionally(cf.cause());
-        }
-      });
+                    if (cf.isSuccess()) {
+                      future.complete(null);
+                    } else {
+                      future.completeExceptionally(cf.cause());
+                    }
+                  });
       return future;
     } else {
       return CompletableFuture.completedFuture(null);
@@ -150,42 +161,39 @@ public class NettyTcpServerTransport implements ModbusTcpServerTransport {
           NettyTcpServerTransport.this.frameReceiver.get();
 
       if (frameReceiver != null) {
-        executionQueue.submit(() -> {
-          try {
-            ModbusTcpFrame responseFrame =
-                frameReceiver.receive(new NettyRequestContext(ctx), requestFrame);
+        executionQueue.submit(
+            () -> {
+              try {
+                ModbusTcpFrame responseFrame =
+                    frameReceiver.receive(new NettyRequestContext(ctx), requestFrame);
 
-            ctx.channel().writeAndFlush(responseFrame);
-          } catch (UnknownUnitIdException e) {
-            logger.debug(
-                "Ignoring request for unknown unit id: {}", requestFrame.header().unitId());
-          } catch (Exception e) {
-            logger.error("Error handling frame: {}", e.getMessage(), e);
+                ctx.channel().writeAndFlush(responseFrame);
+              } catch (UnknownUnitIdException e) {
+                logger.debug(
+                    "Ignoring request for unknown unit id: {}", requestFrame.header().unitId());
+              } catch (Exception e) {
+                logger.error("Error handling frame: {}", e.getMessage(), e);
 
-            ctx.close();
-          }
-        });
+                ctx.close();
+              }
+            });
       }
-
     }
-
   }
 
   /**
    * Create a new {@link NettyTcpServerTransport} with a callback that allows customizing the
    * configuration.
    *
-   * @param configure a {@link Consumer} that accepts a
-   *     {@link NettyServerTransportConfig.Builder} instance to configure.
+   * @param configure a {@link Consumer} that accepts a {@link NettyServerTransportConfig.Builder}
+   *     instance to configure.
    * @return a new {@link NettyTcpServerTransport}.
    */
   public static NettyTcpServerTransport create(
-      Consumer<NettyServerTransportConfig.Builder> configure
-  ) {
+      Consumer<NettyServerTransportConfig.Builder> configure) {
 
     var builder = new NettyServerTransportConfig.Builder();
     configure.accept(builder);
     return new NettyTcpServerTransport(builder.build());
   }
-
 }

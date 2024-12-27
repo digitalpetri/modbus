@@ -22,12 +22,13 @@ public class ReadOnlyModbusServicesTest {
 
   private final ProcessImage processImage = new ProcessImage();
 
-  private final ReadOnlyModbusServices services = new ReadOnlyModbusServices() {
-    @Override
-    protected Optional<ProcessImage> getProcessImage(int unitId) {
-      return Optional.of(processImage);
-    }
-  };
+  private final ReadOnlyModbusServices services =
+      new ReadOnlyModbusServices() {
+        @Override
+        protected Optional<ProcessImage> getProcessImage(int unitId) {
+          return Optional.of(processImage);
+        }
+      };
 
   @Test
   void readCoils() throws Exception {
@@ -36,22 +37,23 @@ public class ReadOnlyModbusServicesTest {
       randomBooleans[i] = random.nextBoolean();
     }
 
-    processImage.with(tx -> tx.writeCoils(coilMap -> {
-      for (int i = 0; i < 65536; i++) {
-        coilMap.put(i, randomBooleans[i]);
-      }
-    }));
+    processImage.with(
+        tx ->
+            tx.writeCoils(
+                coilMap -> {
+                  for (int i = 0; i < 65536; i++) {
+                    coilMap.put(i, randomBooleans[i]);
+                  }
+                }));
 
     int address = 0;
     int remaining = 65536;
     int quantity = Math.min(remaining - address, random.nextInt(2000) + 1);
 
     while (remaining > 0) {
-      ReadCoilsResponse response = services.readCoils(
-          new TestModbusRequestContext(),
-          0,
-          new ReadCoilsRequest(address, quantity)
-      );
+      ReadCoilsResponse response =
+          services.readCoils(
+              new TestModbusRequestContext(), 0, new ReadCoilsRequest(address, quantity));
 
       byte[] inputs = response.coils();
 
@@ -75,22 +77,23 @@ public class ReadOnlyModbusServicesTest {
       randomBooleans[i] = random.nextBoolean();
     }
 
-    processImage.with(tx -> tx.writeDiscreteInputs(discreteInputMap -> {
-      for (int i = 0; i < 65536; i++) {
-        discreteInputMap.put(i, randomBooleans[i]);
-      }
-    }));
+    processImage.with(
+        tx ->
+            tx.writeDiscreteInputs(
+                discreteInputMap -> {
+                  for (int i = 0; i < 65536; i++) {
+                    discreteInputMap.put(i, randomBooleans[i]);
+                  }
+                }));
 
     int address = 0;
     int remaining = 65536;
     int quantity = Math.min(remaining - address, random.nextInt(2000) + 1);
 
     while (remaining > 0) {
-      ReadDiscreteInputsResponse response = services.readDiscreteInputs(
-          new TestModbusRequestContext(),
-          0,
-          new ReadDiscreteInputsRequest(address, quantity)
-      );
+      ReadDiscreteInputsResponse response =
+          services.readDiscreteInputs(
+              new TestModbusRequestContext(), 0, new ReadDiscreteInputsRequest(address, quantity));
 
       byte[] inputs = response.inputs();
 
@@ -114,14 +117,17 @@ public class ReadOnlyModbusServicesTest {
     random.nextBytes(randomBytes);
 
     // Fill the Holding Registers with random data
-    processImage.with(tx -> tx.writeHoldingRegisters(holdingRegisterMap -> {
-      for (int i = 0; i < 65536; i++) {
-        var bs = new byte[2];
-        bs[0] = randomBytes[i * 2];
-        bs[1] = randomBytes[i * 2 + 1];
-        holdingRegisterMap.put(i, bs);
-      }
-    }));
+    processImage.with(
+        tx ->
+            tx.writeHoldingRegisters(
+                holdingRegisterMap -> {
+                  for (int i = 0; i < 65536; i++) {
+                    var bs = new byte[2];
+                    bs[0] = randomBytes[i * 2];
+                    bs[1] = randomBytes[i * 2 + 1];
+                    holdingRegisterMap.put(i, bs);
+                  }
+                }));
 
     // Read random lengths until all registers are read and verified
     int address = 0;
@@ -129,11 +135,11 @@ public class ReadOnlyModbusServicesTest {
     int quantity = Math.min(remaining - address, random.nextInt(125) + 1);
 
     while (remaining > 0) {
-      ReadHoldingRegistersResponse response = services.readHoldingRegisters(
-          new TestModbusRequestContext(),
-          0,
-          new ReadHoldingRegistersRequest(address, quantity)
-      );
+      ReadHoldingRegistersResponse response =
+          services.readHoldingRegisters(
+              new TestModbusRequestContext(),
+              0,
+              new ReadHoldingRegistersRequest(address, quantity));
 
       byte[] registers = response.registers();
 
@@ -160,14 +166,17 @@ public class ReadOnlyModbusServicesTest {
     random.nextBytes(randomBytes);
 
     // Fill the Holding Registers with random data
-    processImage.with(tx -> tx.writeInputRegisters(inputRegisterMap -> {
-      for (int i = 0; i < 65536; i++) {
-        var bs = new byte[2];
-        bs[0] = randomBytes[i * 2];
-        bs[1] = randomBytes[i * 2 + 1];
-        inputRegisterMap.put(i, bs);
-      }
-    }));
+    processImage.with(
+        tx ->
+            tx.writeInputRegisters(
+                inputRegisterMap -> {
+                  for (int i = 0; i < 65536; i++) {
+                    var bs = new byte[2];
+                    bs[0] = randomBytes[i * 2];
+                    bs[1] = randomBytes[i * 2 + 1];
+                    inputRegisterMap.put(i, bs);
+                  }
+                }));
 
     // Read random lengths until all registers are read and verified
     int address = 0;
@@ -175,11 +184,9 @@ public class ReadOnlyModbusServicesTest {
     int quantity = Math.min(remaining - address, random.nextInt(125) + 1);
 
     while (remaining > 0) {
-      ReadInputRegistersResponse response = services.readInputRegisters(
-          new TestModbusRequestContext(),
-          0,
-          new ReadInputRegistersRequest(address, quantity)
-      );
+      ReadInputRegistersResponse response =
+          services.readInputRegisters(
+              new TestModbusRequestContext(), 0, new ReadInputRegistersRequest(address, quantity));
 
       byte[] registers = response.registers();
 
@@ -211,5 +218,4 @@ public class ReadOnlyModbusServicesTest {
       return null;
     }
   }
-
 }

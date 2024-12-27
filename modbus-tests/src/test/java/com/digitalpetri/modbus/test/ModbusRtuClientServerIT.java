@@ -23,38 +23,37 @@ public class ModbusRtuClientServerIT extends ClientServerIT {
   @BeforeEach
   void setup() throws Exception {
     var processImage = new ProcessImage();
-    var modbusServices = new ReadWriteModbusServices() {
-      @Override
-      protected Optional<ProcessImage> getProcessImage(int unitId) {
-        return Optional.of(processImage);
-      }
-    };
+    var modbusServices =
+        new ReadWriteModbusServices() {
+          @Override
+          protected Optional<ProcessImage> getProcessImage(int unitId) {
+            return Optional.of(processImage);
+          }
+        };
 
-    server = ModbusRtuServer.create(
-        SerialPortServerTransport.create(
-            cfg -> {
-              cfg.serialPort = System.getProperty("modbus.serverSerialPort");
-              cfg.baudRate = 115200;
-              cfg.dataBits = 8;
-              cfg.parity = SerialPort.NO_PARITY;
-              cfg.stopBits = 1;
-            }
-        ),
-        modbusServices
-    );
+    server =
+        ModbusRtuServer.create(
+            SerialPortServerTransport.create(
+                cfg -> {
+                  cfg.serialPort = System.getProperty("modbus.serverSerialPort");
+                  cfg.baudRate = 115200;
+                  cfg.dataBits = 8;
+                  cfg.parity = SerialPort.NO_PARITY;
+                  cfg.stopBits = 1;
+                }),
+            modbusServices);
     server.start();
 
-    client = ModbusRtuClient.create(
-        SerialPortClientTransport.create(
-            cfg -> {
-              cfg.serialPort = System.getProperty("modbus.clientSerialPort");
-              cfg.baudRate = 115200;
-              cfg.dataBits = 8;
-              cfg.parity = SerialPort.NO_PARITY;
-              cfg.stopBits = 1;
-            }
-        )
-    );
+    client =
+        ModbusRtuClient.create(
+            SerialPortClientTransport.create(
+                cfg -> {
+                  cfg.serialPort = System.getProperty("modbus.clientSerialPort");
+                  cfg.baudRate = 115200;
+                  cfg.dataBits = 8;
+                  cfg.parity = SerialPort.NO_PARITY;
+                  cfg.stopBits = 1;
+                }));
     client.connect();
   }
 
@@ -82,5 +81,4 @@ public class ModbusRtuClientServerIT extends ClientServerIT {
     return System.getProperty("modbus.clientSerialPort") != null
         && System.getProperty("modbus.serverSerialPort") != null;
   }
-
 }

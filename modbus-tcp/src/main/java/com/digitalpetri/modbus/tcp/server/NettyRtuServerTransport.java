@@ -64,37 +64,41 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
 
     var bootstrap = new ServerBootstrap();
 
-    bootstrap.channel(NioServerSocketChannel.class)
-        .childHandler(new ChannelInitializer<SocketChannel>() {
-          @Override
-          protected void initChannel(SocketChannel channel) throws Exception {
-            if (clientChannel.compareAndSet(null, channel)) {
-              if (config.tlsEnabled()) {
-                SslContext sslContext =
-                    SslContextBuilder.forServer(config.keyManagerFactory().orElseThrow())
-                        .clientAuth(ClientAuth.REQUIRE)
-                        .trustManager(config.trustManagerFactory().orElseThrow())
-                        .protocols(SslProtocols.TLS_v1_2, SslProtocols.TLS_v1_3)
-                        .build();
+    bootstrap
+        .channel(NioServerSocketChannel.class)
+        .childHandler(
+            new ChannelInitializer<SocketChannel>() {
+              @Override
+              protected void initChannel(SocketChannel channel) throws Exception {
+                if (clientChannel.compareAndSet(null, channel)) {
+                  if (config.tlsEnabled()) {
+                    SslContext sslContext =
+                        SslContextBuilder.forServer(config.keyManagerFactory().orElseThrow())
+                            .clientAuth(ClientAuth.REQUIRE)
+                            .trustManager(config.trustManagerFactory().orElseThrow())
+                            .protocols(SslProtocols.TLS_v1_2, SslProtocols.TLS_v1_3)
+                            .build();
 
-                channel.pipeline().addLast(sslContext.newHandler(channel.alloc()));
+                    channel.pipeline().addLast(sslContext.newHandler(channel.alloc()));
+                  }
+
+                  channel
+                      .pipeline()
+                      .addLast(
+                          new ChannelInboundHandlerAdapter() {
+                            @Override
+                            public void channelInactive(ChannelHandlerContext ctx) {
+                              clientChannel.set(null);
+                            }
+                          })
+                      .addLast(new ModbusRtuServerFrameReceiver());
+
+                  config.pipelineCustomizer().accept(channel.pipeline());
+                } else {
+                  channel.close();
+                }
               }
-
-              channel.pipeline()
-                  .addLast(new ChannelInboundHandlerAdapter() {
-                    @Override
-                    public void channelInactive(ChannelHandlerContext ctx) {
-                      clientChannel.set(null);
-                    }
-                  })
-                  .addLast(new ModbusRtuServerFrameReceiver());
-
-              config.pipelineCustomizer().accept(channel.pipeline());
-            } else {
-              channel.close();
-            }
-          }
-        });
+            });
 
     bootstrap.group(config.eventLoopGroup());
     bootstrap.option(ChannelOption.SO_REUSEADDR, Boolean.TRUE);
@@ -102,16 +106,19 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
 
     config.bootstrapCustomizer().accept(bootstrap);
 
-    bootstrap.bind(config.bindAddress(), config.port())
-        .addListener((ChannelFutureListener) channelFuture -> {
-          if (channelFuture.isSuccess()) {
-            serverChannel.set((ServerSocketChannel) channelFuture.channel());
+    bootstrap
+        .bind(config.bindAddress(), config.port())
+        .addListener(
+            (ChannelFutureListener)
+                channelFuture -> {
+                  if (channelFuture.isSuccess()) {
+                    serverChannel.set((ServerSocketChannel) channelFuture.channel());
 
-            future.complete(null);
-          } else {
-            future.completeExceptionally(channelFuture.cause());
-          }
-        });
+                    future.complete(null);
+                  } else {
+                    future.completeExceptionally(channelFuture.cause());
+                  }
+                });
 
     return future;
   }
@@ -122,18 +129,22 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
 
     if (channel != null) {
       var future = new CompletableFuture<Void>();
-      channel.close().addListener((ChannelFutureListener) cf -> {
-        Channel ch = clientChannel.getAndSet(null);
-        if (ch != null) {
-          ch.close();
-        }
+      channel
+          .close()
+          .addListener(
+              (ChannelFutureListener)
+                  cf -> {
+                    Channel ch = clientChannel.getAndSet(null);
+                    if (ch != null) {
+                      ch.close();
+                    }
 
-        if (cf.isSuccess()) {
-          future.complete(null);
-        } else {
-          future.completeExceptionally(cf.cause());
-        }
-      });
+                    if (cf.isSuccess()) {
+                      future.complete(null);
+                    } else {
+                      future.completeExceptionally(cf.cause());
+                    }
+                  });
       return future;
     } else {
       return CompletableFuture.completedFuture(null);
@@ -173,46 +184,43 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
           NettyRtuServerTransport.this.frameReceiver.get();
 
       if (frameReceiver != null) {
-        executionQueue.submit(() -> {
-          try {
-            ModbusRtuFrame responseFrame =
-                frameReceiver.receive(new NettyRequestContext(ctx), requestFrame);
+        executionQueue.submit(
+            () -> {
+              try {
+                ModbusRtuFrame responseFrame =
+                    frameReceiver.receive(new NettyRequestContext(ctx), requestFrame);
 
-            ByteBuf buffer = Unpooled.buffer();
-            buffer.writeByte(responseFrame.unitId());
-            buffer.writeBytes(responseFrame.pdu());
-            buffer.writeBytes(responseFrame.crc());
+                ByteBuf buffer = Unpooled.buffer();
+                buffer.writeByte(responseFrame.unitId());
+                buffer.writeBytes(responseFrame.pdu());
+                buffer.writeBytes(responseFrame.crc());
 
-            ctx.channel().writeAndFlush(buffer);
-          } catch (UnknownUnitIdException e) {
-            logger.debug("Ignoring request for unknown unit id: {}", requestFrame.unitId());
-          } catch (Exception e) {
-            logger.error("Error handling frame: {}", e.getMessage(), e);
+                ctx.channel().writeAndFlush(buffer);
+              } catch (UnknownUnitIdException e) {
+                logger.debug("Ignoring request for unknown unit id: {}", requestFrame.unitId());
+              } catch (Exception e) {
+                logger.error("Error handling frame: {}", e.getMessage(), e);
 
-            ctx.close();
-          }
-        });
+                ctx.close();
+              }
+            });
       }
-
     }
-
   }
 
   /**
    * Create a new {@link NettyRtuServerTransport} with a callback that allows customizing the
    * configuration.
    *
-   * @param configure a {@link Consumer} that accepts a
-   *     {@link NettyServerTransportConfig.Builder} instance to configure.
+   * @param configure a {@link Consumer} that accepts a {@link NettyServerTransportConfig.Builder}
+   *     instance to configure.
    * @return a new {@link NettyRtuServerTransport}.
    */
   public static NettyRtuServerTransport create(
-      Consumer<NettyServerTransportConfig.Builder> configure
-  ) {
+      Consumer<NettyServerTransportConfig.Builder> configure) {
 
     var builder = new NettyServerTransportConfig.Builder();
     configure.accept(builder);
     return new NettyRtuServerTransport(builder.build());
   }
-
 }

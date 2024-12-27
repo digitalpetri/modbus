@@ -20,5 +20,4 @@ public record ModbusTcpFrame(MbapHeader header, ByteBuffer pdu) {
         .add("pdu=" + Hex.format(pdu))
         .toString();
   }
-
 }

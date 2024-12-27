@@ -49,8 +49,7 @@ public class SerialPortServerTransport implements ModbusRtuServerTransport {
         config.dataBits(),
         config.stopBits(),
         config.parity(),
-        config.rs485Mode()
-    );
+        config.rs485Mode());
 
     executionQueue = new ExecutionQueue(config.executor());
   }
@@ -70,8 +69,7 @@ public class SerialPortServerTransport implements ModbusRtuServerTransport {
         return CompletableFuture.failedFuture(
             new Exception(
                 "failed to open port '%s', lastErrorCode=%d"
-                    .formatted(config.serialPort(), serialPort.getLastErrorCode()))
-        );
+                    .formatted(config.serialPort(), serialPort.getLastErrorCode())));
       }
     }
   }
@@ -87,8 +85,7 @@ public class SerialPortServerTransport implements ModbusRtuServerTransport {
         return CompletableFuture.failedFuture(
             new Exception(
                 "failed to close port '%s', lastErrorCode=%d"
-                    .formatted(config.serialPort(), serialPort.getLastErrorCode()))
-        );
+                    .formatted(config.serialPort(), serialPort.getLastErrorCode())));
       }
     } else {
       return CompletableFuture.completedFuture(null);
@@ -102,9 +99,7 @@ public class SerialPortServerTransport implements ModbusRtuServerTransport {
 
   private class ModbusRtuDataListener implements SerialPortDataListener {
 
-    /**
-     * Bit mask indicating what events we're interested in.
-     */
+    /** Bit mask indicating what events we're interested in. */
     private static final int LISTENING_EVENTS = SerialPort.LISTENING_EVENT_DATA_RECEIVED;
 
     @Override
@@ -138,56 +133,54 @@ public class SerialPortServerTransport implements ModbusRtuServerTransport {
           SerialPortServerTransport.this.frameReceiver.get();
 
       if (frameReceiver != null) {
-        executionQueue.submit(() -> {
-          try {
-            ModbusRtuFrame responseFrame =
-                frameReceiver.receive(new ModbusRtuRequestContext() {}, requestFrame);
+        executionQueue.submit(
+            () -> {
+              try {
+                ModbusRtuFrame responseFrame =
+                    frameReceiver.receive(new ModbusRtuRequestContext() {}, requestFrame);
 
-            int unitId = responseFrame.unitId();
-            ByteBuffer pdu = responseFrame.pdu();
-            ByteBuffer crc = responseFrame.crc();
+                int unitId = responseFrame.unitId();
+                ByteBuffer pdu = responseFrame.pdu();
+                ByteBuffer crc = responseFrame.crc();
 
-            byte[] data = new byte[1 + pdu.remaining() + crc.remaining()];
-            data[0] = (byte) unitId;
-            pdu.get(data, 1, pdu.remaining());
-            crc.get(data, data.length - 2, crc.remaining());
+                byte[] data = new byte[1 + pdu.remaining() + crc.remaining()];
+                data[0] = (byte) unitId;
+                pdu.get(data, 1, pdu.remaining());
+                crc.get(data, data.length - 2, crc.remaining());
 
-            int totalWritten = 0;
-            while (totalWritten < data.length) {
-              int written = serialPort.writeBytes(data, data.length - totalWritten, totalWritten);
-              if (written == -1) {
-                logger.error("Error writing frame to serial port");
+                int totalWritten = 0;
+                while (totalWritten < data.length) {
+                  int written =
+                      serialPort.writeBytes(data, data.length - totalWritten, totalWritten);
+                  if (written == -1) {
+                    logger.error("Error writing frame to serial port");
 
-                return;
+                    return;
+                  }
+                  totalWritten += written;
+                }
+              } catch (UnknownUnitIdException e) {
+                logger.debug("Ignoring request for unknown unit id: {}", requestFrame.unitId());
+              } catch (Exception e) {
+                logger.error("Error handling frame: {}", e.getMessage(), e);
               }
-              totalWritten += written;
-            }
-          } catch (UnknownUnitIdException e) {
-            logger.debug("Ignoring request for unknown unit id: {}", requestFrame.unitId());
-          } catch (Exception e) {
-            logger.error("Error handling frame: {}", e.getMessage(), e);
-          }
-        });
+            });
       }
     }
-
   }
 
   /**
    * Create a new {@link SerialPortServerTransport} with a callback that allows customizing the
    * configuration.
    *
-   * @param configure a {@link Consumer} that accepts a
-   *     {@link SerialPortTransportConfig.Builder} instance to configure.
+   * @param configure a {@link Consumer} that accepts a {@link SerialPortTransportConfig.Builder}
+   *     instance to configure.
    * @return a new {@link SerialPortServerTransport}.
    */
-  public static SerialPortServerTransport create(
-      Consumer<Builder> configure
-  ) {
+  public static SerialPortServerTransport create(Consumer<Builder> configure) {
 
     var builder = new SerialPortTransportConfig.Builder();
     configure.accept(builder);
     return new SerialPortServerTransport(builder.build());
   }
-
 }

@@ -16,9 +16,7 @@ public record WriteSingleRegisterResponse(int address, int value) implements Mod
     return FunctionCode.WRITE_SINGLE_REGISTER.getCode();
   }
 
-  /**
-   * Utility functions for encoding and decoding {@link WriteSingleRegisterResponse}.
-   */
+  /** Utility functions for encoding and decoding {@link WriteSingleRegisterResponse}. */
   public static final class Serializer {
 
     private Serializer() {}
@@ -50,7 +48,5 @@ public record WriteSingleRegisterResponse(int address, int value) implements Mod
 
       return new WriteSingleRegisterResponse(address, value);
     }
-
   }
-
 }
