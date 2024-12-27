@@ -1,7 +1,7 @@
 package com.digitalpetri.modbus.test;
 
-import static com.digitalpetri.modbus.test.ModbusTcpTlsClientServerIT.createKeyManagerFactory;
-import static com.digitalpetri.modbus.test.ModbusTcpTlsClientServerIT.createTrustManagerFactory;
+import static com.digitalpetri.modbus.test.CertificateUtil.createKeyManagerFactory;
+import static com.digitalpetri.modbus.test.CertificateUtil.createTrustManagerFactory;
 
 import com.digitalpetri.modbus.client.ModbusClient;
 import com.digitalpetri.modbus.client.ModbusTcpClient;
