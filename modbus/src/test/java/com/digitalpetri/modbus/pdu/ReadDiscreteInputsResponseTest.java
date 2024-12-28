@@ -20,10 +20,8 @@ public class ReadDiscreteInputsResponseTest {
 
     buffer.flip();
 
-    ReadDiscreteInputsResponse decoded =
-        ReadDiscreteInputsResponse.Serializer.decode(buffer);
+    ReadDiscreteInputsResponse decoded = ReadDiscreteInputsResponse.Serializer.decode(buffer);
 
     assertEquals(response, decoded);
   }
-
 }

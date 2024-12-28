@@ -10,7 +10,7 @@ class WriteSingleCoilResponseTest {
   @Test
   void serializer() {
     for (int address = 0; address < 0xFFFF; address++) {
-      for (boolean value : new boolean[]{true, false}) {
+      for (boolean value : new boolean[] {true, false}) {
         var response = new WriteSingleCoilResponse(address, value);
         ByteBuffer buffer = ByteBuffer.allocate(256);
 
@@ -18,12 +18,10 @@ class WriteSingleCoilResponseTest {
 
         buffer.flip();
 
-        WriteSingleCoilResponse decoded =
-            WriteSingleCoilResponse.Serializer.decode(buffer);
+        WriteSingleCoilResponse decoded = WriteSingleCoilResponse.Serializer.decode(buffer);
 
         assertEquals(response, decoded);
       }
     }
   }
-
 }

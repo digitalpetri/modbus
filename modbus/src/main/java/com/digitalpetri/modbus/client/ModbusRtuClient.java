@@ -26,9 +26,7 @@ import org.slf4j.LoggerFactory;
 
 public class ModbusRtuClient extends ModbusClient {
 
-  /**
-   * The unit/slave ID used when sending broadcast messages.
-   */
+  /** The unit/slave ID used when sending broadcast messages. */
   private static final int BROADCAST_ID = 0;
 
   private final Logger logger = LoggerFactory.getLogger(getClass());
@@ -61,51 +59,57 @@ public class ModbusRtuClient extends ModbusClient {
 
     ByteBuffer crc = calculateCrc16(unitId, pdu);
 
-    var promise = new ResponsePromise(
-        unitId,
-        request.getFunctionCode(),
-        new CompletableFuture<>()
-    );
+    var promise = new ResponsePromise(unitId, request.getFunctionCode(), new CompletableFuture<>());
 
     synchronized (promises) {
       promises.push(promise);
     }
 
     long timeoutMillis = config.requestTimeout().toMillis();
-    TimeoutHandle timeout = config.timeoutScheduler().newTimeout(t -> {
-      boolean removed;
-      synchronized (promises) {
-        removed = promises.remove(promise);
-      }
-      if (removed) {
-        // The frame parser needs to be reset!
-        // It could be "stuck" in Accumulating or ParseError states if the timeout was caused by
-        // an incomplete or invalid response rather than no response.
-        resetFrameParser();
+    TimeoutHandle timeout =
+        config
+            .timeoutScheduler()
+            .newTimeout(
+                t -> {
+                  boolean removed;
+                  synchronized (promises) {
+                    removed = promises.remove(promise);
+                  }
+                  if (removed) {
+                    // The frame parser needs to be reset!
+                    // It could be "stuck" in Accumulating or ParseError states if the timeout was
+                    // caused by
+                    // an incomplete or invalid response rather than no response.
+                    resetFrameParser();
 
-        promise.future.completeExceptionally(
-            new TimeoutException("request timed out after %sms".formatted(timeoutMillis))
-        );
-      }
-    }, timeoutMillis, TimeUnit.MILLISECONDS);
+                    promise.future.completeExceptionally(
+                        new TimeoutException(
+                            "request timed out after %sms".formatted(timeoutMillis)));
+                  }
+                },
+                timeoutMillis,
+                TimeUnit.MILLISECONDS);
 
     timeouts.put(promise, timeout);
 
-    transport.send(new ModbusRtuFrame(unitId, pdu, crc)).whenComplete((v, ex) -> {
-      if (ex != null) {
-        boolean removed;
-        synchronized (promises) {
-          removed = promises.remove(promise);
-        }
-        if (removed) {
-          promise.future.completeExceptionally(ex);
-        }
-        TimeoutHandle t = timeouts.remove(promise);
-        if (t != null) {
-          t.cancel();
-        }
-      }
-    });
+    transport
+        .send(new ModbusRtuFrame(unitId, pdu, crc))
+        .whenComplete(
+            (v, ex) -> {
+              if (ex != null) {
+                boolean removed;
+                synchronized (promises) {
+                  removed = promises.remove(promise);
+                }
+                if (removed) {
+                  promise.future.completeExceptionally(ex);
+                }
+                TimeoutHandle t = timeouts.remove(promise);
+                if (t != null) {
+                  t.cancel();
+                }
+              }
+            });
 
     return promise.future;
   }
@@ -178,10 +182,7 @@ public class ModbusRtuClient extends ModbusClient {
 
       if (promise.slaveId != slaveId) {
         promise.future.completeExceptionally(
-            new ModbusException(
-                "slave id mismatch: %s != %s"
-                    .formatted(promise.slaveId, slaveId))
-        );
+            new ModbusException("slave id mismatch: %s != %s".formatted(promise.slaveId, slaveId)));
         return;
       }
 
@@ -196,8 +197,7 @@ public class ModbusRtuClient extends ModbusClient {
           promise.future.completeExceptionally(
               new ModbusException(
                   "function code mismatch: %s != %s"
-                      .formatted(promise.functionCode, functionCode))
-          );
+                      .formatted(promise.functionCode, functionCode)));
 
           // Clear out any pending promises.
           var pending = new ArrayList<ResponsePromise>();
@@ -207,9 +207,7 @@ public class ModbusRtuClient extends ModbusClient {
             }
           }
           pending.forEach(
-              p ->
-                  p.future.completeExceptionally(new ModbusException("synchronization error"))
-          );
+              p -> p.future.completeExceptionally(new ModbusException("synchronization error")));
         } else {
           try {
             ModbusPdu modbusPdu = config.responseSerializer().decode(functionCode, buffer);
@@ -222,17 +220,14 @@ public class ModbusRtuClient extends ModbusClient {
         int exceptionCode = buffer.get();
 
         promise.future.completeExceptionally(
-            new ModbusResponseException(promise.functionCode, exceptionCode)
-        );
+            new ModbusResponseException(promise.functionCode, exceptionCode));
       }
     } else {
       logger.warn("No pending request for response frame: {}", frame);
     }
   }
 
-  /**
-   * Reset the transport's frame parser.
-   */
+  /** Reset the transport's frame parser. */
   protected void resetFrameParser() {
     transport.resetFrameParser();
   }
@@ -297,9 +292,7 @@ public class ModbusRtuClient extends ModbusClient {
    * @return a new {@link ModbusRtuClient}.
    */
   public static ModbusRtuClient create(
-      ModbusRtuClientTransport transport,
-      Consumer<ModbusClientConfig.Builder> configure
-  ) {
+      ModbusRtuClientTransport transport, Consumer<ModbusClientConfig.Builder> configure) {
 
     var builder = new ModbusClientConfig.Builder();
     configure.accept(builder);
@@ -307,9 +300,5 @@ public class ModbusRtuClient extends ModbusClient {
   }
 
   private record ResponsePromise(
-      int slaveId,
-      int functionCode,
-      CompletableFuture<ModbusResponsePdu> future
-  ) {}
-
+      int slaveId, int functionCode, CompletableFuture<ModbusResponsePdu> future) {}
 }

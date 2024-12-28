@@ -21,14 +21,12 @@ public record ModbusClientConfig(
     Duration requestTimeout,
     TimeoutScheduler timeoutScheduler,
     ModbusPduSerializer requestSerializer,
-    ModbusPduSerializer responseSerializer
-) {
+    ModbusPduSerializer responseSerializer) {
 
   /**
    * Create a new {@link ModbusClientConfig} instance.
    *
-   * @param configure a callback that accepts a {@link Builder} used to configure the new
-   *     instance.
+   * @param configure a callback that accepts a {@link Builder} used to configure the new instance.
    * @return a new {@link ModbusClientConfig} instance.
    */
   public static ModbusClientConfig create(Consumer<Builder> configure) {
@@ -39,24 +37,16 @@ public record ModbusClientConfig(
 
   public static class Builder {
 
-    /**
-     * The timeout duration for requests.
-     */
+    /** The timeout duration for requests. */
     public Duration requestTimeout = Duration.ofSeconds(5);
 
-    /**
-     * The {@link TimeoutScheduler} used to schedule request timeouts.
-     */
+    /** The {@link TimeoutScheduler} used to schedule request timeouts. */
     public TimeoutScheduler timeoutScheduler;
 
-    /**
-     * The {@link ModbusPduSerializer} used to encode outgoing requests.
-     */
+    /** The {@link ModbusPduSerializer} used to encode outgoing requests. */
     public ModbusPduSerializer requestSerializer = DefaultRequestSerializer.INSTANCE;
 
-    /**
-     * The {@link ModbusPduSerializer} used to decode incoming responses.
-     */
+    /** The {@link ModbusPduSerializer} used to decode incoming responses. */
     public ModbusPduSerializer responseSerializer = DefaultResponseSerializer.INSTANCE;
 
     /**
@@ -64,20 +54,12 @@ public record ModbusClientConfig(
      */
     public ModbusClientConfig build() {
       if (timeoutScheduler == null) {
-        timeoutScheduler = TimeoutScheduler.create(
-            Modbus.sharedExecutor(),
-            Modbus.sharedScheduledExecutor()
-        );
+        timeoutScheduler =
+            TimeoutScheduler.create(Modbus.sharedExecutor(), Modbus.sharedScheduledExecutor());
       }
 
       return new ModbusClientConfig(
-          requestTimeout,
-          timeoutScheduler,
-          requestSerializer,
-          responseSerializer
-      );
+          requestTimeout, timeoutScheduler, requestSerializer, responseSerializer);
     }
-
   }
-
 }

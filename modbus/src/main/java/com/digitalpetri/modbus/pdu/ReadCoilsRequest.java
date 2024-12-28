@@ -19,9 +19,7 @@ public record ReadCoilsRequest(int address, int quantity) implements ModbusReque
     return FunctionCode.READ_COILS.getCode();
   }
 
-  /**
-   * Utility functions for encoding and decoding {@link ReadCoilsRequest}.
-   */
+  /** Utility functions for encoding and decoding {@link ReadCoilsRequest}. */
   public static final class Serializer {
 
     private Serializer() {}
@@ -53,7 +51,5 @@ public record ReadCoilsRequest(int address, int quantity) implements ModbusReque
 
       return new ReadCoilsRequest(address, quantity);
     }
-
   }
-
 }

@@ -55,19 +55,17 @@ public class NettyRtuClientTransport implements ModbusRtuClientTransport {
   public NettyRtuClientTransport(NettyClientTransportConfig config) {
     this.config = config;
 
-    channelFsm = ChannelFsmFactory.newChannelFsm(
-        ChannelFsmConfig.newBuilder()
-            .setExecutor(config.executor())
-            .setLazy(config.reconnectLazy())
-            .setPersistent(config.connectPersistent())
-            .setChannelActions(new ModbusRtuChannelActions())
-            .build()
-    );
+    channelFsm =
+        ChannelFsmFactory.newChannelFsm(
+            ChannelFsmConfig.newBuilder()
+                .setExecutor(config.executor())
+                .setLazy(config.reconnectLazy())
+                .setPersistent(config.connectPersistent())
+                .setChannelActions(new ModbusRtuChannelActions())
+                .build());
 
     channelFsm.addTransitionListener(
-        (from, to, via) ->
-            logger.debug("onStateTransition: {} -> {} via {}", from, to, via)
-    );
+        (from, to, via) -> logger.debug("onStateTransition: {} -> {} via {}", from, to, via));
 
     executionQueue = new ExecutionQueue(config.executor());
   }
@@ -89,24 +87,31 @@ public class NettyRtuClientTransport implements ModbusRtuClientTransport {
 
   @Override
   public CompletionStage<Void> send(ModbusRtuFrame frame) {
-    return channelFsm.getChannel().thenCompose(channel -> {
-      ByteBuf buffer = Unpooled.buffer();
-      buffer.writeByte(frame.unitId());
-      buffer.writeBytes(frame.pdu());
-      buffer.writeBytes(frame.crc());
+    return channelFsm
+        .getChannel()
+        .thenCompose(
+            channel -> {
+              ByteBuf buffer = Unpooled.buffer();
+              buffer.writeByte(frame.unitId());
+              buffer.writeBytes(frame.pdu());
+              buffer.writeBytes(frame.crc());
 
-      var future = new CompletableFuture<Void>();
+              var future = new CompletableFuture<Void>();
 
-      channel.writeAndFlush(buffer).addListener((ChannelFutureListener) channelFuture -> {
-        if (channelFuture.isSuccess()) {
-          future.complete(null);
-        } else {
-          future.completeExceptionally(channelFuture.cause());
-        }
-      });
+              channel
+                  .writeAndFlush(buffer)
+                  .addListener(
+                      (ChannelFutureListener)
+                          channelFuture -> {
+                            if (channelFuture.isSuccess()) {
+                              future.complete(null);
+                            } else {
+                              future.completeExceptionally(channelFuture.cause());
+                            }
+                          });
 
-      return future;
-    });
+              return future;
+            });
   }
 
   @Override
@@ -148,90 +153,89 @@ public class NettyRtuClientTransport implements ModbusRtuClientTransport {
         executionQueue.submit(() -> frameReceiver.accept(frame));
       }
     }
-
   }
 
   private class ModbusRtuChannelActions implements ChannelActions {
 
     @Override
     public CompletableFuture<Channel> connect(FsmContext<State, Event> fsmContext) {
-      var bootstrap = new Bootstrap()
-          .channel(NioSocketChannel.class)
-          .group(config.eventLoopGroup())
-          .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) config.connectTimeout().toMillis())
-          .option(ChannelOption.TCP_NODELAY, Boolean.TRUE)
-          .handler(new ChannelInitializer<SocketChannel>() {
-            @Override
-            protected void initChannel(SocketChannel channel) throws Exception {
-              if (config.tlsEnabled()) {
-                SslContext sslContext = SslContextBuilder.forClient()
-                    .clientAuth(ClientAuth.REQUIRE)
-                    .keyManager(config.keyManagerFactory().orElseThrow())
-                    .trustManager(config.trustManagerFactory().orElseThrow())
-                    .protocols(SslProtocols.TLS_v1_2, SslProtocols.TLS_v1_3)
-                    .build();
+      var bootstrap =
+          new Bootstrap()
+              .channel(NioSocketChannel.class)
+              .group(config.eventLoopGroup())
+              .option(
+                  ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) config.connectTimeout().toMillis())
+              .option(ChannelOption.TCP_NODELAY, Boolean.TRUE)
+              .handler(
+                  new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    protected void initChannel(SocketChannel channel) throws Exception {
+                      if (config.tlsEnabled()) {
+                        SslContext sslContext =
+                            SslContextBuilder.forClient()
+                                .clientAuth(ClientAuth.REQUIRE)
+                                .keyManager(config.keyManagerFactory().orElseThrow())
+                                .trustManager(config.trustManagerFactory().orElseThrow())
+                                .protocols(SslProtocols.TLS_v1_2, SslProtocols.TLS_v1_3)
+                                .build();
 
-                channel.pipeline().addLast(
-                    sslContext.newHandler(channel.alloc(), config.hostname(), config.port())
-                );
-              }
+                        channel
+                            .pipeline()
+                            .addLast(
+                                sslContext.newHandler(
+                                    channel.alloc(), config.hostname(), config.port()));
+                      }
 
-              channel.pipeline().addLast(new ModbusRtuClientFrameReceiver());
+                      channel.pipeline().addLast(new ModbusRtuClientFrameReceiver());
 
-              config.pipelineCustomizer().accept(channel.pipeline());
-            }
-          });
+                      config.pipelineCustomizer().accept(channel.pipeline());
+                    }
+                  });
 
       config.bootstrapCustomizer().accept(bootstrap);
 
       var future = new CompletableFuture<Channel>();
 
-      bootstrap.connect(config.hostname(), config.port()).addListener(
-          (ChannelFutureListener) channelFuture -> {
-            if (channelFuture.isSuccess()) {
-              future.complete(channelFuture.channel());
-            } else {
-              future.completeExceptionally(channelFuture.cause());
-            }
-          }
-      );
+      bootstrap
+          .connect(config.hostname(), config.port())
+          .addListener(
+              (ChannelFutureListener)
+                  channelFuture -> {
+                    if (channelFuture.isSuccess()) {
+                      future.complete(channelFuture.channel());
+                    } else {
+                      future.completeExceptionally(channelFuture.cause());
+                    }
+                  });
 
       return future;
     }
 
     @Override
     public CompletableFuture<Void> disconnect(
-        FsmContext<State, Event> fsmContext,
-        Channel channel
-    ) {
+        FsmContext<State, Event> fsmContext, Channel channel) {
 
       var future = new CompletableFuture<Void>();
 
-      channel.close().addListener(
-          (ChannelFutureListener) channelFuture ->
-              future.complete(null)
-      );
+      channel.close().addListener((ChannelFutureListener) channelFuture -> future.complete(null));
 
       return future;
     }
-
   }
 
   /**
    * Create a new {@link NettyRtuClientTransport} with a callback that allows customizing the
    * configuration.
    *
-   * @param configure a {@link Consumer} that accepts a
-   *     {@link NettyClientTransportConfig.Builder} instance to configure.
+   * @param configure a {@link Consumer} that accepts a {@link NettyClientTransportConfig.Builder}
+   *     instance to configure.
    * @return a new {@link NettyRtuClientTransport}.
    */
   public static NettyRtuClientTransport create(
-      Consumer<NettyClientTransportConfig.Builder> configure
-  ) {
+      Consumer<NettyClientTransportConfig.Builder> configure) {
 
     var config = NettyClientTransportConfig.create(configure);
 
     return new NettyRtuClientTransport(config);
   }
-
 }

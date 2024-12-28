@@ -40,5 +40,4 @@ public interface ModbusClientTransport<T> {
    * @param frameReceiver the callback to response receive frames.
    */
   void receive(Consumer<T> frameReceiver);
-
 }

@@ -10,5 +10,4 @@ public interface ModbusRtuClientTransport extends ModbusClientTransport<ModbusRt
    * <p>This method should be called after a timeout or CRC error to reset the parser state.
    */
   void resetFrameParser();
-
 }

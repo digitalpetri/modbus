@@ -18,12 +18,10 @@ class ReadDiscreteInputsRequestTest {
 
         buffer.flip();
 
-        ReadDiscreteInputsRequest decoded =
-            ReadDiscreteInputsRequest.Serializer.decode(buffer);
+        ReadDiscreteInputsRequest decoded = ReadDiscreteInputsRequest.Serializer.decode(buffer);
 
         assertEquals(request, decoded);
       }
     }
   }
-
 }

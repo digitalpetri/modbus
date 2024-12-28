@@ -6,9 +6,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.StringJoiner;
 
-/**
- * A {@link FunctionCode#READ_DISCRETE_INPUTS} response PDU.
- */
+/** A {@link FunctionCode#READ_DISCRETE_INPUTS} response PDU. */
 public record ReadDiscreteInputsResponse(byte[] inputs) implements ModbusResponsePdu {
 
   @Override
@@ -41,9 +39,7 @@ public record ReadDiscreteInputsResponse(byte[] inputs) implements ModbusRespons
         .toString();
   }
 
-  /**
-   * Utility functions for encoding and decoding {@link ReadDiscreteInputsResponse}.
-   */
+  /** Utility functions for encoding and decoding {@link ReadDiscreteInputsResponse}. */
   public static final class Serializer {
 
     private Serializer() {}
@@ -76,7 +72,5 @@ public record ReadDiscreteInputsResponse(byte[] inputs) implements ModbusRespons
 
       return new ReadDiscreteInputsResponse(inputs);
     }
-
   }
-
 }

@@ -17,9 +17,7 @@ public record WriteMultipleRegistersResponse(int address, int quantity)
     return FunctionCode.WRITE_MULTIPLE_REGISTERS.getCode();
   }
 
-  /**
-   * Utility functions for encoding and decoding {@link WriteMultipleRegistersResponse}.
-   */
+  /** Utility functions for encoding and decoding {@link WriteMultipleRegistersResponse}. */
   public static class Serializer {
 
     private Serializer() {}
@@ -51,7 +49,5 @@ public record WriteMultipleRegistersResponse(int address, int quantity)
 
       return new WriteMultipleRegistersResponse(address, quantity);
     }
-
   }
-
 }

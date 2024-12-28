@@ -36,8 +36,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Modbus/TCP client transport; a {@link ModbusTcpClientTransport} that sends and receives
- * {@link ModbusTcpFrame}s over TCP.
+ * Modbus/TCP client transport; a {@link ModbusTcpClientTransport} that sends and receives {@link
+ * ModbusTcpFrame}s over TCP.
  */
 public class NettyTcpClientTransport implements ModbusTcpClientTransport {
 
@@ -55,15 +55,15 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
   public NettyTcpClientTransport(NettyClientTransportConfig config) {
     this.config = config;
 
-    channelFsm = ChannelFsmFactory.newChannelFsm(
-        ChannelFsmConfig.newBuilder()
-            .setExecutor(config.executor())
-            .setLazy(config.reconnectLazy())
-            .setPersistent(config.connectPersistent())
-            .setChannelActions(new ModbusTcpChannelActions())
-            .setLoggerName("com.digitalpetri.modbus.client.ChannelFsm")
-            .build()
-    );
+    channelFsm =
+        ChannelFsmFactory.newChannelFsm(
+            ChannelFsmConfig.newBuilder()
+                .setExecutor(config.executor())
+                .setLazy(config.reconnectLazy())
+                .setPersistent(config.connectPersistent())
+                .setChannelActions(new ModbusTcpChannelActions())
+                .setLoggerName("com.digitalpetri.modbus.client.ChannelFsm")
+                .build());
 
     executionQueue = new ExecutionQueue(config.executor());
 
@@ -72,8 +72,7 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
           logger.debug("onStateTransition: {} -> {} via {}", from, to, via);
 
           maybeNotifyConnectionListeners(from, to);
-        }
-    );
+        });
   }
 
   private void maybeNotifyConnectionListeners(State from, State to) {
@@ -82,13 +81,10 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
     }
 
     if (from != State.Connected && to == State.Connected) {
-      executionQueue.submit(() ->
-          connectionListeners.forEach(ConnectionListener::onConnection)
-      );
+      executionQueue.submit(() -> connectionListeners.forEach(ConnectionListener::onConnection));
     } else if (from == State.Connected && to != State.Connected) {
-      executionQueue.submit(() ->
-          connectionListeners.forEach(ConnectionListener::onConnectionLost)
-      );
+      executionQueue.submit(
+          () -> connectionListeners.forEach(ConnectionListener::onConnectionLost));
     }
   }
 
@@ -104,19 +100,26 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
 
   @Override
   public CompletionStage<Void> send(ModbusTcpFrame frame) {
-    return channelFsm.getChannel().thenCompose(channel -> {
-      var future = new CompletableFuture<Void>();
+    return channelFsm
+        .getChannel()
+        .thenCompose(
+            channel -> {
+              var future = new CompletableFuture<Void>();
 
-      channel.writeAndFlush(frame).addListener((ChannelFutureListener) channelFuture -> {
-        if (channelFuture.isSuccess()) {
-          future.complete(null);
-        } else {
-          future.completeExceptionally(channelFuture.cause());
-        }
-      });
+              channel
+                  .writeAndFlush(frame)
+                  .addListener(
+                      (ChannelFutureListener)
+                          channelFuture -> {
+                            if (channelFuture.isSuccess()) {
+                              future.complete(null);
+                            } else {
+                              future.completeExceptionally(channelFuture.cause());
+                            }
+                          });
 
-      return future;
-    });
+              return future;
+            });
   }
 
   @Override
@@ -132,8 +135,8 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
   /**
    * Get the {@link ChannelFsm} used by this transport.
    *
-   * <p>This should not generally be used by client code except perhaps to add a
-   * {@link TransitionListener} to receive more detailed callbacks about the connection status.
+   * <p>This should not generally be used by client code except perhaps to add a {@link
+   * TransitionListener} to receive more detailed callbacks about the connection status.
    *
    * @return the {@link ChannelFsm} used by this transport.
    */
@@ -174,47 +177,53 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
       logger.error("Exception caught", cause);
       ctx.close();
     }
-
   }
 
   private class ModbusTcpChannelActions implements ChannelActions {
 
     @Override
     public CompletableFuture<Channel> connect(FsmContext<State, Event> fsmContext) {
-      var bootstrap = new Bootstrap()
-          .channel(NioSocketChannel.class)
-          .group(config.eventLoopGroup())
-          .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) config.connectTimeout().toMillis())
-          .option(ChannelOption.TCP_NODELAY, Boolean.TRUE)
-          .handler(newChannelInitializer());
+      var bootstrap =
+          new Bootstrap()
+              .channel(NioSocketChannel.class)
+              .group(config.eventLoopGroup())
+              .option(
+                  ChannelOption.CONNECT_TIMEOUT_MILLIS, (int) config.connectTimeout().toMillis())
+              .option(ChannelOption.TCP_NODELAY, Boolean.TRUE)
+              .handler(newChannelInitializer());
 
       config.bootstrapCustomizer().accept(bootstrap);
 
       var future = new CompletableFuture<Channel>();
 
-      bootstrap.connect(config.hostname(), config.port()).addListener(
-          (ChannelFutureListener) channelFuture -> {
-            if (channelFuture.isSuccess()) {
-              Channel channel = channelFuture.channel();
+      bootstrap
+          .connect(config.hostname(), config.port())
+          .addListener(
+              (ChannelFutureListener)
+                  channelFuture -> {
+                    if (channelFuture.isSuccess()) {
+                      Channel channel = channelFuture.channel();
 
-              if (config.tlsEnabled()) {
-                channel.pipeline().get(SslHandler.class).handshakeFuture().addListener(
-                    handshakeFuture -> {
-                      if (handshakeFuture.isSuccess()) {
-                        future.complete(channel);
+                      if (config.tlsEnabled()) {
+                        channel
+                            .pipeline()
+                            .get(SslHandler.class)
+                            .handshakeFuture()
+                            .addListener(
+                                handshakeFuture -> {
+                                  if (handshakeFuture.isSuccess()) {
+                                    future.complete(channel);
+                                  } else {
+                                    future.completeExceptionally(handshakeFuture.cause());
+                                  }
+                                });
                       } else {
-                        future.completeExceptionally(handshakeFuture.cause());
+                        future.complete(channel);
                       }
+                    } else {
+                      future.completeExceptionally(channelFuture.cause());
                     }
-                );
-              } else {
-                future.complete(channel);
-              }
-            } else {
-              future.completeExceptionally(channelFuture.cause());
-            }
-          }
-      );
+                  });
 
       return future;
     }
@@ -224,16 +233,17 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
         @Override
         protected void initChannel(SocketChannel channel) throws Exception {
           if (config.tlsEnabled()) {
-            SslContext sslContext = SslContextBuilder.forClient()
-                .clientAuth(ClientAuth.REQUIRE)
-                .keyManager(config.keyManagerFactory().orElseThrow())
-                .trustManager(config.trustManagerFactory().orElseThrow())
-                .protocols(SslProtocols.TLS_v1_2, SslProtocols.TLS_v1_3)
-                .build();
+            SslContext sslContext =
+                SslContextBuilder.forClient()
+                    .clientAuth(ClientAuth.REQUIRE)
+                    .keyManager(config.keyManagerFactory().orElseThrow())
+                    .trustManager(config.trustManagerFactory().orElseThrow())
+                    .protocols(SslProtocols.TLS_v1_2, SslProtocols.TLS_v1_3)
+                    .build();
 
-            channel.pipeline().addLast(
-                sslContext.newHandler(channel.alloc(), config.hostname(), config.port())
-            );
+            channel
+                .pipeline()
+                .addLast(sslContext.newHandler(channel.alloc(), config.hostname(), config.port()));
           }
 
           channel.pipeline().addLast(new ModbusTcpCodec());
@@ -250,27 +260,22 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
 
       var future = new CompletableFuture<Void>();
 
-      channel.close().addListener(
-          (ChannelFutureListener) channelFuture ->
-              future.complete(null)
-      );
+      channel.close().addListener((ChannelFutureListener) channelFuture -> future.complete(null));
 
       return future;
     }
-
   }
 
   /**
    * Create a new {@link NettyTcpClientTransport} with a callback that allows customizing the
    * configuration.
    *
-   * @param configure a {@link Consumer} that accepts a
-   *     {@link NettyClientTransportConfig.Builder} instance to configure.
+   * @param configure a {@link Consumer} that accepts a {@link NettyClientTransportConfig.Builder}
+   *     instance to configure.
    * @return a new {@link NettyTcpClientTransport}.
    */
   public static NettyTcpClientTransport create(
-      Consumer<NettyClientTransportConfig.Builder> configure
-  ) {
+      Consumer<NettyClientTransportConfig.Builder> configure) {
 
     var config = NettyClientTransportConfig.create(configure);
 
@@ -279,9 +284,7 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
 
   public interface ConnectionListener {
 
-    /**
-     * Callback invoked when the transport has connected.
-     */
+    /** Callback invoked when the transport has connected. */
     void onConnection();
 
     /**
@@ -291,7 +294,5 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
      * automatically by {@link NettyTcpClientTransport}.
      */
     void onConnectionLost();
-
   }
-
 }

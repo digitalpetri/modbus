@@ -17,11 +17,9 @@ import javax.net.ssl.SSLPeerUnverifiedException;
  * Combined {@link ModbusTcpTlsRequestContext} and {@link ModbusRtuTlsRequestContext} implementation
  * for Netty-based transports.
  */
-class NettyRequestContext
-    implements ModbusTcpTlsRequestContext, ModbusRtuTlsRequestContext {
+class NettyRequestContext implements ModbusTcpTlsRequestContext, ModbusRtuTlsRequestContext {
 
-  private static final AttributeKey<String> CLIENT_ROLE =
-      AttributeKey.valueOf("clientRole");
+  private static final AttributeKey<String> CLIENT_ROLE = AttributeKey.valueOf("clientRole");
 
   private static final AttributeKey<X509Certificate[]> CLIENT_CERTIFICATE_CHAIN =
       AttributeKey.valueOf("clientCertificateChain");
@@ -81,9 +79,10 @@ class NettyRequestContext
         SslHandler handler = ctx.channel().pipeline().get(SslHandler.class);
         Certificate[] peerCertificates = handler.engine().getSession().getPeerCertificates();
 
-        clientCertificateChain = Arrays.stream(peerCertificates)
-            .map(cert -> (X509Certificate) cert)
-            .toArray(X509Certificate[]::new);
+        clientCertificateChain =
+            Arrays.stream(peerCertificates)
+                .map(cert -> (X509Certificate) cert)
+                .toArray(X509Certificate[]::new);
 
         attr.set(clientCertificateChain);
       } catch (SSLPeerUnverifiedException e) {
@@ -93,5 +92,4 @@ class NettyRequestContext
 
     return clientCertificateChain;
   }
-
 }

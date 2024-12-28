@@ -10,7 +10,7 @@ class WriteSingleRegisterResponseTest {
   @Test
   void serializer() {
     for (int address = 0; address < 0xFFFF; address++) {
-      for (int value : new int[]{0, 1, 0xFFFF}) {
+      for (int value : new int[] {0, 1, 0xFFFF}) {
         ByteBuffer buffer = ByteBuffer.allocate(256);
 
         var response = new WriteSingleRegisterResponse(address, value);
@@ -19,12 +19,10 @@ class WriteSingleRegisterResponseTest {
 
         buffer.flip();
 
-        WriteSingleRegisterResponse decoded =
-            WriteSingleRegisterResponse.Serializer.decode(buffer);
+        WriteSingleRegisterResponse decoded = WriteSingleRegisterResponse.Serializer.decode(buffer);
 
         assertEquals(response, decoded);
       }
     }
   }
-
 }

@@ -10,7 +10,7 @@ class WriteSingleCoilRequestTest {
   @Test
   void serializer() {
     for (int address = 0; address < 0xFFFF; address++) {
-      for (boolean value : new boolean[]{true, false}) {
+      for (boolean value : new boolean[] {true, false}) {
         ByteBuffer buffer = ByteBuffer.allocate(256);
 
         var request = new WriteSingleCoilRequest(address, value);
@@ -18,12 +18,10 @@ class WriteSingleCoilRequestTest {
 
         buffer.flip();
 
-        WriteSingleCoilRequest decoded =
-            WriteSingleCoilRequest.Serializer.decode(buffer);
+        WriteSingleCoilRequest decoded = WriteSingleCoilRequest.Serializer.decode(buffer);
 
         assertEquals(request, decoded);
       }
     }
   }
-
 }

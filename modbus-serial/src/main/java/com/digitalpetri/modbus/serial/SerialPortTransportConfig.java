@@ -25,8 +25,7 @@ public record SerialPortTransportConfig(
     int stopBits,
     int parity,
     boolean rs485Mode,
-    ExecutorService executor
-) {
+    ExecutorService executor) {
 
   /**
    * Create a new {@link SerialPortTransportConfig}, using the callback to configure the builder as
@@ -51,14 +50,10 @@ public record SerialPortTransportConfig(
      */
     public String serialPort;
 
-    /**
-     * The desired baud rate to operate at.
-     */
+    /** The desired baud rate to operate at. */
     public int baudRate = 9600;
 
-    /**
-     * The number of data bits per word to use.
-     */
+    /** The number of data bits per word to use. */
     public int dataBits = 8;
 
     /**
@@ -84,8 +79,7 @@ public record SerialPortTransportConfig(
     /**
      * Enable RS-485 mode, i.e. transmit/receive mode signaling using the RTS pin.
      *
-     * <p>This requires support from the underlying driver and may not work with all RS-485
-     * devices.
+     * <p>This requires support from the underlying driver and may not work with all RS-485 devices.
      */
     public boolean rs485Mode = false;
 
@@ -110,16 +104,7 @@ public record SerialPortTransportConfig(
       }
 
       return new SerialPortTransportConfig(
-          serialPort,
-          baudRate,
-          dataBits,
-          stopBits,
-          parity,
-          rs485Mode,
-          executor
-      );
+          serialPort, baudRate, dataBits, stopBits, parity, rs485Mode, executor);
     }
-
   }
-
 }

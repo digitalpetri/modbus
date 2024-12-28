@@ -6,8 +6,7 @@ import java.io.Serial;
 
 public class ModbusResponseException extends ModbusException {
 
-  @Serial
-  private static final long serialVersionUID = -4058366691447836220L;
+  @Serial private static final long serialVersionUID = -4058366691447836220L;
 
   private final int functionCode;
   private final int exceptionCode;
@@ -44,5 +43,4 @@ public class ModbusResponseException extends ModbusException {
     return "0x%02X [%s] generated exception response 0x%02X [%s]"
         .formatted(functionCode, fcs, exceptionCode, ecs);
   }
-
 }

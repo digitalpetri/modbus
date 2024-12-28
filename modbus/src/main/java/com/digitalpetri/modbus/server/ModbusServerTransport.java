@@ -35,7 +35,5 @@ public interface ModbusServerTransport<C extends ModbusRequestContext, T> {
      * @throws Exception if there is an unrecoverable error and the channel should be closed.
      */
     T receive(C context, T frame) throws Exception;
-
   }
-
 }

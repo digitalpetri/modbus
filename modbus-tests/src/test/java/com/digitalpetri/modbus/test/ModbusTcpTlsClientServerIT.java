@@ -34,34 +34,35 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
   @BeforeEach
   void setup() throws Exception {
     var processImage = new ProcessImage();
-    var modbusServices = new ReadWriteModbusServices() {
-      @Override
-      protected Optional<ProcessImage> getProcessImage(int unitId) {
-        return Optional.of(processImage);
-      }
-    };
+    var modbusServices =
+        new ReadWriteModbusServices() {
+          @Override
+          protected Optional<ProcessImage> getProcessImage(int unitId) {
+            return Optional.of(processImage);
+          }
+        };
 
-    KeyManagerFactory serverKeyManagerFactory = SecurityUtil.createKeyManagerFactory(
-        serverKeyPairCert.keyPair().getPrivate(),
-        serverKeyPairCert.certificate()
-    );
-    TrustManagerFactory serverTrustManagerFactory = SecurityUtil.createTrustManagerFactory(
-        authorityKeyPairCert.certificate()
-    );
+    KeyManagerFactory serverKeyManagerFactory =
+        SecurityUtil.createKeyManagerFactory(
+            serverKeyPairCert.keyPair().getPrivate(), serverKeyPairCert.certificate());
+    TrustManagerFactory serverTrustManagerFactory =
+        SecurityUtil.createTrustManagerFactory(authorityKeyPairCert.certificate());
 
     int serverPort = -1;
 
     for (int i = 50200; i < 65536; i++) {
       try {
         final var port = i;
-        var serverTransport = NettyTcpServerTransport.create(cfg -> {
-          cfg.bindAddress = "localhost";
-          cfg.port = port;
+        var serverTransport =
+            NettyTcpServerTransport.create(
+                cfg -> {
+                  cfg.bindAddress = "localhost";
+                  cfg.port = port;
 
-          cfg.tlsEnabled = true;
-          cfg.keyManagerFactory = serverKeyManagerFactory;
-          cfg.trustManagerFactory = serverTrustManagerFactory;
-        });
+                  cfg.tlsEnabled = true;
+                  cfg.keyManagerFactory = serverKeyManagerFactory;
+                  cfg.trustManagerFactory = serverTrustManagerFactory;
+                });
 
         System.out.println("trying port " + port);
         server = ModbusTcpServer.create(serverTransport, modbusServices);
@@ -73,24 +74,24 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
       }
     }
 
-    KeyManagerFactory clientKeyManagerFactory = SecurityUtil.createKeyManagerFactory(
-        clientKeyPairCert.keyPair().getPrivate(),
-        clientKeyPairCert.certificate()
-    );
-    TrustManagerFactory clientTrustManagerFactory = SecurityUtil.createTrustManagerFactory(
-        authorityKeyPairCert.certificate()
-    );
+    KeyManagerFactory clientKeyManagerFactory =
+        SecurityUtil.createKeyManagerFactory(
+            clientKeyPairCert.keyPair().getPrivate(), clientKeyPairCert.certificate());
+    TrustManagerFactory clientTrustManagerFactory =
+        SecurityUtil.createTrustManagerFactory(authorityKeyPairCert.certificate());
 
     final var port = serverPort;
-    clientTransport = NettyTcpClientTransport.create(cfg -> {
-      cfg.hostname = "localhost";
-      cfg.port = port;
-      cfg.connectPersistent = false;
+    clientTransport =
+        NettyTcpClientTransport.create(
+            cfg -> {
+              cfg.hostname = "localhost";
+              cfg.port = port;
+              cfg.connectPersistent = false;
 
-      cfg.tlsEnabled = true;
-      cfg.keyManagerFactory = clientKeyManagerFactory;
-      cfg.trustManagerFactory = clientTrustManagerFactory;
-    });
+              cfg.tlsEnabled = true;
+              cfg.keyManagerFactory = clientKeyManagerFactory;
+              cfg.trustManagerFactory = clientTrustManagerFactory;
+            });
 
     client = ModbusTcpClient.create(clientTransport);
     client.connect();
@@ -105,5 +106,4 @@ public class ModbusTcpTlsClientServerIT extends ClientServerIT {
   ModbusServer getServer() {
     return server;
   }
-
 }

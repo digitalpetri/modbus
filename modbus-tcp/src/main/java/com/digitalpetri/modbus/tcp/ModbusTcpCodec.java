@@ -40,5 +40,4 @@ public class ModbusTcpCodec extends ByteToMessageCodec<ModbusTcpFrame> {
       }
     }
   }
-
 }

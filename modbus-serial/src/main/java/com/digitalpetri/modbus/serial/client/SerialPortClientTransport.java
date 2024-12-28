@@ -41,8 +41,7 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
         config.dataBits(),
         config.stopBits(),
         config.parity(),
-        config.rs485Mode()
-    );
+        config.rs485Mode());
 
     executionQueue = new ExecutionQueue(config.executor());
   }
@@ -63,8 +62,7 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
         return CompletableFuture.failedFuture(
             new Exception(
                 "failed to open port '%s', lastErrorCode=%d"
-                    .formatted(config.serialPort(), serialPort.getLastErrorCode()))
-        );
+                    .formatted(config.serialPort(), serialPort.getLastErrorCode())));
       }
     }
   }
@@ -80,8 +78,7 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
         return CompletableFuture.failedFuture(
             new Exception(
                 "failed to close port '%s', lastErrorCode=%d"
-                    .formatted(config.serialPort(), serialPort.getLastErrorCode()))
-        );
+                    .formatted(config.serialPort(), serialPort.getLastErrorCode())));
       }
     } else {
       return CompletableFuture.completedFuture(null);
@@ -136,9 +133,7 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
 
   private class ModbusRtuDataListener implements SerialPortDataListener {
 
-    /**
-     * Bit mask indicating what events we're interested in.
-     */
+    /** Bit mask indicating what events we're interested in. */
     private static final int LISTENING_EVENTS = SerialPort.LISTENING_EVENT_DATA_RECEIVED;
 
     @Override
@@ -173,24 +168,21 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
         executionQueue.submit(() -> frameReceiver.accept(frame));
       }
     }
-
   }
 
   /**
    * Create a new {@link SerialPortClientTransport} with a callback that allows customizing the
    * configuration.
    *
-   * @param configure a {@link Consumer} that accepts a
-   *     {@link SerialPortTransportConfig.Builder} instance to configure.
+   * @param configure a {@link Consumer} that accepts a {@link SerialPortTransportConfig.Builder}
+   *     instance to configure.
    * @return a new {@link SerialPortClientTransport}.
    */
   public static SerialPortClientTransport create(
-      Consumer<SerialPortTransportConfig.Builder> configure
-  ) {
+      Consumer<SerialPortTransportConfig.Builder> configure) {
 
     var builder = new SerialPortTransportConfig.Builder();
     configure.accept(builder);
     return new SerialPortClientTransport(builder.build());
   }
-
 }

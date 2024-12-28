@@ -45,8 +45,8 @@ public class ProcessImage {
    *
    * <p>Transactions are only valid during the scope of the provided action.
    *
-   * @param action an action to perform using the provided {@link Transaction}. The Transaction
-   *     is only valid during the scope of this action.
+   * @param action an action to perform using the provided {@link Transaction}. The Transaction is
+   *     only valid during the scope of this action.
    */
   public void with(Consumer<Transaction> action) {
     with(false, action);
@@ -57,16 +57,18 @@ public class ProcessImage {
    *
    * <p>Transactions are only valid during the scope of the provided action.
    *
-   * @param exclusive whether this Transaction should be exclusive, i.e. it is guaranteed to be
-   *     the only Transaction running against the ProcessImage.
-   * @param action an action to perform using the provided {@link Transaction}. The Transaction
-   *     is only valid during the scope of this action.
+   * @param exclusive whether this Transaction should be exclusive, i.e. it is guaranteed to be the
+   *     only Transaction running against the ProcessImage.
+   * @param action an action to perform using the provided {@link Transaction}. The Transaction is
+   *     only valid during the scope of this action.
    */
   public void with(boolean exclusive, Consumer<Transaction> action) {
-    get(exclusive, tx -> {
-      action.accept(tx);
-      return null;
-    });
+    get(
+        exclusive,
+        tx -> {
+          action.accept(tx);
+          return null;
+        });
   }
 
   /**
@@ -74,8 +76,8 @@ public class ProcessImage {
    *
    * <p>Transactions are only valid during the scope of the provided action.
    *
-   * @param action the action to perform using the provided {@link Transaction}. The Transaction
-   *     is only valid during the scope of this action.
+   * @param action the action to perform using the provided {@link Transaction}. The Transaction is
+   *     only valid during the scope of this action.
    * @param <T> the return type of the action.
    * @return the return value.
    */
@@ -88,10 +90,10 @@ public class ProcessImage {
    *
    * <p>Transactions are only valid during the scope of the provided action.
    *
-   * @param exclusive whether this Transaction should be exclusive, i.e. it is guaranteed to be
-   *     the only Transaction running against the ProcessImage.
-   * @param action the action to perform using the provided {@link Transaction}. The Transaction
-   *     is only valid during the scope of this action.
+   * @param exclusive whether this Transaction should be exclusive, i.e. it is guaranteed to be the
+   *     only Transaction running against the ProcessImage.
+   * @param action the action to perform using the provided {@link Transaction}. The Transaction is
+   *     only valid during the scope of this action.
    * @param <T> the return type of the action.
    * @return the return value.
    */
@@ -245,19 +247,20 @@ public class ProcessImage {
 
       coilLock.writeLock().lock();
       try {
-        write.accept(new TransactionScopedMap<>(coilMap, state) {
-          @Override
-          protected void recordPut(Integer key, Boolean value) {
-            modifications.add(new CoilModification(key, value));
-          }
+        write.accept(
+            new TransactionScopedMap<>(coilMap, state) {
+              @Override
+              protected void recordPut(Integer key, Boolean value) {
+                modifications.add(new CoilModification(key, value));
+              }
 
-          @Override
-          protected void recordRemove(Object key) {
-            if (key instanceof Integer k) {
-              modifications.add(new CoilModification(k, false));
-            }
-          }
-        });
+              @Override
+              protected void recordRemove(Object key) {
+                if (key instanceof Integer k) {
+                  modifications.add(new CoilModification(k, false));
+                }
+              }
+            });
 
         notifyCoilsModified(modifications);
       } finally {
@@ -266,8 +269,7 @@ public class ProcessImage {
     }
 
     /**
-     * Provide a callback that can write to mutable view of the Discrete Inputs in the
-     * ProcessImage.
+     * Provide a callback that can write to mutable view of the Discrete Inputs in the ProcessImage.
      *
      * @param write the callback that can write to the Discrete Inputs.
      */
@@ -280,19 +282,20 @@ public class ProcessImage {
 
       discreteInputLock.writeLock().lock();
       try {
-        write.accept(new TransactionScopedMap<>(discreteInputMap, state) {
-          @Override
-          protected void recordPut(Integer key, Boolean value) {
-            modifications.add(new DiscreteInputModification(key, value));
-          }
+        write.accept(
+            new TransactionScopedMap<>(discreteInputMap, state) {
+              @Override
+              protected void recordPut(Integer key, Boolean value) {
+                modifications.add(new DiscreteInputModification(key, value));
+              }
 
-          @Override
-          protected void recordRemove(Object key) {
-            if (key instanceof Integer k) {
-              modifications.add(new DiscreteInputModification(k, false));
-            }
-          }
-        });
+              @Override
+              protected void recordRemove(Object key) {
+                if (key instanceof Integer k) {
+                  modifications.add(new DiscreteInputModification(k, false));
+                }
+              }
+            });
 
         notifyDiscreteInputsModified(modifications);
       } finally {
@@ -315,19 +318,20 @@ public class ProcessImage {
 
       holdingRegisterLock.writeLock().lock();
       try {
-        write.accept(new TransactionScopedMap<>(holdingRegisterMap, state) {
-          @Override
-          protected void recordPut(Integer key, byte[] value) {
-            modifications.add(new HoldingRegisterModification(key, value));
-          }
+        write.accept(
+            new TransactionScopedMap<>(holdingRegisterMap, state) {
+              @Override
+              protected void recordPut(Integer key, byte[] value) {
+                modifications.add(new HoldingRegisterModification(key, value));
+              }
 
-          @Override
-          protected void recordRemove(Object key) {
-            if (key instanceof Integer k) {
-              modifications.add(new HoldingRegisterModification(k, new byte[2]));
-            }
-          }
-        });
+              @Override
+              protected void recordRemove(Object key) {
+                if (key instanceof Integer k) {
+                  modifications.add(new HoldingRegisterModification(k, new byte[2]));
+                }
+              }
+            });
 
         notifyHoldingRegistersModified(modifications);
       } finally {
@@ -336,8 +340,7 @@ public class ProcessImage {
     }
 
     /**
-     * Provide a callback that can write to mutable view of the Input Registers in the
-     * ProcessImage.
+     * Provide a callback that can write to mutable view of the Input Registers in the ProcessImage.
      *
      * @param write the callback that can write to the Input Registers.
      */
@@ -350,19 +353,20 @@ public class ProcessImage {
 
       inputRegisterLock.writeLock().lock();
       try {
-        write.accept(new TransactionScopedMap<>(inputRegisterMap, state) {
-          @Override
-          protected void recordPut(Integer key, byte[] value) {
-            modifications.add(new InputRegisterModification(key, value));
-          }
+        write.accept(
+            new TransactionScopedMap<>(inputRegisterMap, state) {
+              @Override
+              protected void recordPut(Integer key, byte[] value) {
+                modifications.add(new InputRegisterModification(key, value));
+              }
 
-          @Override
-          protected void recordRemove(Object key) {
-            if (key instanceof Integer k) {
-              modifications.add(new InputRegisterModification(k, new byte[2]));
-            }
-          }
-        });
+              @Override
+              protected void recordRemove(Object key) {
+                if (key instanceof Integer k) {
+                  modifications.add(new InputRegisterModification(k, new byte[2]));
+                }
+              }
+            });
 
         notifyInputRegistersModified(modifications);
       } finally {
@@ -377,37 +381,26 @@ public class ProcessImage {
 
     private void notifyCoilsModified(List<CoilModification> modifications) {
       if (!modifications.isEmpty()) {
-        modificationListeners.forEach(
-            listener ->
-                listener.onCoilsModified(modifications)
-        );
+        modificationListeners.forEach(listener -> listener.onCoilsModified(modifications));
       }
     }
 
     private void notifyDiscreteInputsModified(List<DiscreteInputModification> modifications) {
       if (!modifications.isEmpty()) {
-        modificationListeners.forEach(
-            listener ->
-                listener.onDiscreteInputsModified(modifications)
-        );
+        modificationListeners.forEach(listener -> listener.onDiscreteInputsModified(modifications));
       }
     }
 
     private void notifyHoldingRegistersModified(List<HoldingRegisterModification> modifications) {
       if (!modifications.isEmpty()) {
         modificationListeners.forEach(
-            listener ->
-                listener.onHoldingRegistersModified(modifications)
-        );
+            listener -> listener.onHoldingRegistersModified(modifications));
       }
     }
 
     private void notifyInputRegistersModified(List<InputRegisterModification> modifications) {
       if (!modifications.isEmpty()) {
-        modificationListeners.forEach(
-            listener ->
-                listener.onInputRegistersModified(modifications)
-        );
+        modificationListeners.forEach(listener -> listener.onInputRegistersModified(modifications));
       }
     }
 
@@ -456,16 +449,14 @@ public class ProcessImage {
       protected abstract void recordPut(K key, V value);
 
       protected abstract void recordRemove(Object key);
-
     }
-
   }
 
-  public sealed interface Modification permits
-      CoilModification,
-      DiscreteInputModification,
-      HoldingRegisterModification,
-      InputRegisterModification {
+  public sealed interface Modification
+      permits CoilModification,
+          DiscreteInputModification,
+          HoldingRegisterModification,
+          InputRegisterModification {
 
     record CoilModification(int address, boolean value) implements Modification {}
 
@@ -480,7 +471,6 @@ public class ProcessImage {
             .add("value=0x" + Hex.format(value))
             .toString();
       }
-
     }
 
     record InputRegisterModification(int address, byte[] value) implements Modification {
@@ -492,9 +482,7 @@ public class ProcessImage {
             .add("value=0x" + Hex.format(value))
             .toString();
       }
-
     }
-
   }
 
   public interface ModificationListener {
@@ -538,7 +526,5 @@ public class ProcessImage {
      * @param modifications the list of {@link InputRegisterModification}s that were applied.
      */
     void onInputRegistersModified(List<InputRegisterModification> modifications);
-
   }
-
 }

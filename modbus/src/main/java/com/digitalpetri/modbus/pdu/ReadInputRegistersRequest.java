@@ -6,8 +6,8 @@ import java.nio.ByteBuffer;
 /**
  * A {@link FunctionCode#READ_INPUT_REGISTERS} request PDU.
  *
- * <p>Requests specify the starting register address and the number of register to read. In the
- * PDU, addresses are addressed starting at 0.
+ * <p>Requests specify the starting register address and the number of register to read. In the PDU,
+ * addresses are addressed starting at 0.
  *
  * @param address the starting address. 2 bytes, range [0x0000, 0xFFFF].
  * @param quantity the quantity of registers to read. 2 bytes, range [0x01, 0x7D].
@@ -19,9 +19,7 @@ public record ReadInputRegistersRequest(int address, int quantity) implements Mo
     return FunctionCode.READ_INPUT_REGISTERS.getCode();
   }
 
-  /**
-   * Utility functions for encoding and decoding {@link ReadInputRegistersRequest}.
-   */
+  /** Utility functions for encoding and decoding {@link ReadInputRegistersRequest}. */
   public static final class Serializer {
 
     private Serializer() {}
@@ -53,7 +51,5 @@ public record ReadInputRegistersRequest(int address, int quantity) implements Mo
 
       return new ReadInputRegistersRequest(address, quantity);
     }
-
   }
-
 }

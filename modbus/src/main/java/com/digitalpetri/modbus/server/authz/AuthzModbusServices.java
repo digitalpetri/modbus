@@ -50,17 +50,14 @@ public class AuthzModbusServices implements ModbusServices {
 
   @Override
   public ReadCoilsResponse readCoils(
-      ModbusRequestContext context,
-      int unitId,
-      ReadCoilsRequest request
-  ) throws ModbusResponseException, UnknownUnitIdException {
+      ModbusRequestContext context, int unitId, ReadCoilsRequest request)
+      throws ModbusResponseException, UnknownUnitIdException {
 
     if (context instanceof AuthzContext ctx) {
       AuthzResult result = authzHandler.authorizeReadCoils(ctx, unitId, request);
 
       if (result != AuthzResult.AUTHORIZED) {
-        throw new ModbusResponseException(FunctionCode.READ_COILS,
-            ExceptionCode.ILLEGAL_FUNCTION);
+        throw new ModbusResponseException(FunctionCode.READ_COILS, ExceptionCode.ILLEGAL_FUNCTION);
       }
     }
 
@@ -69,17 +66,15 @@ public class AuthzModbusServices implements ModbusServices {
 
   @Override
   public ReadDiscreteInputsResponse readDiscreteInputs(
-      ModbusRequestContext context,
-      int unitId,
-      ReadDiscreteInputsRequest request
-  ) throws ModbusResponseException, UnknownUnitIdException {
+      ModbusRequestContext context, int unitId, ReadDiscreteInputsRequest request)
+      throws ModbusResponseException, UnknownUnitIdException {
 
     if (context instanceof AuthzContext ctx) {
       AuthzResult result = authzHandler.authorizeReadDiscreteInputs(ctx, unitId, request);
 
       if (result != AuthzResult.AUTHORIZED) {
-        throw new ModbusResponseException(FunctionCode.READ_DISCRETE_INPUTS,
-            ExceptionCode.ILLEGAL_FUNCTION);
+        throw new ModbusResponseException(
+            FunctionCode.READ_DISCRETE_INPUTS, ExceptionCode.ILLEGAL_FUNCTION);
       }
     }
 
@@ -88,17 +83,15 @@ public class AuthzModbusServices implements ModbusServices {
 
   @Override
   public ReadHoldingRegistersResponse readHoldingRegisters(
-      ModbusRequestContext context,
-      int unitId,
-      ReadHoldingRegistersRequest request
-  ) throws ModbusResponseException, UnknownUnitIdException {
+      ModbusRequestContext context, int unitId, ReadHoldingRegistersRequest request)
+      throws ModbusResponseException, UnknownUnitIdException {
 
     if (context instanceof AuthzContext ctx) {
       AuthzResult result = authzHandler.authorizeReadHoldingRegisters(ctx, unitId, request);
 
       if (result != AuthzResult.AUTHORIZED) {
-        throw new ModbusResponseException(FunctionCode.READ_HOLDING_REGISTERS,
-            ExceptionCode.ILLEGAL_FUNCTION);
+        throw new ModbusResponseException(
+            FunctionCode.READ_HOLDING_REGISTERS, ExceptionCode.ILLEGAL_FUNCTION);
       }
     }
 
@@ -107,17 +100,15 @@ public class AuthzModbusServices implements ModbusServices {
 
   @Override
   public ReadInputRegistersResponse readInputRegisters(
-      ModbusRequestContext context,
-      int unitId,
-      ReadInputRegistersRequest request
-  ) throws ModbusResponseException, UnknownUnitIdException {
+      ModbusRequestContext context, int unitId, ReadInputRegistersRequest request)
+      throws ModbusResponseException, UnknownUnitIdException {
 
     if (context instanceof AuthzContext ctx) {
       AuthzResult result = authzHandler.authorizeReadInputRegisters(ctx, unitId, request);
 
       if (result != AuthzResult.AUTHORIZED) {
-        throw new ModbusResponseException(FunctionCode.READ_INPUT_REGISTERS,
-            ExceptionCode.ILLEGAL_FUNCTION);
+        throw new ModbusResponseException(
+            FunctionCode.READ_INPUT_REGISTERS, ExceptionCode.ILLEGAL_FUNCTION);
       }
     }
 
@@ -126,17 +117,15 @@ public class AuthzModbusServices implements ModbusServices {
 
   @Override
   public WriteSingleCoilResponse writeSingleCoil(
-      ModbusRequestContext context,
-      int unitId,
-      WriteSingleCoilRequest request
-  ) throws ModbusResponseException, UnknownUnitIdException {
+      ModbusRequestContext context, int unitId, WriteSingleCoilRequest request)
+      throws ModbusResponseException, UnknownUnitIdException {
 
     if (context instanceof AuthzContext ctx) {
       AuthzResult result = authzHandler.authorizeWriteSingleCoil(ctx, unitId, request);
 
       if (result != AuthzResult.AUTHORIZED) {
-        throw new ModbusResponseException(FunctionCode.WRITE_SINGLE_COIL,
-            ExceptionCode.ILLEGAL_FUNCTION);
+        throw new ModbusResponseException(
+            FunctionCode.WRITE_SINGLE_COIL, ExceptionCode.ILLEGAL_FUNCTION);
       }
     }
 
@@ -145,17 +134,15 @@ public class AuthzModbusServices implements ModbusServices {
 
   @Override
   public WriteSingleRegisterResponse writeSingleRegister(
-      ModbusRequestContext context,
-      int unitId,
-      WriteSingleRegisterRequest request
-  ) throws ModbusResponseException, UnknownUnitIdException {
+      ModbusRequestContext context, int unitId, WriteSingleRegisterRequest request)
+      throws ModbusResponseException, UnknownUnitIdException {
 
     if (context instanceof AuthzContext ctx) {
       AuthzResult result = authzHandler.authorizeWriteSingleRegister(ctx, unitId, request);
 
       if (result != AuthzResult.AUTHORIZED) {
-        throw new ModbusResponseException(FunctionCode.WRITE_SINGLE_REGISTER,
-            ExceptionCode.ILLEGAL_FUNCTION);
+        throw new ModbusResponseException(
+            FunctionCode.WRITE_SINGLE_REGISTER, ExceptionCode.ILLEGAL_FUNCTION);
       }
     }
 
@@ -164,17 +151,15 @@ public class AuthzModbusServices implements ModbusServices {
 
   @Override
   public WriteMultipleCoilsResponse writeMultipleCoils(
-      ModbusRequestContext context,
-      int unitId,
-      WriteMultipleCoilsRequest request
-  ) throws ModbusResponseException, UnknownUnitIdException {
+      ModbusRequestContext context, int unitId, WriteMultipleCoilsRequest request)
+      throws ModbusResponseException, UnknownUnitIdException {
 
     if (context instanceof AuthzContext ctx) {
       AuthzResult result = authzHandler.authorizeWriteMultipleCoils(ctx, unitId, request);
 
       if (result != AuthzResult.AUTHORIZED) {
-        throw new ModbusResponseException(FunctionCode.WRITE_MULTIPLE_COILS,
-            ExceptionCode.ILLEGAL_FUNCTION);
+        throw new ModbusResponseException(
+            FunctionCode.WRITE_MULTIPLE_COILS, ExceptionCode.ILLEGAL_FUNCTION);
       }
     }
 
@@ -183,17 +168,15 @@ public class AuthzModbusServices implements ModbusServices {
 
   @Override
   public WriteMultipleRegistersResponse writeMultipleRegisters(
-      ModbusRequestContext context,
-      int unitId,
-      WriteMultipleRegistersRequest request
-  ) throws ModbusResponseException, UnknownUnitIdException {
+      ModbusRequestContext context, int unitId, WriteMultipleRegistersRequest request)
+      throws ModbusResponseException, UnknownUnitIdException {
 
     if (context instanceof AuthzContext ctx) {
       AuthzResult result = authzHandler.authorizeWriteMultipleRegisters(ctx, unitId, request);
 
       if (result != AuthzResult.AUTHORIZED) {
-        throw new ModbusResponseException(FunctionCode.WRITE_MULTIPLE_REGISTERS,
-            ExceptionCode.ILLEGAL_FUNCTION);
+        throw new ModbusResponseException(
+            FunctionCode.WRITE_MULTIPLE_REGISTERS, ExceptionCode.ILLEGAL_FUNCTION);
       }
     }
 
@@ -202,17 +185,15 @@ public class AuthzModbusServices implements ModbusServices {
 
   @Override
   public MaskWriteRegisterResponse maskWriteRegister(
-      ModbusRequestContext context,
-      int unitId,
-      MaskWriteRegisterRequest request
-  ) throws ModbusResponseException, UnknownUnitIdException {
+      ModbusRequestContext context, int unitId, MaskWriteRegisterRequest request)
+      throws ModbusResponseException, UnknownUnitIdException {
 
     if (context instanceof AuthzContext ctx) {
       AuthzResult result = authzHandler.authorizeMaskWriteRegister(ctx, unitId, request);
 
       if (result != AuthzResult.AUTHORIZED) {
-        throw new ModbusResponseException(FunctionCode.MASK_WRITE_REGISTER,
-            ExceptionCode.ILLEGAL_FUNCTION);
+        throw new ModbusResponseException(
+            FunctionCode.MASK_WRITE_REGISTER, ExceptionCode.ILLEGAL_FUNCTION);
       }
     }
 
@@ -221,21 +202,18 @@ public class AuthzModbusServices implements ModbusServices {
 
   @Override
   public ReadWriteMultipleRegistersResponse readWriteMultipleRegisters(
-      ModbusRequestContext context,
-      int unitId,
-      ReadWriteMultipleRegistersRequest request
-  ) throws ModbusResponseException, UnknownUnitIdException {
+      ModbusRequestContext context, int unitId, ReadWriteMultipleRegistersRequest request)
+      throws ModbusResponseException, UnknownUnitIdException {
 
     if (context instanceof AuthzContext ctx) {
       AuthzResult result = authzHandler.authorizeReadWriteMultipleRegisters(ctx, unitId, request);
 
       if (result != AuthzResult.AUTHORIZED) {
-        throw new ModbusResponseException(FunctionCode.READ_WRITE_MULTIPLE_REGISTERS,
-            ExceptionCode.ILLEGAL_FUNCTION);
+        throw new ModbusResponseException(
+            FunctionCode.READ_WRITE_MULTIPLE_REGISTERS, ExceptionCode.ILLEGAL_FUNCTION);
       }
     }
 
     return modbusServices.readWriteMultipleRegisters(context, unitId, request);
   }
-
 }

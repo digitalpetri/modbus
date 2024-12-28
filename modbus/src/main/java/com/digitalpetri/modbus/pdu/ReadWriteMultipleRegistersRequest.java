@@ -17,12 +17,8 @@ import java.util.StringJoiner;
  * @param values the register values to write. 2 bytes per register.
  */
 public record ReadWriteMultipleRegistersRequest(
-    int readAddress,
-    int readQuantity,
-    int writeAddress,
-    int writeQuantity,
-    byte[] values
-) implements ModbusRequestPdu {
+    int readAddress, int readQuantity, int writeAddress, int writeQuantity, byte[] values)
+    implements ModbusRequestPdu {
 
   @Override
   public int getFunctionCode() {
@@ -38,22 +34,24 @@ public record ReadWriteMultipleRegistersRequest(
       return false;
     }
     ReadWriteMultipleRegistersRequest that = (ReadWriteMultipleRegistersRequest) o;
-    return readAddress == that.readAddress && readQuantity == that.readQuantity
-        && writeAddress == that.writeAddress && writeQuantity == that.writeQuantity
+    return readAddress == that.readAddress
+        && readQuantity == that.readQuantity
+        && writeAddress == that.writeAddress
+        && writeQuantity == that.writeQuantity
         && Objects.deepEquals(values, that.values);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(readAddress, readQuantity, writeAddress, writeQuantity,
-        Arrays.hashCode(values));
+    return Objects.hash(
+        readAddress, readQuantity, writeAddress, writeQuantity, Arrays.hashCode(values));
   }
 
   @Override
   public String toString() {
     // note: overridden to give preferred representation of `values` bytes
     return new StringJoiner(
-        ", ", ReadWriteMultipleRegistersRequest.class.getSimpleName() + "[", "]")
+            ", ", ReadWriteMultipleRegistersRequest.class.getSimpleName() + "[", "]")
         .add("readAddress=" + readAddress)
         .add("readQuantity=" + readQuantity)
         .add("writeAddress=" + writeAddress)
@@ -62,9 +60,7 @@ public record ReadWriteMultipleRegistersRequest(
         .toString();
   }
 
-  /**
-   * Utility functions for encoding and decoding {@link ReadWriteMultipleRegistersRequest}.
-   */
+  /** Utility functions for encoding and decoding {@link ReadWriteMultipleRegistersRequest}. */
   public static final class Serializer {
 
     private Serializer() {}
@@ -104,14 +100,7 @@ public record ReadWriteMultipleRegistersRequest(
       buffer.get(values);
 
       return new ReadWriteMultipleRegistersRequest(
-          readAddress,
-          readQuantity,
-          writeAddress,
-          writeQuantity,
-          values
-      );
+          readAddress, readQuantity, writeAddress, writeQuantity, values);
     }
-
   }
-
 }

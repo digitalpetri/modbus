@@ -50,7 +50,5 @@ public record ReadDiscreteInputsRequest(int address, int quantity) implements Mo
 
       return new ReadDiscreteInputsRequest(address, quantity);
     }
-
   }
-
 }

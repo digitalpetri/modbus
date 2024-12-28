@@ -28,23 +28,17 @@ public class ModbusRtuResponseFrameParser {
     return state.get();
   }
 
-  /**
-   * Reset this parser to the {@link Idle} state.
-   */
+  /** Reset this parser to the {@link Idle} state. */
   public ParserState reset() {
     return state.getAndSet(new Idle());
   }
 
-  public sealed interface ParserState
-      permits Idle, Accumulating, Accumulated, ParseError {
+  public sealed interface ParserState permits Idle, Accumulating, Accumulated, ParseError {
 
     ParserState parse(byte[] data);
-
   }
 
-  /**
-   * Waiting to receive initial data.
-   */
+  /** Waiting to receive initial data. */
   public record Idle() implements ParserState {
 
     @Override
@@ -175,5 +169,4 @@ public class ModbusRtuResponseFrameParser {
       return this;
     }
   }
-
 }

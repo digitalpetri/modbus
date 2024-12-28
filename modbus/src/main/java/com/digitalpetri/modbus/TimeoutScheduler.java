@@ -14,7 +14,6 @@ public interface TimeoutScheduler {
   interface Task {
 
     void run(TimeoutHandle handle);
-
   }
 
   interface TimeoutHandle {
@@ -22,7 +21,6 @@ public interface TimeoutScheduler {
     void cancel();
 
     boolean isCancelled();
-
   }
 
   static TimeoutScheduler create(Executor executor, ScheduledExecutorService scheduledExecutor) {
@@ -30,33 +28,30 @@ public interface TimeoutScheduler {
       final var ref = new AtomicReference<ScheduledFuture<?>>();
       final ExecutionQueue queue = new ExecutionQueue(executor);
 
-      var handle = new TimeoutHandle() {
-        @Override
-        public void cancel() {
-          synchronized (ref) {
-            ref.get().cancel(false);
-          }
-        }
+      var handle =
+          new TimeoutHandle() {
+            @Override
+            public void cancel() {
+              synchronized (ref) {
+                ref.get().cancel(false);
+              }
+            }
 
-        @Override
-        public boolean isCancelled() {
-          synchronized (ref) {
-            return ref.get().isCancelled();
-          }
-        }
-      };
+            @Override
+            public boolean isCancelled() {
+              synchronized (ref) {
+                return ref.get().isCancelled();
+              }
+            }
+          };
 
       synchronized (ref) {
-        ScheduledFuture<?> future = scheduledExecutor.schedule(
-            () -> queue.submit(() -> task.run(handle)),
-            delay,
-            unit
-        );
+        ScheduledFuture<?> future =
+            scheduledExecutor.schedule(() -> queue.submit(() -> task.run(handle)), delay, unit);
         ref.set(future);
       }
 
       return handle;
     };
   }
-
 }

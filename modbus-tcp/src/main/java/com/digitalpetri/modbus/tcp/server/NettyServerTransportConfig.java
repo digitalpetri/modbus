@@ -18,10 +18,10 @@ import javax.net.ssl.TrustManagerFactory;
  * @param port the port to bind to.
  * @param eventLoopGroup the {@link EventLoopGroup} to use.
  * @param executor the {@link ExecutorService} to use.
- * @param bootstrapCustomizer a {@link Consumer} that can be used to customize the Netty
- *     {@link ServerBootstrap}.
- * @param pipelineCustomizer a {@link Consumer} that can be used to customize the Netty
- *     {@link ChannelPipeline}.
+ * @param bootstrapCustomizer a {@link Consumer} that can be used to customize the Netty {@link
+ *     ServerBootstrap}.
+ * @param pipelineCustomizer a {@link Consumer} that can be used to customize the Netty {@link
+ *     ChannelPipeline}.
  */
 public record NettyServerTransportConfig(
     String bindAddress,
@@ -32,8 +32,7 @@ public record NettyServerTransportConfig(
     Consumer<ChannelPipeline> pipelineCustomizer,
     boolean tlsEnabled,
     Optional<KeyManagerFactory> keyManagerFactory,
-    Optional<TrustManagerFactory> trustManagerFactory
-) {
+    Optional<TrustManagerFactory> trustManagerFactory) {
 
   /**
    * Create a new {@link NettyServerTransportConfig} with a callback that allows customizing the
@@ -50,34 +49,22 @@ public record NettyServerTransportConfig(
 
   public static class Builder {
 
-    /**
-     * The address to bind to.
-     */
+    /** The address to bind to. */
     public String bindAddress = "0.0.0.0";
 
-    /**
-     * The port to bind to.
-     */
+    /** The port to bind to. */
     public int port = -1;
 
-    /**
-     * The {@link EventLoopGroup} to use.
-     */
+    /** The {@link EventLoopGroup} to use. */
     public EventLoopGroup eventLoopGroup;
 
-    /**
-     * The {@link ExecutorService} to use.
-     */
+    /** The {@link ExecutorService} to use. */
     public ExecutorService executor;
 
-    /**
-     * A {@link Consumer} that can be used to customize the Netty {@link ServerBootstrap}.
-     */
+    /** A {@link Consumer} that can be used to customize the Netty {@link ServerBootstrap}. */
     public Consumer<ServerBootstrap> bootstrapCustomizer = b -> {};
 
-    /**
-     * A {@link Consumer} that can be used to customize the Netty {@link ChannelPipeline}.
-     */
+    /** A {@link Consumer} that can be used to customize the Netty {@link ChannelPipeline}. */
     public Consumer<ChannelPipeline> pipelineCustomizer = p -> {};
 
     public boolean tlsEnabled = false;
@@ -104,9 +91,7 @@ public record NettyServerTransportConfig(
           pipelineCustomizer,
           tlsEnabled,
           Optional.ofNullable(keyManagerFactory),
-          Optional.ofNullable(trustManagerFactory)
-      );
+          Optional.ofNullable(trustManagerFactory));
     }
   }
-
 }

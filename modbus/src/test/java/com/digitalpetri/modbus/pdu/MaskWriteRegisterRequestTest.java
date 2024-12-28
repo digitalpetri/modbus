@@ -19,13 +19,11 @@ class MaskWriteRegisterRequestTest {
 
           buffer.flip();
 
-          MaskWriteRegisterRequest decoded =
-              MaskWriteRegisterRequest.Serializer.decode(buffer);
+          MaskWriteRegisterRequest decoded = MaskWriteRegisterRequest.Serializer.decode(buffer);
 
           assertEquals(request, decoded);
         }
       }
     }
   }
-
 }

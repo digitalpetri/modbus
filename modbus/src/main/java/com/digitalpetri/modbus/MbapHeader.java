@@ -6,18 +6,14 @@ import java.nio.ByteBuffer;
  * Modbus Application Protocol header for frames that encapsulates Modbus request and response PDUs
  * on TCP/IP.
  *
- * @param transactionId transaction identifier. 2 bytes, identifies a request/response
- *     transaction.
+ * @param transactionId transaction identifier. 2 bytes, identifies a request/response transaction.
  * @param protocolId protocol identifier. 2 bytes, always 0 for Modbus protocol.
  * @param length number of bytes that follow, including 1 for the unit id. 2 bytes.
- * @param unitId identifier of a remote slave connected on a physical or logical other bus. 1
- *     byte.
+ * @param unitId identifier of a remote slave connected on a physical or logical other bus. 1 byte.
  */
 public record MbapHeader(int transactionId, int protocolId, int length, int unitId) {
 
-  /**
-   * Utility functions for encoding and decoding {@link MbapHeader}.
-   */
+  /** Utility functions for encoding and decoding {@link MbapHeader}. */
   public static class Serializer {
 
     private Serializer() {}
@@ -49,7 +45,5 @@ public record MbapHeader(int transactionId, int protocolId, int length, int unit
 
       return new MbapHeader(transactionId, protocolId, length, unitId);
     }
-
   }
-
 }

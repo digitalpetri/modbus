@@ -50,8 +50,7 @@ public interface ModbusPduSerializer {
     /**
      * A shared instance of {@link DefaultRequestSerializer}.
      *
-     * <p>This instance is stateless and therefore safe for concurrent use by any number of
-     * threads.
+     * <p>This instance is stateless and therefore safe for concurrent use by any number of threads.
      */
     public static final DefaultRequestSerializer INSTANCE = new DefaultRequestSerializer();
 
@@ -71,7 +70,6 @@ public interface ModbusPduSerializer {
           } else {
             throw new IllegalArgumentException("expected ReadDiscreteInputsRequest");
           }
-
         }
         case 0x03 -> {
           if (pdu instanceof ReadHoldingRegistersRequest request) {
@@ -129,10 +127,9 @@ public interface ModbusPduSerializer {
             throw new IllegalArgumentException("expected ReadWriteMultipleRegistersRequest");
           }
         }
-        default -> throw new ModbusException(
-            "no serializer for functionCode=0x%02X"
-                .formatted(pdu.getFunctionCode())
-        );
+        default ->
+            throw new ModbusException(
+                "no serializer for functionCode=0x%02X".formatted(pdu.getFunctionCode()));
       }
     }
 
@@ -149,13 +146,11 @@ public interface ModbusPduSerializer {
         case 0x10 -> WriteMultipleRegistersRequest.Serializer.decode(buffer);
         case 0x16 -> MaskWriteRegisterRequest.Serializer.decode(buffer);
         case 0x17 -> ReadWriteMultipleRegistersRequest.Serializer.decode(buffer);
-        default -> throw new ModbusException(
-            "no serializer for functionCode=0x%02X"
-                .formatted(functionCode)
-        );
+        default ->
+            throw new ModbusException(
+                "no serializer for functionCode=0x%02X".formatted(functionCode));
       };
     }
-
   }
 
   class DefaultResponseSerializer implements ModbusPduSerializer {
@@ -163,8 +158,7 @@ public interface ModbusPduSerializer {
     /**
      * A shared instance of {@link DefaultResponseSerializer}.
      *
-     * <p>This instance is stateless and therefore safe for concurrent use by any number of
-     * threads.
+     * <p>This instance is stateless and therefore safe for concurrent use by any number of threads.
      */
     public static final DefaultResponseSerializer INSTANCE = new DefaultResponseSerializer();
 
@@ -241,10 +235,9 @@ public interface ModbusPduSerializer {
             throw new IllegalArgumentException("expected ReadWriteMultipleRegistersResponse");
           }
         }
-        default -> throw new ModbusException(
-            "no serializer for functionCode=0x%02X"
-                .formatted(pdu.getFunctionCode())
-        );
+        default ->
+            throw new ModbusException(
+                "no serializer for functionCode=0x%02X".formatted(pdu.getFunctionCode()));
       }
     }
 
@@ -261,13 +254,10 @@ public interface ModbusPduSerializer {
         case 0x10 -> WriteMultipleRegistersResponse.Serializer.decode(buffer);
         case 0x16 -> MaskWriteRegisterResponse.Serializer.decode(buffer);
         case 0x17 -> ReadWriteMultipleRegistersResponse.Serializer.decode(buffer);
-        default -> throw new ModbusException(
-            "no serializer for functionCode=0x%02X"
-                .formatted(functionCode)
-        );
+        default ->
+            throw new ModbusException(
+                "no serializer for functionCode=0x%02X".formatted(functionCode));
       };
     }
-
   }
-
 }

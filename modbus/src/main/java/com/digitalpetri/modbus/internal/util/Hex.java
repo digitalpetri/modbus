@@ -33,5 +33,4 @@ public class Hex {
   public static String format(byte[] bytes) {
     return HexFormat.of().formatHex(bytes);
   }
-
 }

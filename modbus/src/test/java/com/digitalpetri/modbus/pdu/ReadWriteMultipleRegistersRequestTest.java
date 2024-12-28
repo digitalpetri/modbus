@@ -20,13 +20,9 @@ class ReadWriteMultipleRegistersRequestTest {
 
     ByteBuffer buffer = ByteBuffer.allocate(256);
 
-    var request = new ReadWriteMultipleRegistersRequest(
-        address,
-        quantity,
-        writeAddress,
-        writeQuantity,
-        writeValues
-    );
+    var request =
+        new ReadWriteMultipleRegistersRequest(
+            address, quantity, writeAddress, writeQuantity, writeValues);
 
     ReadWriteMultipleRegistersRequest.Serializer.encode(request, buffer);
 
@@ -37,5 +33,4 @@ class ReadWriteMultipleRegistersRequestTest {
 
     assertEquals(request, decoded);
   }
-
 }

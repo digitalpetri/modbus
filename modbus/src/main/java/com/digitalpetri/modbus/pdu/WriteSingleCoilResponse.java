@@ -23,9 +23,7 @@ public record WriteSingleCoilResponse(int address, int value) implements ModbusR
     return FunctionCode.WRITE_SINGLE_COIL.getCode();
   }
 
-  /**
-   * Utility functions for encoding and decoding {@link WriteSingleCoilResponse}.
-   */
+  /** Utility functions for encoding and decoding {@link WriteSingleCoilResponse}. */
   public static final class Serializer {
 
     private Serializer() {}
@@ -57,7 +55,5 @@ public record WriteSingleCoilResponse(int address, int value) implements ModbusR
 
       return new WriteSingleCoilResponse(address, value);
     }
-
   }
-
 }

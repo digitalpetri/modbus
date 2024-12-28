@@ -16,9 +16,7 @@ public record WriteSingleRegisterRequest(int address, int value) implements Modb
     return FunctionCode.WRITE_SINGLE_REGISTER.getCode();
   }
 
-  /**
-   * Utility functions for encoding and decoding {@link WriteSingleRegisterRequest}.
-   */
+  /** Utility functions for encoding and decoding {@link WriteSingleRegisterRequest}. */
   public static final class Serializer {
 
     private Serializer() {}
@@ -50,7 +48,5 @@ public record WriteSingleRegisterRequest(int address, int value) implements Modb
 
       return new WriteSingleRegisterRequest(address, value);
     }
-
   }
-
 }

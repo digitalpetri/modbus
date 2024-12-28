@@ -17,11 +17,7 @@ class WriteMultipleRegistersRequestTest {
         byte[] values = new byte[quantity * 2];
         Arrays.fill(values, (byte) 0xFF);
 
-        var request = new WriteMultipleRegistersRequest(
-            address,
-            quantity,
-            values
-        );
+        var request = new WriteMultipleRegistersRequest(address, quantity, values);
 
         WriteMultipleRegistersRequest.Serializer.encode(request, buffer);
 
@@ -34,5 +30,4 @@ class WriteMultipleRegistersRequestTest {
       }
     }
   }
-
 }

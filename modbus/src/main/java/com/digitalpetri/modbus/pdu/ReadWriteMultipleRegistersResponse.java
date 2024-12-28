@@ -39,14 +39,12 @@ public record ReadWriteMultipleRegistersResponse(byte[] registers) implements Mo
   public String toString() {
     // note: overridden to give preferred representation of `registers` bytes
     return new StringJoiner(
-        ", ", ReadWriteMultipleRegistersResponse.class.getSimpleName() + "[", "]")
+            ", ", ReadWriteMultipleRegistersResponse.class.getSimpleName() + "[", "]")
         .add("registers=" + Hex.format(registers))
         .toString();
   }
 
-  /**
-   * Utility functions for encoding and decoding {@link ReadWriteMultipleRegistersResponse}.
-   */
+  /** Utility functions for encoding and decoding {@link ReadWriteMultipleRegistersResponse}. */
   public static final class Serializer {
 
     private Serializer() {}
@@ -79,7 +77,5 @@ public record ReadWriteMultipleRegistersResponse(byte[] registers) implements Mo
 
       return new ReadWriteMultipleRegistersResponse(registers);
     }
-
   }
-
 }

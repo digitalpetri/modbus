@@ -120,10 +120,8 @@ public abstract class ModbusClient {
    * @throws ModbusResponseException if the remote device responds with an error.
    * @throws ModbusTimeoutException if the request times out.
    */
-  public ModbusResponsePdu send(
-      int unitId,
-      ModbusRequestPdu request
-  ) throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
+  public ModbusResponsePdu send(int unitId, ModbusRequestPdu request)
+      throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
 
     try {
       return sendAsync(unitId, request).toCompletableFuture().get();
@@ -147,15 +145,13 @@ public abstract class ModbusClient {
    *
    * @param unitId the remote device unit id.
    * @param request the request PDU.
-   * @return a {@link CompletionStage} that completes successfully with the
-   *     {@link ModbusResponsePdu} PDU, or completes exceptionally if an error occurs.
+   * @return a {@link CompletionStage} that completes successfully with the {@link
+   *     ModbusResponsePdu} PDU, or completes exceptionally if an error occurs.
    */
   public abstract CompletionStage<ModbusResponsePdu> sendAsync(
-      int unitId,
-      ModbusRequestPdu request
-  );
+      int unitId, ModbusRequestPdu request);
 
-  //region Read Coils (function code 0x01)
+  // region Read Coils (function code 0x01)
 
   /**
    * Send a {@link ReadCoilsRequest} (FC 0x01) to the remote device identified by {@code unitId}.
@@ -167,10 +163,8 @@ public abstract class ModbusClient {
    * @throws ModbusResponseException if the remote device responds with an error.
    * @throws ModbusTimeoutException if the request times out.
    */
-  public ReadCoilsResponse readCoils(
-      int unitId,
-      ReadCoilsRequest request
-  ) throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
+  public ReadCoilsResponse readCoils(int unitId, ReadCoilsRequest request)
+      throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
 
     ModbusResponsePdu response = send(unitId, request);
 
@@ -178,9 +172,7 @@ public abstract class ModbusClient {
       return r;
     } else {
       throw new ModbusExecutionException(
-          "unexpected response: 0x%02X"
-              .formatted(response.getFunctionCode())
-      );
+          "unexpected response: 0x%02X".formatted(response.getFunctionCode()));
     }
   }
 
@@ -189,25 +181,21 @@ public abstract class ModbusClient {
    *
    * @param unitId the remote device unit id.
    * @param request the {@link ReadCoilsRequest}.
-   * @return a {@link CompletionStage} that completes successfully with the
-   *     {@link ReadCoilsResponse}, or completes exceptionally if an error occurs.
+   * @return a {@link CompletionStage} that completes successfully with the {@link
+   *     ReadCoilsResponse}, or completes exceptionally if an error occurs.
    */
-  public CompletionStage<ReadCoilsResponse> readCoilsAsync(
-      int unitId,
-      ReadCoilsRequest request
-  ) {
+  public CompletionStage<ReadCoilsResponse> readCoilsAsync(int unitId, ReadCoilsRequest request) {
 
-    return sendAsync(unitId, request)
-        .thenApply(ReadCoilsResponse.class::cast);
+    return sendAsync(unitId, request).thenApply(ReadCoilsResponse.class::cast);
   }
 
-  //endregion
+  // endregion
 
-  //region Read Discrete Inputs (function code 0x02)
+  // region Read Discrete Inputs (function code 0x02)
 
   /**
-   * Send a {@link ReadDiscreteInputsRequest} (FC 0x02) to the remote device identified by
-   * {@code unitId}.
+   * Send a {@link ReadDiscreteInputsRequest} (FC 0x02) to the remote device identified by {@code
+   * unitId}.
    *
    * @param unitId the remote device unit id.
    * @param request the {@link ReadDiscreteInputsRequest}.
@@ -217,9 +205,8 @@ public abstract class ModbusClient {
    * @throws ModbusTimeoutException if the request times out.
    */
   public ReadDiscreteInputsResponse readDiscreteInputs(
-      int unitId,
-      ReadDiscreteInputsRequest request
-  ) throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
+      int unitId, ReadDiscreteInputsRequest request)
+      throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
 
     ModbusResponsePdu response = send(unitId, request);
 
@@ -227,37 +214,32 @@ public abstract class ModbusClient {
       return r;
     } else {
       throw new ModbusExecutionException(
-          "unexpected response: 0x%02X"
-              .formatted(response.getFunctionCode())
-      );
+          "unexpected response: 0x%02X".formatted(response.getFunctionCode()));
     }
   }
 
   /**
-   * Send a {@link ReadDiscreteInputsRequest} (FC 0x02) to the remote device identified by
-   * {@code unitId}.
+   * Send a {@link ReadDiscreteInputsRequest} (FC 0x02) to the remote device identified by {@code
+   * unitId}.
    *
    * @param unitId the remote device unit id.
    * @param request the {@link ReadDiscreteInputsRequest}.
-   * @return a {@link CompletionStage} that completes successfully with the
-   *     {@link ReadDiscreteInputsResponse}, or completes exceptionally if an error occurs.
+   * @return a {@link CompletionStage} that completes successfully with the {@link
+   *     ReadDiscreteInputsResponse}, or completes exceptionally if an error occurs.
    */
   public CompletionStage<ReadDiscreteInputsResponse> readDiscreteInputsAsync(
-      int unitId,
-      ReadDiscreteInputsRequest request
-  ) {
+      int unitId, ReadDiscreteInputsRequest request) {
 
-    return sendAsync(unitId, request)
-        .thenApply(ReadDiscreteInputsResponse.class::cast);
+    return sendAsync(unitId, request).thenApply(ReadDiscreteInputsResponse.class::cast);
   }
 
-  //endregion
+  // endregion
 
-  //region Read Holding Registers (function code 0x03)
+  // region Read Holding Registers (function code 0x03)
 
   /**
-   * Send a {@link ReadHoldingRegistersRequest} (FC 0x03) to the remote device identified by
-   * {@code unitId}.
+   * Send a {@link ReadHoldingRegistersRequest} (FC 0x03) to the remote device identified by {@code
+   * unitId}.
    *
    * @param unitId the remote device unit id.
    * @param request the {@link ReadHoldingRegistersRequest}.
@@ -267,9 +249,8 @@ public abstract class ModbusClient {
    * @throws ModbusTimeoutException if the request times out.
    */
   public ReadHoldingRegistersResponse readHoldingRegisters(
-      int unitId,
-      ReadHoldingRegistersRequest request
-  ) throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
+      int unitId, ReadHoldingRegistersRequest request)
+      throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
 
     ModbusResponsePdu response = send(unitId, request);
 
@@ -277,37 +258,32 @@ public abstract class ModbusClient {
       return r;
     } else {
       throw new ModbusExecutionException(
-          "unexpected response: 0x%02X"
-              .formatted(response.getFunctionCode())
-      );
+          "unexpected response: 0x%02X".formatted(response.getFunctionCode()));
     }
   }
 
   /**
-   * Send a {@link ReadHoldingRegistersRequest} (FC 0x03) to the remote device identified by
-   * {@code unitId}.
+   * Send a {@link ReadHoldingRegistersRequest} (FC 0x03) to the remote device identified by {@code
+   * unitId}.
    *
    * @param unitId the remote device unit id.
    * @param request the {@link ReadHoldingRegistersRequest}.
-   * @return a {@link CompletionStage} that completes successfully with the
-   *     {@link ReadHoldingRegistersResponse}, or completes exceptionally if an error occurs.
+   * @return a {@link CompletionStage} that completes successfully with the {@link
+   *     ReadHoldingRegistersResponse}, or completes exceptionally if an error occurs.
    */
   public CompletionStage<ReadHoldingRegistersResponse> readHoldingRegistersAsync(
-      int unitId,
-      ReadHoldingRegistersRequest request
-  ) {
+      int unitId, ReadHoldingRegistersRequest request) {
 
-    return sendAsync(unitId, request)
-        .thenApply(ReadHoldingRegistersResponse.class::cast);
+    return sendAsync(unitId, request).thenApply(ReadHoldingRegistersResponse.class::cast);
   }
 
-  //endregion
+  // endregion
 
-  //region Read Input Registers (function code 0x04)
+  // region Read Input Registers (function code 0x04)
 
   /**
-   * Send a {@link ReadInputRegistersRequest} (FC 0x04) to the remote device identified by
-   * {@code unitId}.
+   * Send a {@link ReadInputRegistersRequest} (FC 0x04) to the remote device identified by {@code
+   * unitId}.
    *
    * @param unitId the remote device unit id.
    * @param request the {@link ReadInputRegistersRequest}.
@@ -317,9 +293,8 @@ public abstract class ModbusClient {
    * @throws ModbusTimeoutException if the request times out.
    */
   public ReadInputRegistersResponse readInputRegisters(
-      int unitId,
-      ReadInputRegistersRequest request
-  ) throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
+      int unitId, ReadInputRegistersRequest request)
+      throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
 
     ModbusResponsePdu response = send(unitId, request);
 
@@ -327,37 +302,32 @@ public abstract class ModbusClient {
       return r;
     } else {
       throw new ModbusExecutionException(
-          "unexpected response: 0x%02X"
-              .formatted(response.getFunctionCode())
-      );
+          "unexpected response: 0x%02X".formatted(response.getFunctionCode()));
     }
   }
 
   /**
-   * Send a {@link ReadInputRegistersRequest} (FC 0x04) to the remote device identified by
-   * {@code unitId}.
+   * Send a {@link ReadInputRegistersRequest} (FC 0x04) to the remote device identified by {@code
+   * unitId}.
    *
    * @param unitId the remote device unit id.
    * @param request the {@link ReadInputRegistersRequest}.
-   * @return a {@link CompletionStage} that completes successfully with the
-   *     {@link ReadInputRegistersResponse}, or completes exceptionally if an error occurs.
+   * @return a {@link CompletionStage} that completes successfully with the {@link
+   *     ReadInputRegistersResponse}, or completes exceptionally if an error occurs.
    */
   public CompletionStage<ReadInputRegistersResponse> readInputRegistersAsync(
-      int unitId,
-      ReadInputRegistersRequest request
-  ) {
+      int unitId, ReadInputRegistersRequest request) {
 
-    return sendAsync(unitId, request)
-        .thenApply(ReadInputRegistersResponse.class::cast);
+    return sendAsync(unitId, request).thenApply(ReadInputRegistersResponse.class::cast);
   }
 
-  //endregion
+  // endregion
 
-  //region Write Single Coil (0x05)
+  // region Write Single Coil (0x05)
 
   /**
-   * Send a {@link WriteSingleCoilRequest} (FC 0x05) to the remote device identified by
-   * {@code unitId}.
+   * Send a {@link WriteSingleCoilRequest} (FC 0x05) to the remote device identified by {@code
+   * unitId}.
    *
    * @param unitId the remote device unit id.
    * @param request the {@link WriteSingleCoilRequest}.
@@ -366,10 +336,8 @@ public abstract class ModbusClient {
    * @throws ModbusResponseException if the remote device responds with an error.
    * @throws ModbusTimeoutException if the request times out.
    */
-  public WriteSingleCoilResponse writeSingleCoil(
-      int unitId,
-      WriteSingleCoilRequest request
-  ) throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
+  public WriteSingleCoilResponse writeSingleCoil(int unitId, WriteSingleCoilRequest request)
+      throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
 
     ModbusResponsePdu response = send(unitId, request);
 
@@ -377,37 +345,32 @@ public abstract class ModbusClient {
       return r;
     } else {
       throw new ModbusExecutionException(
-          "unexpected response: 0x%02X"
-              .formatted(response.getFunctionCode())
-      );
+          "unexpected response: 0x%02X".formatted(response.getFunctionCode()));
     }
   }
 
   /**
-   * Send a {@link WriteSingleCoilRequest} (FC 0x05) to the remote device identified by
-   * {@code unitId}.
+   * Send a {@link WriteSingleCoilRequest} (FC 0x05) to the remote device identified by {@code
+   * unitId}.
    *
    * @param unitId the remote device unit id.
    * @param request the {@link WriteSingleCoilRequest}.
-   * @return a {@link CompletionStage} that completes successfully with the
-   *     {@link WriteSingleCoilResponse}, or completes exceptionally if an error occurs.
+   * @return a {@link CompletionStage} that completes successfully with the {@link
+   *     WriteSingleCoilResponse}, or completes exceptionally if an error occurs.
    */
   public CompletionStage<WriteSingleCoilResponse> writeSingleCoilAsync(
-      int unitId,
-      WriteSingleCoilRequest request
-  ) {
+      int unitId, WriteSingleCoilRequest request) {
 
-    return sendAsync(unitId, request)
-        .thenApply(WriteSingleCoilResponse.class::cast);
+    return sendAsync(unitId, request).thenApply(WriteSingleCoilResponse.class::cast);
   }
 
-  //endregion
+  // endregion
 
-  //region Write Single Register (0x06)
+  // region Write Single Register (0x06)
 
   /**
-   * Send a {@link WriteSingleRegisterRequest} (FC 0x06) to the remote device identified by
-   * {@code unitId}.
+   * Send a {@link WriteSingleRegisterRequest} (FC 0x06) to the remote device identified by {@code
+   * unitId}.
    *
    * @param unitId the remote device unit id.
    * @param request the {@link WriteSingleRegisterRequest}.
@@ -417,9 +380,8 @@ public abstract class ModbusClient {
    * @throws ModbusTimeoutException if the request times out.
    */
   public WriteSingleRegisterResponse writeSingleRegister(
-      int unitId,
-      WriteSingleRegisterRequest request
-  ) throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
+      int unitId, WriteSingleRegisterRequest request)
+      throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
 
     ModbusResponsePdu response = send(unitId, request);
 
@@ -427,37 +389,32 @@ public abstract class ModbusClient {
       return r;
     } else {
       throw new ModbusExecutionException(
-          "unexpected response: 0x%02X"
-              .formatted(response.getFunctionCode())
-      );
+          "unexpected response: 0x%02X".formatted(response.getFunctionCode()));
     }
   }
 
   /**
-   * Send a {@link WriteSingleRegisterRequest} (FC 0x06) to the remote device identified by
-   * {@code unitId}.
+   * Send a {@link WriteSingleRegisterRequest} (FC 0x06) to the remote device identified by {@code
+   * unitId}.
    *
    * @param unitId the remote device unit id.
    * @param request the {@link WriteSingleRegisterRequest}.
-   * @return a {@link CompletionStage} that completes successfully with the
-   *     {@link WriteSingleRegisterResponse}, or completes exceptionally if an error occurs.
+   * @return a {@link CompletionStage} that completes successfully with the {@link
+   *     WriteSingleRegisterResponse}, or completes exceptionally if an error occurs.
    */
   public CompletionStage<WriteSingleRegisterResponse> writeSingleRegisterAsync(
-      int unitId,
-      WriteSingleRegisterRequest request
-  ) {
+      int unitId, WriteSingleRegisterRequest request) {
 
-    return sendAsync(unitId, request)
-        .thenApply(WriteSingleRegisterResponse.class::cast);
+    return sendAsync(unitId, request).thenApply(WriteSingleRegisterResponse.class::cast);
   }
 
-  //endregion
+  // endregion
 
-  //region Write Multiple Coils (0x0F)
+  // region Write Multiple Coils (0x0F)
 
   /**
-   * Send a {@link WriteMultipleCoilsRequest} (FC 0x0F) to the remote device identified by
-   * {@code unitId}.
+   * Send a {@link WriteMultipleCoilsRequest} (FC 0x0F) to the remote device identified by {@code
+   * unitId}.
    *
    * @param unitId the remote device unit id.
    * @param request the {@link WriteMultipleCoilsRequest}.
@@ -467,9 +424,8 @@ public abstract class ModbusClient {
    * @throws ModbusTimeoutException if the request times out.
    */
   public WriteMultipleCoilsResponse writeMultipleCoils(
-      int unitId,
-      WriteMultipleCoilsRequest request
-  ) throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
+      int unitId, WriteMultipleCoilsRequest request)
+      throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
 
     ModbusResponsePdu response = send(unitId, request);
 
@@ -477,33 +433,28 @@ public abstract class ModbusClient {
       return r;
     } else {
       throw new ModbusExecutionException(
-          "unexpected response: 0x%02X"
-              .formatted(response.getFunctionCode())
-      );
+          "unexpected response: 0x%02X".formatted(response.getFunctionCode()));
     }
   }
 
   /**
-   * Send a {@link WriteMultipleCoilsRequest} (FC 0x0F) to the remote device identified by
-   * {@code unitId}.
+   * Send a {@link WriteMultipleCoilsRequest} (FC 0x0F) to the remote device identified by {@code
+   * unitId}.
    *
    * @param unitId the remote device unit id.
    * @param request the {@link WriteMultipleCoilsRequest}.
-   * @return a {@link CompletionStage} that completes successfully with the
-   *     {@link WriteMultipleCoilsResponse}, or completes exceptionally if an error occurs.
+   * @return a {@link CompletionStage} that completes successfully with the {@link
+   *     WriteMultipleCoilsResponse}, or completes exceptionally if an error occurs.
    */
   public CompletionStage<WriteMultipleCoilsResponse> writeMultipleCoilsAsync(
-      int unitId,
-      WriteMultipleCoilsRequest request
-  ) {
+      int unitId, WriteMultipleCoilsRequest request) {
 
-    return sendAsync(unitId, request)
-        .thenApply(WriteMultipleCoilsResponse.class::cast);
+    return sendAsync(unitId, request).thenApply(WriteMultipleCoilsResponse.class::cast);
   }
 
-  //endregion
+  // endregion
 
-  //region Write Multiple Registers (0x10)
+  // region Write Multiple Registers (0x10)
 
   /**
    * Send a {@link WriteMultipleRegistersRequest} (FC 0x10) to the remote device identified by
@@ -517,9 +468,8 @@ public abstract class ModbusClient {
    * @throws ModbusTimeoutException if the request times out.
    */
   public WriteMultipleRegistersResponse writeMultipleRegisters(
-      int unitId,
-      WriteMultipleRegistersRequest request
-  ) throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
+      int unitId, WriteMultipleRegistersRequest request)
+      throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
 
     ModbusResponsePdu response = send(unitId, request);
 
@@ -527,9 +477,7 @@ public abstract class ModbusClient {
       return r;
     } else {
       throw new ModbusExecutionException(
-          "unexpected response: 0x%02X"
-              .formatted(response.getFunctionCode())
-      );
+          "unexpected response: 0x%02X".formatted(response.getFunctionCode()));
     }
   }
 
@@ -539,25 +487,22 @@ public abstract class ModbusClient {
    *
    * @param unitId the remote device unit id.
    * @param request the {@link WriteMultipleRegistersRequest}.
-   * @return a {@link CompletionStage} that completes successfully with the
-   *     {@link WriteMultipleRegistersResponse}, or completes exceptionally if an error occurs.
+   * @return a {@link CompletionStage} that completes successfully with the {@link
+   *     WriteMultipleRegistersResponse}, or completes exceptionally if an error occurs.
    */
   public CompletionStage<WriteMultipleRegistersResponse> writeMultipleRegistersAsync(
-      int unitId,
-      WriteMultipleRegistersRequest request
-  ) {
+      int unitId, WriteMultipleRegistersRequest request) {
 
-    return sendAsync(unitId, request)
-        .thenApply(WriteMultipleRegistersResponse.class::cast);
+    return sendAsync(unitId, request).thenApply(WriteMultipleRegistersResponse.class::cast);
   }
 
-  //endregion
+  // endregion
 
-  //region Mask Write Register (0x16)
+  // region Mask Write Register (0x16)
 
   /**
-   * Send a {@link MaskWriteRegisterRequest} (FC 0x16) to the remote device identified by
-   * {@code unitId}.
+   * Send a {@link MaskWriteRegisterRequest} (FC 0x16) to the remote device identified by {@code
+   * unitId}.
    *
    * @param unitId the remote device unit id.
    * @param request the {@link MaskWriteRegisterRequest}.
@@ -566,10 +511,8 @@ public abstract class ModbusClient {
    * @throws ModbusResponseException if the remote device responds with an error.
    * @throws ModbusTimeoutException if the request times out.
    */
-  public MaskWriteRegisterResponse maskWriteRegister(
-      int unitId,
-      MaskWriteRegisterRequest request
-  ) throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
+  public MaskWriteRegisterResponse maskWriteRegister(int unitId, MaskWriteRegisterRequest request)
+      throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
 
     ModbusResponsePdu response = send(unitId, request);
 
@@ -577,33 +520,28 @@ public abstract class ModbusClient {
       return r;
     } else {
       throw new ModbusExecutionException(
-          "unexpected response: 0x%02X"
-              .formatted(response.getFunctionCode())
-      );
+          "unexpected response: 0x%02X".formatted(response.getFunctionCode()));
     }
   }
 
   /**
-   * Send a {@link MaskWriteRegisterRequest} (FC 0x16) to the remote device identified by
-   * {@code unitId}.
+   * Send a {@link MaskWriteRegisterRequest} (FC 0x16) to the remote device identified by {@code
+   * unitId}.
    *
    * @param unitId the remote device unit id.
    * @param request the {@link MaskWriteRegisterRequest}.
-   * @return a {@link CompletionStage} that completes successfully with the
-   *     {@link MaskWriteRegisterResponse}, or completes exceptionally if an error occurs.
+   * @return a {@link CompletionStage} that completes successfully with the {@link
+   *     MaskWriteRegisterResponse}, or completes exceptionally if an error occurs.
    */
   public CompletionStage<MaskWriteRegisterResponse> maskWriteRegisterAsync(
-      int unitId,
-      MaskWriteRegisterRequest request
-  ) {
+      int unitId, MaskWriteRegisterRequest request) {
 
-    return sendAsync(unitId, request)
-        .thenApply(MaskWriteRegisterResponse.class::cast);
+    return sendAsync(unitId, request).thenApply(MaskWriteRegisterResponse.class::cast);
   }
 
-  //endregion
+  // endregion
 
-  //region ReadWriteMultipleRegisters (0x17)
+  // region ReadWriteMultipleRegisters (0x17)
 
   /**
    * Send a {@link ReadWriteMultipleRegistersRequest} (FC 0x17) to the remote device identified by
@@ -617,9 +555,8 @@ public abstract class ModbusClient {
    * @throws ModbusTimeoutException if the request times out.
    */
   public ReadWriteMultipleRegistersResponse readWriteMultipleRegisters(
-      int unitId,
-      ReadWriteMultipleRegistersRequest request
-  ) throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
+      int unitId, ReadWriteMultipleRegistersRequest request)
+      throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
 
     ModbusResponsePdu response = send(unitId, request);
 
@@ -627,9 +564,7 @@ public abstract class ModbusClient {
       return r;
     } else {
       throw new ModbusExecutionException(
-          "unexpected response: 0x%02X"
-              .formatted(response.getFunctionCode())
-      );
+          "unexpected response: 0x%02X".formatted(response.getFunctionCode()));
     }
   }
 
@@ -639,24 +574,20 @@ public abstract class ModbusClient {
    *
    * @param unitId the remote device unit id.
    * @param request the {@link ReadWriteMultipleRegistersRequest}.
-   * @return a {@link CompletionStage} that completes successfully with the
-   *     {@link ReadWriteMultipleRegistersResponse}, or completes exceptionally if an error occurs.
+   * @return a {@link CompletionStage} that completes successfully with the {@link
+   *     ReadWriteMultipleRegistersResponse}, or completes exceptionally if an error occurs.
    */
   public CompletionStage<ReadWriteMultipleRegistersResponse> readWriteMultipleRegistersAsync(
-      int unitId,
-      ReadWriteMultipleRegistersRequest request
-  ) {
+      int unitId, ReadWriteMultipleRegistersRequest request) {
 
-    return sendAsync(unitId, request)
-        .thenApply(ReadWriteMultipleRegistersResponse.class::cast);
+    return sendAsync(unitId, request).thenApply(ReadWriteMultipleRegistersResponse.class::cast);
   }
 
-  //endregion
+  // endregion
 
   public interface ModbusClientAutoCloseable extends AutoCloseable {
 
     @Override
     void close() throws ModbusExecutionException;
   }
-
 }

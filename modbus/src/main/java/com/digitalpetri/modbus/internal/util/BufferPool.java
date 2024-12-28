@@ -19,10 +19,8 @@ public abstract class BufferPool implements AutoCloseable {
   private final NavigableMap<Integer, Deque<ByteBuffer>> buffers = new ConcurrentSkipListMap<>();
 
   public void give(ByteBuffer buffer) {
-    Deque<ByteBuffer> queue = buffers.computeIfAbsent(
-        buffer.capacity(),
-        k -> new LinkedBlockingDeque<>(QUEUE_SIZE)
-    );
+    Deque<ByteBuffer> queue =
+        buffers.computeIfAbsent(buffer.capacity(), k -> new LinkedBlockingDeque<>(QUEUE_SIZE));
     if (!queue.offer(buffer)) {
       rejectionCounts.computeIfAbsent(buffer.capacity(), k -> new AtomicLong()).incrementAndGet();
     }
@@ -110,5 +108,4 @@ public abstract class BufferPool implements AutoCloseable {
       return allocate(capacity);
     }
   }
-
 }

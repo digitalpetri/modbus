@@ -45,9 +45,7 @@ public record ReadHoldingRegistersResponse(byte[] registers) implements ModbusRe
         .toString();
   }
 
-  /**
-   * Utility functions for encoding and decoding {@link ReadHoldingRegistersResponse}.
-   */
+  /** Utility functions for encoding and decoding {@link ReadHoldingRegistersResponse}. */
   public static final class Serializer {
 
     private Serializer() {}
@@ -80,7 +78,5 @@ public record ReadHoldingRegistersResponse(byte[] registers) implements ModbusRe
 
       return new ReadHoldingRegistersResponse(registers);
     }
-
   }
-
 }
