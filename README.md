@@ -1,6 +1,10 @@
 [![Maven Central](https://img.shields.io/maven-central/v/com.digitalpetri.modbus/modbus.svg)](https://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22com.digitalpetri.modbus%22%20AND%20a%3A%22modbus%22)
 
-A modern, performant, easy to use client and server implementation of Modbus TCP, Modbus RTU/TCP, and Modbus RTU/Serial for Java 17+.
+A modern, performant, easy to use client and server implementation of Modbus, supporting:
+- Modbus TCP
+- Modbus TCP Security (Modbus TCP with TLS)
+- Modbus RTU on Serial
+- Modbus RTU on TCP
 
 ### Quick Start Examples
 
@@ -22,7 +26,7 @@ ReadHoldingRegistersResponse response = client.readHoldingRegisters(
 System.out.println("Response: " + response);
 ```
 
-#### Modbus RTU/Serial Client
+#### Modbus RTU on Serial Client
 ```java
 var transport = SerialPortClientTransport.create(cfg -> {
   cfg.serialPort = "/dev/ttyUSB0";
@@ -51,7 +55,7 @@ System.out.println("Response: " + response);
 <dependency>
     <groupId>com.digitalpetri.modbus</groupId>
     <artifactId>modbus-tcp</artifactId>
-    <version>2.0.1</version>
+    <version>2.1.0</version>
 </dependency>
 ```
 
@@ -60,7 +64,7 @@ System.out.println("Response: " + response);
 <dependency>
     <groupId>com.digitalpetri.modbus</groupId>
     <artifactId>modbus-serial</artifactId>
-    <version>2.0.1</version>
+    <version>2.1.0</version>
 </dependency>
 ```
 
