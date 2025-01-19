@@ -69,8 +69,7 @@ public record WriteMultipleRegistersRequest(int address, int quantity, byte[] va
       buffer.putShort((short) request.address);
       buffer.putShort((short) request.quantity);
 
-      int byteCount = request.quantity * 2;
-      buffer.put((byte) byteCount);
+      buffer.put((byte) request.values.length);
       buffer.put(request.values);
     }
 
