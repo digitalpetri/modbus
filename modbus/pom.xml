@@ -7,8 +7,10 @@
   <parent>
     <groupId>com.digitalpetri.modbus</groupId>
     <artifactId>modbus-parent</artifactId>
-    <version>2.1.1-SNAPSHOT</version>
+    <version>2.1.2-SNAPSHOT</version>
   </parent>
+
+  <name>Modbus :: Core</name>
 
   <artifactId>modbus</artifactId>
 
@@ -49,8 +51,8 @@
       <build>
         <plugins>
           <plugin>
-            <groupId>org.sonatype.plugins</groupId>
-            <artifactId>nexus-staging-maven-plugin</artifactId>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
           </plugin>
         </plugins>
       </build>

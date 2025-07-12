@@ -6,8 +6,10 @@
   <parent>
     <groupId>com.digitalpetri.modbus</groupId>
     <artifactId>modbus-parent</artifactId>
-    <version>2.1.1-SNAPSHOT</version>
+    <version>2.1.2-SNAPSHOT</version>
   </parent>
+
+  <name>Modbus :: Tests</name>
 
   <artifactId>modbus-tests</artifactId>
 
