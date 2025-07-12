@@ -110,8 +110,8 @@ public record NettyClientTransportConfig(
      * @return this Builder.
      */
     public Builder setHostname(String hostname) {
-        this.hostname = hostname;
-        return this;
+      this.hostname = hostname;
+      return this;
     }
 
     /**
@@ -121,8 +121,8 @@ public record NettyClientTransportConfig(
      * @return this Builder.
      */
     public Builder setPort(int port) {
-        this.port = port;
-        return this;
+      this.port = port;
+      return this;
     }
 
     /**
@@ -132,8 +132,8 @@ public record NettyClientTransportConfig(
      * @return this Builder.
      */
     public Builder setConnectTimeout(Duration connectTimeout) {
-        this.connectTimeout = connectTimeout;
-        return this;
+      this.connectTimeout = connectTimeout;
+      return this;
     }
 
     /**
@@ -143,8 +143,8 @@ public record NettyClientTransportConfig(
      * @return this Builder.
      */
     public Builder setConnectPersistent(boolean connectPersistent) {
-        this.connectPersistent = connectPersistent;
-        return this;
+      this.connectPersistent = connectPersistent;
+      return this;
     }
 
     /**
@@ -154,8 +154,8 @@ public record NettyClientTransportConfig(
      * @return this Builder.
      */
     public Builder setReconnectLazy(boolean reconnectLazy) {
-        this.reconnectLazy = reconnectLazy;
-        return this;
+      this.reconnectLazy = reconnectLazy;
+      return this;
     }
 
     /**
@@ -166,8 +166,8 @@ public record NettyClientTransportConfig(
      * @see Netty#sharedEventLoop()
      */
     public Builder setEventLoopGroup(EventLoopGroup eventLoopGroup) {
-        this.eventLoopGroup = eventLoopGroup;
-        return this;
+      this.eventLoopGroup = eventLoopGroup;
+      return this;
     }
 
     /**
@@ -178,30 +178,32 @@ public record NettyClientTransportConfig(
      * @see Modbus#sharedExecutor()
      */
     public Builder setExecutor(ExecutorService executor) {
-        this.executor = executor;
-        return this;
+      this.executor = executor;
+      return this;
     }
 
     /**
      * Set the {@link Consumer} that can be used to customize the Netty {@link Bootstrap}.
      *
-     * @param bootstrapCustomizer the {@link Consumer} that can be used to customize the Netty {@link Bootstrap}.
+     * @param bootstrapCustomizer the {@link Consumer} that can be used to customize the Netty
+     *     {@link Bootstrap}.
      * @return this Builder.
      */
     public Builder setBootstrapCustomizer(Consumer<Bootstrap> bootstrapCustomizer) {
-        this.bootstrapCustomizer = bootstrapCustomizer;
-        return this;
+      this.bootstrapCustomizer = bootstrapCustomizer;
+      return this;
     }
 
     /**
      * Set the {@link Consumer} that can be used to customize the Netty {@link ChannelPipeline}.
      *
-     * @param pipelineCustomizer the {@link Consumer} that can be used to customize the Netty {@link ChannelPipeline}.
+     * @param pipelineCustomizer the {@link Consumer} that can be used to customize the Netty {@link
+     *     ChannelPipeline}.
      * @return this Builder.
      */
     public Builder setPipelineCustomizer(Consumer<ChannelPipeline> pipelineCustomizer) {
-        this.pipelineCustomizer = pipelineCustomizer;
-        return this;
+      this.pipelineCustomizer = pipelineCustomizer;
+      return this;
     }
 
     /**
@@ -211,8 +213,8 @@ public record NettyClientTransportConfig(
      * @return this Builder.
      */
     public Builder setTlsEnabled(boolean tlsEnabled) {
-        this.tlsEnabled = tlsEnabled;
-        return this;
+      this.tlsEnabled = tlsEnabled;
+      return this;
     }
 
     /**
@@ -222,8 +224,8 @@ public record NettyClientTransportConfig(
      * @return this Builder.
      */
     public Builder setKeyManagerFactory(KeyManagerFactory keyManagerFactory) {
-        this.keyManagerFactory = keyManagerFactory;
-        return this;
+      this.keyManagerFactory = keyManagerFactory;
+      return this;
     }
 
     /**
@@ -233,8 +235,8 @@ public record NettyClientTransportConfig(
      * @return this Builder.
      */
     public Builder setTrustManagerFactory(TrustManagerFactory trustManagerFactory) {
-        this.trustManagerFactory = trustManagerFactory;
-        return this;
+      this.trustManagerFactory = trustManagerFactory;
+      return this;
     }
 
     public NettyClientTransportConfig build() {

@@ -97,8 +97,8 @@ public record SerialPortTransportConfig(
      * @return this {@link Builder}.
      */
     public Builder setSerialPort(String serialPort) {
-        this.serialPort = serialPort;
-        return this;
+      this.serialPort = serialPort;
+      return this;
     }
 
     /**
@@ -108,8 +108,8 @@ public record SerialPortTransportConfig(
      * @return this {@link Builder}.
      */
     public Builder setBaudRate(int baudRate) {
-        this.baudRate = baudRate;
-        return this;
+      this.baudRate = baudRate;
+      return this;
     }
 
     /**
@@ -119,8 +119,8 @@ public record SerialPortTransportConfig(
      * @return this {@link Builder}.
      */
     public Builder setDataBits(int dataBits) {
-        this.dataBits = dataBits;
-        return this;
+      this.dataBits = dataBits;
+      return this;
     }
 
     /**
@@ -133,8 +133,8 @@ public record SerialPortTransportConfig(
      * @see SerialPort#TWO_STOP_BITS
      */
     public Builder setStopBits(int stopBits) {
-        this.stopBits = stopBits;
-        return this;
+      this.stopBits = stopBits;
+      return this;
     }
 
     /**
@@ -149,8 +149,8 @@ public record SerialPortTransportConfig(
      * @see SerialPort#SPACE_PARITY
      */
     public Builder setParity(int parity) {
-        this.parity = parity;
-        return this;
+      this.parity = parity;
+      return this;
     }
 
     /**
@@ -160,8 +160,8 @@ public record SerialPortTransportConfig(
      * @return this {@link Builder}.
      */
     public Builder setRs485Mode(boolean rs485Mode) {
-        this.rs485Mode = rs485Mode;
-        return this;
+      this.rs485Mode = rs485Mode;
+      return this;
     }
 
     /**
@@ -171,8 +171,8 @@ public record SerialPortTransportConfig(
      * @return this {@link Builder}.
      */
     public Builder setExecutor(ExecutorService executor) {
-        this.executor = executor;
-        return this;
+      this.executor = executor;
+      return this;
     }
 
     /**
