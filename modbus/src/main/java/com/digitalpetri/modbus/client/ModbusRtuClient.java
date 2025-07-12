@@ -46,6 +46,25 @@ public class ModbusRtuClient extends ModbusClient {
     transport.receive(this::onFrameReceived);
   }
 
+  /**
+   * Get the {@link ModbusClientConfig} used by this client.
+   *
+   * @return the {@link ModbusClientConfig} used by this client.
+   */
+  public ModbusClientConfig getConfig() {
+    return config;
+  }
+
+  /**
+   * Get the {@link ModbusRtuClientTransport} used by this client.
+   *
+   * @return the {@link ModbusRtuClientTransport} used by this client.
+   */
+  @Override
+  public ModbusRtuClientTransport getTransport() {
+    return transport;
+  }
+
   @Override
   public CompletionStage<ModbusResponsePdu> sendAsync(int unitId, ModbusRequestPdu request) {
     ByteBuffer pdu = ByteBuffer.allocate(256);
