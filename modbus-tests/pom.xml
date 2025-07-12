@@ -9,6 +9,8 @@
     <version>2.1.1-SNAPSHOT</version>
   </parent>
 
+  <name>Modbus :: Tests</name>
+
   <artifactId>modbus-tests</artifactId>
 
   <properties>
