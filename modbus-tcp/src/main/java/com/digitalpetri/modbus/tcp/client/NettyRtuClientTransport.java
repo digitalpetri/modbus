@@ -8,8 +8,10 @@ import com.digitalpetri.modbus.ModbusRtuResponseFrameParser.ParseError;
 import com.digitalpetri.modbus.ModbusRtuResponseFrameParser.ParserState;
 import com.digitalpetri.modbus.client.ModbusRtuClientTransport;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
+import com.digitalpetri.modbus.tcp.client.NettyTcpClientTransport.ConnectionListener;
 import com.digitalpetri.netty.fsm.ChannelActions;
 import com.digitalpetri.netty.fsm.ChannelFsm;
+import com.digitalpetri.netty.fsm.ChannelFsm.TransitionListener;
 import com.digitalpetri.netty.fsm.ChannelFsmConfig;
 import com.digitalpetri.netty.fsm.ChannelFsmFactory;
 import com.digitalpetri.netty.fsm.Event;
@@ -29,8 +31,10 @@ import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProtocols;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
@@ -46,6 +50,8 @@ public class NettyRtuClientTransport implements ModbusRtuClientTransport {
 
   private final ModbusRtuResponseFrameParser frameParser = new ModbusRtuResponseFrameParser();
   private final AtomicReference<Consumer<ModbusRtuFrame>> frameReceiver = new AtomicReference<>();
+
+  private final List<ConnectionListener> connectionListeners = new CopyOnWriteArrayList<>();
 
   private final ChannelFsm channelFsm;
   private final ExecutionQueue executionQueue;
@@ -65,9 +71,27 @@ public class NettyRtuClientTransport implements ModbusRtuClientTransport {
                 .build());
 
     channelFsm.addTransitionListener(
-        (from, to, via) -> logger.debug("onStateTransition: {} -> {} via {}", from, to, via));
+        (from, to, via) -> {
+          logger.debug("onStateTransition: {} -> {} via {}", from, to, via);
+
+          maybeNotifyConnectionListeners(from, to);
+        });
 
     executionQueue = new ExecutionQueue(config.executor());
+  }
+
+  @SuppressWarnings("DuplicatedCode")
+  private void maybeNotifyConnectionListeners(State from, State to) {
+    if (connectionListeners.isEmpty()) {
+      return;
+    }
+
+    if (from != State.Connected && to == State.Connected) {
+      executionQueue.submit(() -> connectionListeners.forEach(ConnectionListener::onConnection));
+    } else if (from == State.Connected && to != State.Connected) {
+      executionQueue.submit(
+          () -> connectionListeners.forEach(ConnectionListener::onConnectionLost));
+    }
   }
 
   @Override
@@ -83,6 +107,36 @@ public class NettyRtuClientTransport implements ModbusRtuClientTransport {
   @Override
   public boolean isConnected() {
     return channelFsm.getState() == State.Connected;
+  }
+
+  /**
+   * Get the {@link ChannelFsm} used by this transport.
+   *
+   * <p>This should not generally be used by client code except perhaps to add a {@link
+   * TransitionListener} to receive more detailed callbacks about the connection status.
+   *
+   * @return the {@link ChannelFsm} used by this transport.
+   */
+  public ChannelFsm getChannelFsm() {
+    return channelFsm;
+  }
+
+  /**
+   * Add a {@link ConnectionListener} to this transport.
+   *
+   * @param listener the listener to add.
+   */
+  public void addConnectionListener(ConnectionListener listener) {
+    connectionListeners.add(listener);
+  }
+
+  /**
+   * Remove a {@link ConnectionListener} from this transport.
+   *
+   * @param listener the listener to remove.
+   */
+  public void removeConnectionListener(ConnectionListener listener) {
+    connectionListeners.remove(listener);
   }
 
   @Override
