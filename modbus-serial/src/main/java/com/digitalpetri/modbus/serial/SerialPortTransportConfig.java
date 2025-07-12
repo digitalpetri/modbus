@@ -91,6 +91,91 @@ public record SerialPortTransportConfig(
     public ExecutorService executor;
 
     /**
+     * Set the OS/system-dependent serial port descriptor.
+     *
+     * @param serialPort the serial port descriptor.
+     * @return this {@link Builder}.
+     */
+    public Builder setSerialPort(String serialPort) {
+        this.serialPort = serialPort;
+        return this;
+    }
+
+    /**
+     * Set the desired baud rate to operate at.
+     *
+     * @param baudRate the baud rate.
+     * @return this {@link Builder}.
+     */
+    public Builder setBaudRate(int baudRate) {
+        this.baudRate = baudRate;
+        return this;
+    }
+
+    /**
+     * Set the number of data bits per word to use.
+     *
+     * @param dataBits the number of data bits.
+     * @return this {@link Builder}.
+     */
+    public Builder setDataBits(int dataBits) {
+        this.dataBits = dataBits;
+        return this;
+    }
+
+    /**
+     * Set the number of stop bits to use.
+     *
+     * @param stopBits the number of stop bits.
+     * @return this {@link Builder}.
+     * @see SerialPort#ONE_STOP_BIT
+     * @see SerialPort#ONE_POINT_FIVE_STOP_BITS
+     * @see SerialPort#TWO_STOP_BITS
+     */
+    public Builder setStopBits(int stopBits) {
+        this.stopBits = stopBits;
+        return this;
+    }
+
+    /**
+     * Set the type of parity error-checking to use.
+     *
+     * @param parity the type of parity.
+     * @return this {@link Builder}.
+     * @see SerialPort#NO_PARITY
+     * @see SerialPort#ODD_PARITY
+     * @see SerialPort#EVEN_PARITY
+     * @see SerialPort#MARK_PARITY
+     * @see SerialPort#SPACE_PARITY
+     */
+    public Builder setParity(int parity) {
+        this.parity = parity;
+        return this;
+    }
+
+    /**
+     * Enable or disable RS-485 mode, i.e. transmit/receive mode signaling using the RTS pin.
+     *
+     * @param rs485Mode true to enable RS-485 mode, false to disable.
+     * @return this {@link Builder}.
+     */
+    public Builder setRs485Mode(boolean rs485Mode) {
+        this.rs485Mode = rs485Mode;
+        return this;
+    }
+
+    /**
+     * Set the {@link ExecutorService} to use when delivering frame received callbacks.
+     *
+     * @param executor the executor service.
+     * @return this {@link Builder}.
+     */
+    public Builder setExecutor(ExecutorService executor) {
+        this.executor = executor;
+        return this;
+    }
+
+    /**
      * Build a new {@link SerialPortTransportConfig} from the current state of this builder.
      *
      * @return a new {@link SerialPortTransportConfig}.

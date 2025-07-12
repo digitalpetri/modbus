@@ -36,6 +36,28 @@ public record ModbusServerConfig(
     public ModbusPduSerializer responseSerializer = DefaultResponseSerializer.INSTANCE;
 
     /**
+     * Set the {@link ModbusPduSerializer} used to decode incoming requests.
+     *
+     * @param requestSerializer the request serializer
+     * @return this {@link Builder}
+     */
+    public Builder setRequestSerializer(ModbusPduSerializer requestSerializer) {
+      this.requestSerializer = requestSerializer;
+      return this;
+    }
+
+    /**
+     * Set the {@link ModbusPduSerializer} used to encode outgoing responses.
+     *
+     * @param responseSerializer the response serializer
+     * @return this {@link Builder}
+     */
+    public Builder setResponseSerializer(ModbusPduSerializer responseSerializer) {
+      this.responseSerializer = responseSerializer;
+      return this;
+    }
+
+    /**
      * @return a new {@link ModbusServerConfig} instance.
      */
     public ModbusServerConfig build() {
