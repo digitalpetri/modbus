@@ -2,6 +2,7 @@ package com.digitalpetri.modbus.tcp.client;
 
 import com.digitalpetri.modbus.Modbus;
 import com.digitalpetri.modbus.tcp.Netty;
+import com.digitalpetri.netty.fsm.ChannelFsmConfigBuilder;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
@@ -26,6 +27,8 @@ import javax.net.ssl.TrustManagerFactory;
  *     Bootstrap}.
  * @param pipelineCustomizer a {@link Consumer} that can be used to customize the Netty {@link
  *     ChannelPipeline}.
+ * @param channelFsmCustomizer a {@link Consumer} that can be used to customize the {@link
+ *     ChannelFsmConfigBuilder}.
  * @param tlsEnabled whether to enable TLS (Modbus/TCP Security).
  * @param keyManagerFactory the {@link KeyManagerFactory} to use if TLS is enabled.
  * @param trustManagerFactory the {@link TrustManagerFactory} to use if TLS is enabled.
@@ -40,6 +43,7 @@ public record NettyClientTransportConfig(
     ExecutorService executor,
     Consumer<Bootstrap> bootstrapCustomizer,
     Consumer<ChannelPipeline> pipelineCustomizer,
+    Consumer<ChannelFsmConfigBuilder> channelFsmCustomizer,
     boolean tlsEnabled,
     Optional<KeyManagerFactory> keyManagerFactory,
     Optional<TrustManagerFactory> trustManagerFactory) {
@@ -93,6 +97,9 @@ public record NettyClientTransportConfig(
 
     /** A {@link Consumer} that can be used to customize the Netty {@link ChannelPipeline}. */
     public Consumer<ChannelPipeline> pipelineCustomizer = p -> {};
+
+    /** A {@link Consumer} that can be used to customize the {@link ChannelFsmConfigBuilder}. */
+    public Consumer<ChannelFsmConfigBuilder> channelFsmCustomizer = c -> {};
 
     /** Whether to enable TLS (Modbus/TCP Security). */
     public boolean tlsEnabled = false;
@@ -207,6 +214,18 @@ public record NettyClientTransportConfig(
     }
 
     /**
+     * Set the {@link Consumer} that can be used to customize the {@link ChannelFsmConfigBuilder}.
+     *
+     * @param channelFsmCustomizer the {@link Consumer} that can be used to customize the {@link
+     *     ChannelFsmConfigBuilder}.
+     * @return this Builder.
+     */
+    public Builder setChannelFsmCustomizer(Consumer<ChannelFsmConfigBuilder> channelFsmCustomizer) {
+      this.channelFsmCustomizer = channelFsmCustomizer;
+      return this;
+    }
+
+    /**
      * Set whether to enable TLS (Modbus/TCP Security).
      *
      * @param tlsEnabled whether to enable TLS (Modbus/TCP Security).
@@ -271,6 +290,7 @@ public record NettyClientTransportConfig(
           executor,
           bootstrapCustomizer,
           pipelineCustomizer,
+          channelFsmCustomizer,
           tlsEnabled,
           Optional.ofNullable(keyManagerFactory),
           Optional.ofNullable(trustManagerFactory));

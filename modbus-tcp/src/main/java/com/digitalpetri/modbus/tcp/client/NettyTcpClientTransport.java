@@ -5,13 +5,8 @@ import com.digitalpetri.modbus.ModbusTcpFrame;
 import com.digitalpetri.modbus.client.ModbusTcpClientTransport;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
 import com.digitalpetri.modbus.tcp.ModbusTcpCodec;
-import com.digitalpetri.netty.fsm.ChannelActions;
-import com.digitalpetri.netty.fsm.ChannelFsm;
+import com.digitalpetri.netty.fsm.*;
 import com.digitalpetri.netty.fsm.ChannelFsm.TransitionListener;
-import com.digitalpetri.netty.fsm.ChannelFsmConfig;
-import com.digitalpetri.netty.fsm.ChannelFsmFactory;
-import com.digitalpetri.netty.fsm.Event;
-import com.digitalpetri.netty.fsm.State;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
@@ -55,15 +50,17 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
   public NettyTcpClientTransport(NettyClientTransportConfig config) {
     this.config = config;
 
-    channelFsm =
-        ChannelFsmFactory.newChannelFsm(
-            ChannelFsmConfig.newBuilder()
-                .setExecutor(config.executor())
-                .setLazy(config.reconnectLazy())
-                .setPersistent(config.connectPersistent())
-                .setChannelActions(new ModbusTcpChannelActions())
-                .setLoggerName("com.digitalpetri.modbus.client.ChannelFsm")
-                .build());
+    ChannelFsmConfigBuilder channelFsmConfigBuilder =
+        ChannelFsmConfig.newBuilder()
+            .setExecutor(config.executor())
+            .setLazy(config.reconnectLazy())
+            .setPersistent(config.connectPersistent())
+            .setChannelActions(new ModbusTcpChannelActions())
+            .setLoggerName("com.digitalpetri.modbus.client.ChannelFsm");
+
+    config.channelFsmCustomizer().accept(channelFsmConfigBuilder);
+
+    channelFsm = ChannelFsmFactory.newChannelFsm(channelFsmConfigBuilder.build());
 
     executionQueue = new ExecutionQueue(config.executor());
 
