@@ -75,6 +75,7 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
         });
   }
 
+  @SuppressWarnings("DuplicatedCode")
   private void maybeNotifyConnectionListeners(State from, State to) {
     if (connectionListeners.isEmpty()) {
       return;
