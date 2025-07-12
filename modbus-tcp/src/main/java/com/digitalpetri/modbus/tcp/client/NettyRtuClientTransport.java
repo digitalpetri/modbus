@@ -9,13 +9,8 @@ import com.digitalpetri.modbus.ModbusRtuResponseFrameParser.ParserState;
 import com.digitalpetri.modbus.client.ModbusRtuClientTransport;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
 import com.digitalpetri.modbus.tcp.client.NettyTcpClientTransport.ConnectionListener;
-import com.digitalpetri.netty.fsm.ChannelActions;
-import com.digitalpetri.netty.fsm.ChannelFsm;
+import com.digitalpetri.netty.fsm.*;
 import com.digitalpetri.netty.fsm.ChannelFsm.TransitionListener;
-import com.digitalpetri.netty.fsm.ChannelFsmConfig;
-import com.digitalpetri.netty.fsm.ChannelFsmFactory;
-import com.digitalpetri.netty.fsm.Event;
-import com.digitalpetri.netty.fsm.State;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -61,14 +56,16 @@ public class NettyRtuClientTransport implements ModbusRtuClientTransport {
   public NettyRtuClientTransport(NettyClientTransportConfig config) {
     this.config = config;
 
-    channelFsm =
-        ChannelFsmFactory.newChannelFsm(
-            ChannelFsmConfig.newBuilder()
-                .setExecutor(config.executor())
-                .setLazy(config.reconnectLazy())
-                .setPersistent(config.connectPersistent())
-                .setChannelActions(new ModbusRtuChannelActions())
-                .build());
+    ChannelFsmConfigBuilder channelFsmConfigBuilder =
+        ChannelFsmConfig.newBuilder()
+            .setExecutor(config.executor())
+            .setLazy(config.reconnectLazy())
+            .setPersistent(config.connectPersistent())
+            .setChannelActions(new ModbusRtuChannelActions());
+
+    config.channelFsmCustomizer().accept(channelFsmConfigBuilder);
+
+    channelFsm = ChannelFsmFactory.newChannelFsm(channelFsmConfigBuilder.build());
 
     channelFsm.addTransitionListener(
         (from, to, via) -> {
