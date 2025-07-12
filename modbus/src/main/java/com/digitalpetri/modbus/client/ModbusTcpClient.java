@@ -47,6 +47,25 @@ public class ModbusTcpClient extends ModbusClient {
     transport.receive(this::onFrameReceived);
   }
 
+  /**
+   * Get the {@link ModbusClientConfig} used by this client.
+   *
+   * @return the {@link ModbusClientConfig} used by this client.
+   */
+  public ModbusClientConfig getConfig() {
+    return config;
+  }
+
+  /**
+   * Get the {@link ModbusTcpClientTransport} used by this client.
+   *
+   * @return the {@link ModbusTcpClientTransport} used by this client.
+   */
+  @Override
+  public ModbusTcpClientTransport getTransport() {
+    return transport;
+  }
+
   public byte[] sendRaw(int unitId, byte[] pduBytes)
       throws ModbusExecutionException, ModbusResponseException, ModbusTimeoutException {
 

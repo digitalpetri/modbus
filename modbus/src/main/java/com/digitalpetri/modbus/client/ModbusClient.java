@@ -38,6 +38,15 @@ public abstract class ModbusClient {
   }
 
   /**
+   * Get the {@link ModbusClientTransport} used by this client.
+   *
+   * @return the {@link ModbusClientTransport} used by this client.
+   */
+  public ModbusClientTransport<?> getTransport() {
+    return transport;
+  }
+
+  /**
    * Connect the underlying transport.
    *
    * @throws ModbusExecutionException if the connection fails.
