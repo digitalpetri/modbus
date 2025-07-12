@@ -50,6 +50,50 @@ public record ModbusClientConfig(
     public ModbusPduSerializer responseSerializer = DefaultResponseSerializer.INSTANCE;
 
     /**
+     * Set the timeout duration for requests.
+     *
+     * @param requestTimeout the request timeout.
+     * @return this {@link Builder}.
+     */
+    public Builder setRequestTimeout(Duration requestTimeout) {
+      this.requestTimeout = requestTimeout;
+      return this;
+    }
+
+    /**
+     * Set the {@link TimeoutScheduler} used to schedule request timeouts.
+     *
+     * @param timeoutScheduler the timeout scheduler.
+     * @return this {@link Builder}.
+     */
+    public Builder setTimeoutScheduler(TimeoutScheduler timeoutScheduler) {
+      this.timeoutScheduler = timeoutScheduler;
+      return this;
+    }
+
+    /**
+     * Set the {@link ModbusPduSerializer} used to encode outgoing requests.
+     *
+     * @param requestSerializer the request serializer.
+     * @return this {@link Builder}.
+     */
+    public Builder setRequestSerializer(ModbusPduSerializer requestSerializer) {
+      this.requestSerializer = requestSerializer;
+      return this;
+    }
+
+    /**
+     * Set the {@link ModbusPduSerializer} used to decode incoming responses.
+     *
+     * @param responseSerializer the response serializer.
+     * @return this {@link Builder}.
+     */
+    public Builder setResponseSerializer(ModbusPduSerializer responseSerializer) {
+      this.responseSerializer = responseSerializer;
+      return this;
+    }
+
+    /**
      * @return a new {@link ModbusClientConfig} instance.
      */
     public ModbusClientConfig build() {

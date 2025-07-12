@@ -11,8 +11,8 @@ A modern, performant, easy to use client and server implementation of Modbus, su
 #### Modbus TCP Client
 ```java
 var transport = NettyTcpClientTransport.create(cfg -> {
-  cfg.hostname = "172.17.0.2";
-  cfg.port = 502;
+  cfg.setHostname("172.17.0.2");
+  cfg.setPort(502);
 });
 
 var client = ModbusTcpClient.create(transport);
@@ -29,11 +29,11 @@ System.out.println("Response: " + response);
 #### Modbus RTU on Serial Client
 ```java
 var transport = SerialPortClientTransport.create(cfg -> {
-  cfg.serialPort = "/dev/ttyUSB0";
-  cfg.baudRate = 115200;
-  cfg.dataBits = 8;
-  cfg.parity = SerialPort.NO_PARITY;
-  cfg.stopBits = SerialPort.ONE_STOP_BIT;
+  cfg.setSerialPort("/dev/ttyUSB0");
+  cfg.setBaudRate(115200);
+  cfg.setDataBits(8);
+  cfg.setParity(SerialPort.NO_PARITY);
+  cfg.setStopBits(SerialPort.TWO_STOP_BITS);
 });
 
 var client = ModbusRtuClient.create(transport);
