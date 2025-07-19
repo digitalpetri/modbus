@@ -4,6 +4,10 @@ import com.digitalpetri.modbus.server.ModbusTcpServer;
 import com.digitalpetri.modbus.server.ProcessImage;
 import com.digitalpetri.modbus.server.ReadWriteModbusServices;
 import com.digitalpetri.modbus.tcp.server.NettyTcpServerTransport;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -39,7 +43,24 @@ public class ModbusServer {
 
     LOGGER.info("Listening on 0.0.0.0:502");
 
+    logInetAddresses();
+
     waitForShutdownHook(server);
+  }
+
+  private static void logInetAddresses() {
+    try {
+      for (NetworkInterface ni : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+        for (InetAddress addr : Collections.list(ni.getInetAddresses())) {
+          if (addr.getHostAddress().indexOf(':') == -1) {
+            LOGGER.info(
+                "└─ {}: {} ({})", ni.getDisplayName(), addr.getHostAddress(), addr.getHostName());
+          }
+        }
+      }
+    } catch (SocketException e) {
+      LOGGER.error("Failed to get network interfaces", e);
+    }
   }
 
   private static void waitForShutdownHook(ModbusTcpServer server) throws InterruptedException {
