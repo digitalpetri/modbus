@@ -39,6 +39,24 @@ public class ModbusTcpServer implements ModbusServer {
     this.services.set(services);
   }
 
+  /**
+   * Get the {@link ModbusServerConfig} used by this server.
+   *
+   * @return the {@link ModbusServerConfig} used by this server.
+   */
+  public ModbusServerConfig getConfig() {
+    return config;
+  }
+
+  /**
+   * Get the {@link ModbusTcpServerTransport} used by this server.
+   *
+   * @return the {@link ModbusTcpServerTransport} used by this server.
+   */
+  public ModbusTcpServerTransport getTransport() {
+    return transport;
+  }
+
   @Override
   public void start() throws ExecutionException, InterruptedException {
     transport.receive((context, frame) -> handleModbusTcpFrame(frame, context));
