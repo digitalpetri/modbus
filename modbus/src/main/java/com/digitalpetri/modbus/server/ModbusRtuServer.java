@@ -39,6 +39,24 @@ public class ModbusRtuServer implements ModbusServer {
     this.services.set(services);
   }
 
+  /**
+   * Get the {@link ModbusServerConfig} used by this server.
+   *
+   * @return the {@link ModbusServerConfig} used by this server.
+   */
+  public ModbusServerConfig getConfig() {
+    return config;
+  }
+
+  /**
+   * Get the {@link ModbusRtuServerTransport} used by this server.
+   *
+   * @return the {@link ModbusRtuServerTransport} used by this server.
+   */
+  public ModbusRtuServerTransport getTransport() {
+    return transport;
+  }
+
   @Override
   public void start() throws ExecutionException, InterruptedException {
     transport.receive(
