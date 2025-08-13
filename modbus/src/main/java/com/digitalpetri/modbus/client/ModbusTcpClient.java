@@ -172,6 +172,12 @@ public class ModbusTcpClient extends ModbusClient {
       promise.timeout.cancel();
 
       ByteBuffer buffer = frame.pdu();
+
+      if (buffer.remaining() == 0) {
+        promise.future.completeExceptionally(new ModbusException("empty response PDU"));
+        return;
+      }
+
       int functionCode = buffer.get(buffer.position()) & 0xFF;
 
       if (functionCode == promise.functionCode) {

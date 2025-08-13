@@ -6,6 +6,7 @@ import com.digitalpetri.modbus.MbapHeader;
 import com.digitalpetri.modbus.ModbusTcpFrame;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import java.nio.ByteBuffer;
 import org.junit.jupiter.api.Test;
@@ -33,5 +34,17 @@ class ModbusTcpCodecTest {
     System.out.println(decoded);
 
     assertEquals(frame, decoded);
+  }
+
+  @Test
+  void emptyPdu() {
+    var rx = Unpooled.copiedBuffer(ByteBufUtil.decodeHexDump("5FFD0000000101"));
+    var channel = new EmbeddedChannel(new ModbusTcpCodec());
+
+    channel.writeInbound(rx);
+    ModbusTcpFrame frame = channel.readInbound();
+
+    System.out.println(frame);
+    assertEquals(0, frame.pdu().remaining());
   }
 }
