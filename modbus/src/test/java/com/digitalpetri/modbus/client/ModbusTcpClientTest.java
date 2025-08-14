@@ -38,6 +38,30 @@ public class ModbusTcpClientTest {
     assertEquals("empty response PDU", cause.getMessage());
   }
 
+  /**
+   * Tests handling of a malformed exception response PDU containing only the function code | 0x80
+   * and missing the required exception code byte.
+   */
+  @Test
+  void malformedExceptionResponsePdu() {
+    var transport = new TestTransport();
+    var client = ModbusTcpClient.create(transport);
+
+    // Send a request with function code 0x04
+    CompletionStage<byte[]> cs = client.sendRawAsync(1, new byte[] {0x04, 0x03, 0x00, 0x00, 0x01});
+
+    // Receive a malformed exception response: only 1 byte (0x84), no exception code
+    transport.frameReceiver.accept(
+        new ModbusTcpFrame(
+            new MbapHeader(0, 1, 1, 1), ByteBuffer.wrap(new byte[] {(byte) 0x84})));
+
+    ExecutionException ex =
+        assertThrows(ExecutionException.class, () -> cs.toCompletableFuture().get());
+
+    ModbusException cause = (ModbusException) ex.getCause();
+    assertEquals("malformed exception response PDU: 84", cause.getMessage());
+  }
+
   private static class TestTransport implements ModbusTcpClientTransport {
 
     boolean connected = false;

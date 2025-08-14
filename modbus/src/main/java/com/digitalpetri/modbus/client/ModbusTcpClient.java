@@ -7,6 +7,7 @@ import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
 import com.digitalpetri.modbus.exceptions.ModbusTimeoutException;
+import com.digitalpetri.modbus.internal.util.Hex;
 import com.digitalpetri.modbus.pdu.ModbusPdu;
 import com.digitalpetri.modbus.pdu.ModbusRequestPdu;
 import com.digitalpetri.modbus.pdu.ModbusResponsePdu;
@@ -181,17 +182,19 @@ public class ModbusTcpClient extends ModbusClient {
       int functionCode = buffer.get(buffer.position()) & 0xFF;
 
       if (functionCode == promise.functionCode) {
-        try {
-          promise.future.complete(buffer);
-        } catch (Exception e) {
-          promise.future.completeExceptionally(e);
-        }
+        promise.future.complete(buffer);
       } else if (functionCode == promise.functionCode + 0x80) {
-        buffer.get(); // skip FC byte
-        int exceptionCode = buffer.get() & 0xFF;
+        if (buffer.remaining() >= 2) {
+          buffer.get(); // skip FC byte
+          int exceptionCode = buffer.get() & 0xFF;
 
-        promise.future.completeExceptionally(
-            new ModbusResponseException(promise.functionCode, exceptionCode));
+          promise.future.completeExceptionally(
+              new ModbusResponseException(promise.functionCode, exceptionCode));
+        } else {
+          promise.future.completeExceptionally(
+              new ModbusException(
+                  "malformed exception response PDU: %s".formatted(Hex.format(buffer))));
+        }
       } else {
         promise.future.completeExceptionally(
             new ModbusException("unexpected function code: 0x%02X".formatted(functionCode)));
