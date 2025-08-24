@@ -94,11 +94,13 @@ public class ModbusRtuClient extends ModbusClient {
                   synchronized (promises) {
                     removed = promises.remove(promise);
                   }
+
+                  timeouts.remove(promise);
+
                   if (removed) {
                     // The frame parser needs to be reset!
                     // It could be "stuck" in Accumulating or ParseError states if the timeout was
-                    // caused by
-                    // an incomplete or invalid response rather than no response.
+                    // caused by an incomplete or invalid response rather than no response.
                     resetFrameParser();
 
                     promise.future.completeExceptionally(
