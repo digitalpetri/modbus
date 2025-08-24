@@ -32,7 +32,9 @@ public class ModbusRtuClient extends ModbusClient {
   private final Logger logger = LoggerFactory.getLogger(getClass());
 
   private final ArrayDeque<ResponsePromise> promises = new ArrayDeque<>();
-  private final Map<ResponsePromise, TimeoutHandle> timeouts = new ConcurrentHashMap<>();
+
+  // package visibility for testing
+  final Map<ResponsePromise, TimeoutHandle> timeouts = new ConcurrentHashMap<>();
 
   private final ModbusClientConfig config;
   private final ModbusRtuClientTransport transport;
