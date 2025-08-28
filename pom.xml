@@ -49,17 +49,17 @@
 
     <!-- Dependencies -->
     <jserialcomm.version>2.11.2</jserialcomm.version>
-    <netty.version>4.1.122.Final</netty.version>
+    <netty.version>4.1.124.Final</netty.version>
     <netty-channel-fsm.version>1.0.2</netty-channel-fsm.version>
     <slf4j.version>2.0.17</slf4j.version>
 
     <!-- Test Dependencies -->
-    <bouncycastle.version>1.80</bouncycastle.version>
-    <junit.version>5.13.3</junit.version>
+    <bouncycastle.version>1.81</bouncycastle.version>
+    <junit.version>5.13.4</junit.version>
 
     <!-- Plugin Dependencies -->
     <central-publishing-maven-plugin.version>0.7.0</central-publishing-maven-plugin.version>
-    <checkstyle.version>10.26.1</checkstyle.version>
+    <checkstyle.version>11.0.0</checkstyle.version>
     <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
     <maven-compiler-plugin.version>3.14.0</maven-compiler-plugin.version>
     <maven-deploy-plugin.version>3.1.4</maven-deploy-plugin.version>
@@ -377,6 +377,18 @@
                 <version>(?i).*[-_\.](alpha|b|beta|rc|m|ea)[-_\.]?[0-9]*</version>
               </ignoreVersion>
             </ignoreVersions>
+            <rules>
+              <rule>
+                <groupId>io.netty</groupId>
+                <artifactId>*</artifactId>
+                <ignoreVersions>
+                  <ignoreVersion>
+                    <type>range</type>
+                    <version>[4.2,)</version>
+                  </ignoreVersion>
+                </ignoreVersions>
+              </rule>
+            </rules>
           </ruleSet>
         </configuration>
       </plugin>
