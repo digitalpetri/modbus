@@ -49,29 +49,29 @@
 
     <!-- Dependencies -->
     <jserialcomm.version>2.11.2</jserialcomm.version>
-    <netty.version>4.1.124.Final</netty.version>
+    <netty.version>4.1.127.Final</netty.version>
     <netty-channel-fsm.version>1.0.2</netty-channel-fsm.version>
     <slf4j.version>2.0.17</slf4j.version>
 
     <!-- Test Dependencies -->
-    <bouncycastle.version>1.81</bouncycastle.version>
-    <junit.version>5.13.4</junit.version>
+    <bouncycastle.version>1.82</bouncycastle.version>
+    <junit.version>5.14.0</junit.version>
 
     <!-- Plugin Dependencies -->
-    <central-publishing-maven-plugin.version>0.8.0</central-publishing-maven-plugin.version>
-    <checkstyle.version>11.0.0</checkstyle.version>
+    <central-publishing-maven-plugin.version>0.9.0</central-publishing-maven-plugin.version>
+    <checkstyle.version>11.1.0</checkstyle.version>
     <maven-checkstyle-plugin.version>3.6.0</maven-checkstyle-plugin.version>
-    <maven-compiler-plugin.version>3.14.0</maven-compiler-plugin.version>
+    <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
     <maven-deploy-plugin.version>3.1.4</maven-deploy-plugin.version>
-    <maven-enforcer-plugin.version>3.6.1</maven-enforcer-plugin.version>
+    <maven-enforcer-plugin.version>3.6.2</maven-enforcer-plugin.version>
     <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
     <maven-install-plugin.version>3.1.4</maven-install-plugin.version>
     <maven-jar-plugin.version>3.4.2</maven-jar-plugin.version>
-    <maven-javadoc-plugin.version>3.11.3</maven-javadoc-plugin.version>
+    <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
     <maven-release-plugin.version>3.1.1</maven-release-plugin.version>
     <maven-resources-plugin.version>3.3.1</maven-resources-plugin.version>
     <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
-    <versions-maven-plugin.version>2.18.0</versions-maven-plugin.version>
+    <versions-maven-plugin.version>2.19.1</versions-maven-plugin.version>
   </properties>
 
   <dependencyManagement>
@@ -370,6 +370,7 @@
         <artifactId>versions-maven-plugin</artifactId>
         <version>${versions-maven-plugin.version}</version>
         <configuration>
+          <allowMajorUpdates>false</allowMajorUpdates>
           <ruleSet>
             <ignoreVersions>
               <ignoreVersion>
