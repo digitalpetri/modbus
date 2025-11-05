@@ -52,8 +52,7 @@ public class ModbusTcpClientTest {
 
     // Receive a malformed exception response: only 1 byte (0x84), no exception code
     transport.frameReceiver.accept(
-        new ModbusTcpFrame(
-            new MbapHeader(0, 1, 1, 1), ByteBuffer.wrap(new byte[] {(byte) 0x84})));
+        new ModbusTcpFrame(new MbapHeader(0, 1, 1, 1), ByteBuffer.wrap(new byte[] {(byte) 0x84})));
 
     ExecutionException ex =
         assertThrows(ExecutionException.class, () -> cs.toCompletableFuture().get());
