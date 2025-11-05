@@ -19,3 +19,5 @@ release.properties
 *.iws
 *.iml
 
+### External src and other files ###
+external/
