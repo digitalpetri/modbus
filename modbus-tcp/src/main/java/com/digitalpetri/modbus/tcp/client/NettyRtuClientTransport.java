@@ -26,6 +26,7 @@ import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProtocols;
+import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -248,7 +249,7 @@ public class NettyRtuClientTransport implements ModbusRtuClientTransport {
       var future = new CompletableFuture<Channel>();
 
       bootstrap
-          .connect(config.hostname(), config.port())
+          .connect(new InetSocketAddress(config.hostname(), config.port()))
           .addListener(
               (ChannelFutureListener)
                   channelFuture -> {
