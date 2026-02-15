@@ -46,6 +46,15 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
     executionQueue = new ExecutionQueue(config.executor());
   }
 
+  /**
+   * Return the underlying {@link SerialPort} used by this transport.
+   *
+   * @return the configured {@link SerialPort} instance.
+   */
+  public SerialPort getSerialPort() {
+    return serialPort;
+  }
+
   @Override
   public synchronized CompletableFuture<Void> connect() {
     if (serialPort.isOpen()) {
