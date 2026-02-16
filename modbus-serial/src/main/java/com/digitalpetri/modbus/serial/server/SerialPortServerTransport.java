@@ -54,6 +54,15 @@ public class SerialPortServerTransport implements ModbusRtuServerTransport {
     executionQueue = new ExecutionQueue(config.executor());
   }
 
+  /**
+   * Return the underlying {@link SerialPort} used by this transport.
+   *
+   * @return the configured {@link SerialPort} instance.
+   */
+  public SerialPort getSerialPort() {
+    return serialPort;
+  }
+
   @Override
   public CompletionStage<Void> bind() {
     if (serialPort.isOpen()) {
