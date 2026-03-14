@@ -12,6 +12,7 @@ import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.serial.client.SerialPortClientTransport;
 import com.digitalpetri.modbus.serial.server.SerialPortServerTransport;
 import com.fazecast.jSerialComm.SerialPort;
+import com.fazecast.jSerialComm.SerialPortInvalidPortException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.Nested;
@@ -53,14 +54,14 @@ class SerialPortGetCommPortBehaviorTest {
     void getCommPortThrowsForNonExistentPortFile() {
       // On Linux/Mac, getCommPort checks File.exists() for the port descriptor.
       // A path that doesn't exist on the filesystem causes an immediate exception.
-      assertThrows(RuntimeException.class, () -> SerialPort.getCommPort(BOGUS_UNIX_PORT));
+      assertThrows(SerialPortInvalidPortException.class, () -> SerialPort.getCommPort(BOGUS_UNIX_PORT));
     }
 
     @Test
     void getCommPortThrowsForWindowsStyleDescriptor() {
       // A Windows-style descriptor like "COM999" also fails on Linux/Mac because
       // it doesn't exist on the filesystem (not under /dev/ either).
-      assertThrows(RuntimeException.class, () -> SerialPort.getCommPort(BOGUS_WINDOWS_PORT));
+      assertThrows(SerialPortInvalidPortException.class, () -> SerialPort.getCommPort(BOGUS_WINDOWS_PORT));
     }
   }
 
