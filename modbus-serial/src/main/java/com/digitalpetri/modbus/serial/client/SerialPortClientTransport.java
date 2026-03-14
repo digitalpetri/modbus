@@ -141,7 +141,7 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
   @Override
   public CompletionStage<Void> send(ModbusRtuFrame frame) {
     SerialPort sp = this.serialPort;
-    if (sp == null) {
+    if (sp == null || !sp.isOpen()) {
       return CompletableFuture.failedFuture(new ModbusException("not connected"));
     }
 
