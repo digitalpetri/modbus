@@ -86,8 +86,7 @@ public class SerialPortServerTransport implements ModbusRtuServerTransport {
     try {
       sp = getSerialPort();
     } catch (ModbusException e) {
-      return CompletableFuture.failedFuture(
-          new ModbusConnectException(e.getMessage(), e.getCause()));
+      return CompletableFuture.failedFuture(new ModbusConnectException(e));
     }
 
     if (sp.isOpen()) {
