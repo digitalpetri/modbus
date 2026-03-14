@@ -55,12 +55,24 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
         if (sp == null) {
           try {
             sp = SerialPort.getCommPort(config.serialPort());
+
             sp.setComPortParameters(
                 config.baudRate(),
                 config.dataBits(),
                 config.stopBits(),
                 config.parity(),
                 config.rs485Mode());
+
+            if (config.rs485Mode()) {
+              sp.setRs485ModeParameters(
+                  true,
+                  config.rs485RtsActiveHigh(),
+                  config.rs485Termination(),
+                  config.rs485RxDuringTx(),
+                  config.rs485DelayBefore(),
+                  config.rs485DelayAfter());
+            }
+
             this.serialPort = sp;
           } catch (Exception e) {
             throw new ModbusException(
