@@ -54,14 +54,16 @@ class SerialPortGetCommPortBehaviorTest {
     void getCommPortThrowsForNonExistentPortFile() {
       // On Linux/Mac, getCommPort checks File.exists() for the port descriptor.
       // A path that doesn't exist on the filesystem causes an immediate exception.
-      assertThrows(SerialPortInvalidPortException.class, () -> SerialPort.getCommPort(BOGUS_UNIX_PORT));
+      assertThrows(
+          SerialPortInvalidPortException.class, () -> SerialPort.getCommPort(BOGUS_UNIX_PORT));
     }
 
     @Test
     void getCommPortThrowsForWindowsStyleDescriptor() {
       // A Windows-style descriptor like "COM999" also fails on Linux/Mac because
       // it doesn't exist on the filesystem (not under /dev/ either).
-      assertThrows(SerialPortInvalidPortException.class, () -> SerialPort.getCommPort(BOGUS_WINDOWS_PORT));
+      assertThrows(
+          SerialPortInvalidPortException.class, () -> SerialPort.getCommPort(BOGUS_WINDOWS_PORT));
     }
   }
 
