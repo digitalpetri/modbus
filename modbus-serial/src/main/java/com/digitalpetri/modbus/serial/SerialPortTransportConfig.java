@@ -15,6 +15,16 @@ import java.util.function.Consumer;
  * @param stopBits the number of stop bits to use.
  * @param parity the type of parity error-checking to use.
  * @param rs485Mode enable RS-485 mode, i.e. transmit/receive mode signaling using the RTS pin.
+ * @param rs485RtsActiveHigh whether to set the RTS line to 1 when transmitting. Effective only on
+ *     Linux.
+ * @param rs485Termination whether to enable RS-485 bus termination, on systems that support this
+ *     feature. Effective only on Linux.
+ * @param rs485RxDuringTx whether to receive data while transmitting. This usually means that data
+ *     sent will be read back. Effective only on Linux.
+ * @param rs485DelayBefore the time to wait in microseconds after enabling transmit mode before
+ *     sending the first data bit. Effective only on Linux.
+ * @param rs485DelayAfter the time to wait in microseconds after sending the last data bit before
+ *     disabling transmit mode. Effective only on Linux.
  * @param executor the {@link ExecutorService} to use when delivering frame received callbacks.
  * @see SerialPortTransportConfig#create(Consumer)
  */
@@ -25,6 +35,11 @@ public record SerialPortTransportConfig(
     int stopBits,
     int parity,
     boolean rs485Mode,
+    boolean rs485RtsActiveHigh,
+    boolean rs485Termination,
+    boolean rs485RxDuringTx,
+    int rs485DelayBefore,
+    int rs485DelayAfter,
     ExecutorService executor) {
 
   /**
@@ -77,11 +92,49 @@ public record SerialPortTransportConfig(
     public int parity = SerialPort.NO_PARITY;
 
     /**
-     * Enable RS-485 mode, i.e. transmit/receive mode signaling using the RTS pin.
+     * Enable RS-485 mode, i.e., transmit/receive mode signaling using the RTS pin.
      *
      * <p>This requires support from the underlying driver and may not work with all RS-485 devices.
      */
     public boolean rs485Mode = false;
+
+    /**
+     * Whether to set the RTS line to 1 when transmitting.
+     *
+     * <p>Effective only on Linux.
+     */
+    public boolean rs485RtsActiveHigh = true;
+
+    /**
+     * Whether to enable RS-485 bus termination on systems that support this feature.
+     *
+     * <p>Effective only on Linux.
+     */
+    public boolean rs485Termination = false;
+
+    /**
+     * Whether to receive data while transmitting. This usually means that data sent will be read
+     * back.
+     *
+     * <p>Effective only on Linux.
+     */
+    public boolean rs485RxDuringTx = false;
+
+    /**
+     * The time to wait in microseconds after enabling transmit mode before sending the first data
+     * bit.
+     *
+     * <p>Effective only on Linux.
+     */
+    public int rs485DelayBefore = 0;
+
+    /**
+     * The time to wait in microseconds after sending the last data bit before disabling transmit
+     * mode.
+     *
+     * <p>Effective only on Linux.
+     */
+    public int rs485DelayAfter = 0;
 
     /**
      * The {@link ExecutorService} to use when delivering frame received callbacks.
@@ -165,6 +218,74 @@ public record SerialPortTransportConfig(
     }
 
     /**
+     * Set whether to set the RTS line to 1 when transmitting.
+     *
+     * <p>Effective only on Linux.
+     *
+     * @param rs485RtsActiveHigh true to set the RTS line to 1 when transmitting.
+     * @return this {@link Builder}.
+     */
+    public Builder setRs485RtsActiveHigh(boolean rs485RtsActiveHigh) {
+      this.rs485RtsActiveHigh = rs485RtsActiveHigh;
+      return this;
+    }
+
+    /**
+     * Set whether to enable RS-485 bus termination on systems that support this feature.
+     *
+     * <p>Effective only on Linux.
+     *
+     * @param rs485Termination true to enable bus termination.
+     * @return this {@link Builder}.
+     */
+    public Builder setRs485Termination(boolean rs485Termination) {
+      this.rs485Termination = rs485Termination;
+      return this;
+    }
+
+    /**
+     * Set whether to receive data while transmitting. This usually means that data sent will be
+     * read back.
+     *
+     * <p>Effective only on Linux.
+     *
+     * @param rs485RxDuringTx true to receive data while transmitting.
+     * @return this {@link Builder}.
+     */
+    public Builder setRs485RxDuringTx(boolean rs485RxDuringTx) {
+      this.rs485RxDuringTx = rs485RxDuringTx;
+      return this;
+    }
+
+    /**
+     * Set the time to wait in microseconds after enabling transmit mode before sending the first
+     * data bit.
+     *
+     * <p>Effective only on Linux.
+     *
+     * @param rs485DelayBefore the delay in microseconds before sending.
+     * @return this {@link Builder}.
+     */
+    public Builder setRs485DelayBefore(int rs485DelayBefore) {
+      this.rs485DelayBefore = rs485DelayBefore;
+      return this;
+    }
+
+    /**
+     * Set the time to wait in microseconds after sending the last data bit before disabling
+     * transmit mode.
+     *
+     * <p>Effective only on Linux.
+     *
+     * @param rs485DelayAfter the delay in microseconds after sending.
+     * @return this {@link Builder}.
+     */
+    public Builder setRs485DelayAfter(int rs485DelayAfter) {
+      this.rs485DelayAfter = rs485DelayAfter;
+      return this;
+    }
+
+    /**
      * Set the {@link ExecutorService} to use when delivering frame received callbacks.
      *
      * @param executor the executor service.
@@ -189,7 +310,18 @@ public record SerialPortTransportConfig(
       }
 
       return new SerialPortTransportConfig(
-          serialPort, baudRate, dataBits, stopBits, parity, rs485Mode, executor);
+          serialPort,
+          baudRate,
+          dataBits,
+          stopBits,
+          parity,
+          rs485Mode,
+          rs485RtsActiveHigh,
+          rs485Termination,
+          rs485RxDuringTx,
+          rs485DelayBefore,
+          rs485DelayAfter,
+          executor);
     }
   }
 }
