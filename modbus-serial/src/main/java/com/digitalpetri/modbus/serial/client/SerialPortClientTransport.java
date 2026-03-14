@@ -5,6 +5,8 @@ import com.digitalpetri.modbus.ModbusRtuResponseFrameParser;
 import com.digitalpetri.modbus.ModbusRtuResponseFrameParser.Accumulated;
 import com.digitalpetri.modbus.ModbusRtuResponseFrameParser.ParserState;
 import com.digitalpetri.modbus.client.ModbusRtuClientTransport;
+import com.digitalpetri.modbus.exceptions.ModbusConnectException;
+import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
 import com.digitalpetri.modbus.serial.SerialPortTransportConfig;
 import com.fazecast.jSerialComm.SerialPort;
@@ -27,21 +29,12 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
 
   private final ExecutionQueue executionQueue;
 
-  private final SerialPort serialPort;
+  private volatile SerialPort serialPort;
 
   private final SerialPortTransportConfig config;
 
   public SerialPortClientTransport(SerialPortTransportConfig config) {
     this.config = config;
-
-    serialPort = SerialPort.getCommPort(config.serialPort());
-
-    serialPort.setComPortParameters(
-        config.baudRate(),
-        config.dataBits(),
-        config.stopBits(),
-        config.parity(),
-        config.rs485Mode());
 
     executionQueue = new ExecutionQueue(config.executor());
   }
@@ -49,45 +42,84 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
   /**
    * Return the underlying {@link SerialPort} used by this transport.
    *
+   * <p>The serial port is lazily instantiated on first access.
+   *
    * @return the configured {@link SerialPort} instance.
+   * @throws ModbusException if the serial port could not be created.
    */
-  public SerialPort getSerialPort() {
-    return serialPort;
+  public SerialPort getSerialPort() throws ModbusException {
+    SerialPort sp = this.serialPort;
+    if (sp == null) {
+      synchronized (this) {
+        sp = this.serialPort;
+        if (sp == null) {
+          try {
+            sp = SerialPort.getCommPort(config.serialPort());
+            sp.setComPortParameters(
+                config.baudRate(),
+                config.dataBits(),
+                config.stopBits(),
+                config.parity(),
+                config.rs485Mode());
+            this.serialPort = sp;
+          } catch (Exception e) {
+            throw new ModbusException(
+                "failed to get comm port '%s'".formatted(config.serialPort()), e);
+          }
+        }
+      }
+    }
+    return sp;
   }
 
   @Override
   public synchronized CompletableFuture<Void> connect() {
-    if (serialPort.isOpen()) {
+    SerialPort sp;
+    try {
+      sp = getSerialPort();
+    } catch (ModbusException e) {
+      return CompletableFuture.failedFuture(
+          new ModbusConnectException(e.getMessage(), e));
+    }
+
+    if (sp.isOpen()) {
       return CompletableFuture.completedFuture(null);
     } else {
-      if (serialPort.openPort()) {
+      if (sp.openPort()) {
         frameParser.reset();
 
         // note: no-op if already added from previous connect()
-        serialPort.addDataListener(new ModbusRtuDataListener());
+        sp.addDataListener(new ModbusRtuDataListener());
 
         return CompletableFuture.completedFuture(null);
       } else {
         return CompletableFuture.failedFuture(
-            new Exception(
+            new ModbusConnectException(
                 "failed to open port '%s', lastErrorCode=%d"
-                    .formatted(config.serialPort(), serialPort.getLastErrorCode())));
+                    .formatted(config.serialPort(), sp.getLastErrorCode())));
       }
     }
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>The returned {@link CompletionStage} may complete exceptionally with a {@link
+   * ModbusException} if the serial port could not be closed.
+   */
   @Override
   public synchronized CompletableFuture<Void> disconnect() {
-    if (serialPort.isOpen()) {
-      if (serialPort.closePort()) {
+    SerialPort sp = this.serialPort;
+    if (sp != null && sp.isOpen()) {
+      if (sp.closePort()) {
         frameParser.reset();
 
         return CompletableFuture.completedFuture(null);
       } else {
         return CompletableFuture.failedFuture(
-            new Exception(
+            new ModbusException(
                 "failed to close port '%s', lastErrorCode=%d"
-                    .formatted(config.serialPort(), serialPort.getLastErrorCode())));
+                    .formatted(config.serialPort(), sp.getLastErrorCode())));
       }
     } else {
       return CompletableFuture.completedFuture(null);
@@ -96,11 +128,23 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
 
   @Override
   public boolean isConnected() {
-    return serialPort.isOpen();
+    SerialPort sp = this.serialPort;
+    return sp != null && sp.isOpen();
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>The returned {@link CompletionStage} may complete exceptionally with a {@link
+   * ModbusException} if the transport is not connected or if writing to the serial port fails.
+   */
   @Override
   public CompletionStage<Void> send(ModbusRtuFrame frame) {
+    SerialPort sp = this.serialPort;
+    if (sp == null || !sp.isOpen()) {
+      return CompletableFuture.failedFuture(new ModbusException("not connected"));
+    }
+
     ByteBuffer buffer = ByteBuffer.allocate(256);
 
     try {
@@ -114,10 +158,10 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
 
       int totalWritten = 0;
       while (totalWritten < data.length) {
-        int written = serialPort.writeBytes(data, data.length - totalWritten, totalWritten);
+        int written = sp.writeBytes(data, data.length - totalWritten, totalWritten);
         if (written == -1) {
-          int errorCode = serialPort.getLastErrorCode();
-          throw new Exception(
+          int errorCode = sp.getLastErrorCode();
+          throw new ModbusException(
               "failed to write to port '%s', lastErrorCode=%d"
                   .formatted(config.serialPort(), errorCode));
         }
