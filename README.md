@@ -26,6 +26,10 @@ ReadHoldingRegistersResponse response = client.readHoldingRegisters(
 System.out.println("Response: " + response);
 ```
 
+```java
+byte[] responsePdu = client.sendRaw(1, new byte[] {(byte) 0x5A, 0x00, 0x01});
+```
+
 #### Modbus RTU on Serial Client
 ```java
 var transport = SerialPortClientTransport.create(cfg -> {
@@ -84,7 +88,7 @@ Code     | Function | Client | Server
 0x16     | Mask Write Register | ✅ | ✅
 0x17     | Read/Write Multiple Registers | ✅ | ✅
 
-- raw/custom PDUs on Modbus/TCP
+- raw/custom PDUs on Modbus/TCP with MBAP framing, transaction correlation, and raw TCP server hooks
 - broadcast messages on Modbus/RTU
 - pluggable codec implementations
 - pluggable transport implementations

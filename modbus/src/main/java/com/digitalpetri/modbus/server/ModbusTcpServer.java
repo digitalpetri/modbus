@@ -19,6 +19,7 @@ import com.digitalpetri.modbus.pdu.WriteSingleCoilRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterRequest;
 import com.digitalpetri.modbus.server.ModbusRequestContext.ModbusTcpRequestContext;
 import java.nio.ByteBuffer;
+import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
@@ -82,11 +83,41 @@ public class ModbusTcpServer implements ModbusServer {
 
     MbapHeader header = frame.header();
     ByteBuffer pdu = frame.pdu();
+
+    ModbusServices services = this.services.get();
+    assert services != null;
+
+    if (services instanceof RawModbusTcpServices rawServices) {
+      Optional<RawModbusTcpResponse> rawResponse =
+          rawServices.handleRawTcpRequest(context, toRawRequest(header.unitId(), pdu));
+
+      if (rawResponse.isPresent()) {
+        return toTcpFrame(header.transactionId(), header.unitId(), rawResponse.get());
+      }
+    }
+
     int functionCode = pdu.get(pdu.position()) & 0xFF;
     ModbusRequestPdu requestPdu =
         (ModbusRequestPdu) config.requestSerializer().decode(functionCode, pdu);
 
     return handleModbusRequestPdu(context, header.transactionId(), header.unitId(), requestPdu);
+  }
+
+  private static RawModbusTcpRequest toRawRequest(int unitId, ByteBuffer pdu) {
+    ByteBuffer buffer = pdu.slice();
+    byte[] bytes = new byte[buffer.remaining()];
+    buffer.get(bytes);
+
+    return new RawModbusTcpRequest(unitId, bytes);
+  }
+
+  private static ModbusTcpFrame toTcpFrame(
+      int transactionId, int unitId, RawModbusTcpResponse response) {
+
+    byte[] pdu = response.pdu();
+    var header = new MbapHeader(transactionId, 0, pdu.length + 1, unitId);
+
+    return new ModbusTcpFrame(header, ByteBuffer.wrap(pdu));
   }
 
   protected ModbusTcpFrame handleModbusRequestPdu(
