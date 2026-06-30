@@ -105,11 +105,10 @@ public class ModbusTcpServer implements ModbusServer {
 
   private static RawModbusTcpRequest toRawRequest(int unitId, ByteBuffer pdu) {
     ByteBuffer buffer = pdu.slice();
-    int functionCode = buffer.get() & 0xFF;
-    byte[] payload = new byte[buffer.remaining()];
-    buffer.get(payload);
+    byte[] bytes = new byte[buffer.remaining()];
+    buffer.get(bytes);
 
-    return new RawModbusTcpRequest(unitId, functionCode, payload);
+    return new RawModbusTcpRequest(unitId, bytes);
   }
 
   private static ModbusTcpFrame toTcpFrame(

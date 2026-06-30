@@ -30,7 +30,7 @@ class ModbusTcpServerTest {
         (requestContext, request) -> {
           receivedContext.set(requestContext);
           receivedRequest.set(request);
-          return Optional.of(RawModbusTcpResponse.response(0x5A, new byte[] {0x10, 0x20}));
+          return Optional.of(new RawModbusTcpResponse(new byte[] {0x5A, 0x10, 0x20}));
         };
     var server = new TestServer(services);
 
@@ -40,14 +40,36 @@ class ModbusTcpServerTest {
     assertSame(context, receivedContext.get());
     RawModbusTcpRequest request = receivedRequest.get();
     assertEquals(3, request.unitId());
-    assertEquals(0x5A, request.functionCode());
-    assertArrayEquals(new byte[] {0x01, 0x02}, request.payload());
+    assertArrayEquals(new byte[] {0x5A, 0x01, 0x02}, request.pdu());
 
     assertEquals(7, response.header().transactionId());
     assertEquals(0, response.header().protocolId());
     assertEquals(4, response.header().length());
     assertEquals(3, response.header().unitId());
     assertArrayEquals(new byte[] {0x5A, 0x10, 0x20}, bytes(response.pdu()));
+  }
+
+  @Test
+  void rawServicesHandleEmptyPduBeforeTypedDecode() throws Exception {
+    var receivedRequest = new AtomicReference<RawModbusTcpRequest>();
+    RawModbusTcpServices services =
+        (context, request) -> {
+          receivedRequest.set(request);
+          return Optional.of(new RawModbusTcpResponse(new byte[0]));
+        };
+    var server = new TestServer(services);
+
+    ModbusTcpFrame response = server.handle(requestFrame(7, 3, new byte[0]), new TestContext());
+
+    RawModbusTcpRequest request = receivedRequest.get();
+    assertEquals(3, request.unitId());
+    assertArrayEquals(new byte[0], request.pdu());
+
+    assertEquals(7, response.header().transactionId());
+    assertEquals(0, response.header().protocolId());
+    assertEquals(1, response.header().length());
+    assertEquals(3, response.header().unitId());
+    assertArrayEquals(new byte[0], bytes(response.pdu()));
   }
 
   @Test

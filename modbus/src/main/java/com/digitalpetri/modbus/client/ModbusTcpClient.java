@@ -70,15 +70,16 @@ public class ModbusTcpClient extends ModbusClient {
   /**
    * Send an already-encoded request PDU and wait for the matching Modbus/TCP response PDU.
    *
-   * <p>The supplied bytes are the PDU only, beginning with the function code; callers must not
-   * include an MBAP header. The client allocates the transaction id, adds the MBAP header, applies
-   * the configured request timeout, and correlates the response by transaction id.
+   * <p>The supplied bytes are the PDU only; callers must not include an MBAP header. The client
+   * allocates the transaction id, adds the MBAP header, applies the configured request timeout, and
+   * correlates the response by transaction id.
    *
    * <p>The returned bytes are the response PDU exactly as received after MBAP correlation. Raw
-   * calls do not decode standard Modbus exception PDUs, so a response whose first byte is {@code
-   * requestFunction + 0x80} is returned to the caller instead of being translated into a {@link
-   * ModbusResponseException}. Transport send failures and request timeouts are still reported
-   * through the same exceptions as other client calls.
+   * calls do not decode standard Modbus exception PDUs, so a response whose first byte happens to
+   * be {@code requestFunction + 0x80} is returned to the caller instead of being translated into a
+   * {@link ModbusResponseException}. Raw requests and responses may contain zero PDU bytes.
+   * Transport send failures and request timeouts are still reported through the same exceptions as
+   * other client calls.
    *
    * @param unitId the unit id to place in the MBAP header.
    * @param pduBytes the encoded request PDU bytes, without an MBAP header.
@@ -113,15 +114,15 @@ public class ModbusTcpClient extends ModbusClient {
   /**
    * Send an already-encoded request PDU and complete with the matching Modbus/TCP response PDU.
    *
-   * <p>The supplied bytes are the PDU only, beginning with the function code; callers must not
-   * include an MBAP header. The client allocates the transaction id, adds the MBAP header, applies
-   * the configured request timeout, and correlates the response by transaction id.
+   * <p>The supplied bytes are the PDU only; callers must not include an MBAP header. The client
+   * allocates the transaction id, adds the MBAP header, applies the configured request timeout, and
+   * correlates the response by transaction id.
    *
    * <p>The completed value contains the response PDU exactly as received after MBAP correlation.
-   * Raw calls do not decode standard Modbus exception PDUs, so a response whose first byte is
-   * {@code requestFunction + 0x80} completes successfully with those raw bytes. Transport send
-   * failures, request timeouts, and malformed TCP responses such as an empty PDU still complete the
-   * returned stage exceptionally.
+   * Raw calls do not decode standard Modbus exception PDUs, so a response whose first byte happens
+   * to be {@code requestFunction + 0x80} completes successfully with those raw bytes. Raw requests
+   * and responses may contain zero PDU bytes. Transport send failures and request timeouts still
+   * complete the returned stage exceptionally.
    *
    * @param unitId the unit id to place in the MBAP header.
    * @param pduBytes the encoded request PDU bytes, without an MBAP header.
@@ -129,10 +130,6 @@ public class ModbusTcpClient extends ModbusClient {
    *     MBAP header.
    */
   public CompletionStage<byte[]> sendRawAsync(int unitId, byte[] pduBytes) {
-    if (pduBytes.length == 0) {
-      return CompletableFuture.failedFuture(new ModbusException("empty request PDU"));
-    }
-
     CompletionStage<ByteBuffer> cs =
         sendBufferAsync(unitId, ByteBuffer.wrap(pduBytes), RawResponsePromise::new);
 
@@ -229,11 +226,6 @@ public class ModbusTcpClient extends ModbusClient {
 
       ByteBuffer buffer = frame.pdu();
 
-      if (buffer.remaining() == 0) {
-        promise.future().completeExceptionally(new ModbusException("empty response PDU"));
-        return;
-      }
-
       promise.complete(buffer);
     } else {
       logger.warn("No pending request for response frame: {}", frame);
@@ -306,6 +298,11 @@ public class ModbusTcpClient extends ModbusClient {
 
     @Override
     public void complete(ByteBuffer buffer) {
+      if (buffer.remaining() == 0) {
+        future.completeExceptionally(new ModbusException("empty response PDU"));
+        return;
+      }
+
       int responseFunctionCode = buffer.get(buffer.position()) & 0xFF;
 
       if (responseFunctionCode == functionCode) {

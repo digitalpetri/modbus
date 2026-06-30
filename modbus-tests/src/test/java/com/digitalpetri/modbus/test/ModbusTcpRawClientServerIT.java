@@ -49,7 +49,20 @@ class ModbusTcpRawClientServerIT {
     assertArrayEquals(new byte[] {(byte) 0xDA, 0x04}, responsePdu);
     RawModbusTcpRequest request = services.vendorRequest.get();
     assertNotNull(request);
-    assertArrayEquals(new byte[] {0x00, 0x01}, request.payload());
+    assertArrayEquals(new byte[] {(byte) 0x5A, 0x00, 0x01}, request.pdu());
+  }
+
+  @Test
+  void sendRawRoundTripsEmptyPdu() throws Exception {
+    var services = new TestRawModbusTcpServices();
+    startClientServer(services);
+
+    byte[] responsePdu = client.sendRaw(1, new byte[0]);
+
+    assertArrayEquals(new byte[0], responsePdu);
+    RawModbusTcpRequest request = services.emptyRequest.get();
+    assertNotNull(request);
+    assertArrayEquals(new byte[0], request.pdu());
   }
 
   @Test
@@ -111,18 +124,25 @@ class ModbusTcpRawClientServerIT {
 
     private final ProcessImage processImage = new ProcessImage();
     private final AtomicBoolean standardReadDeclined = new AtomicBoolean();
+    private final AtomicReference<RawModbusTcpRequest> emptyRequest = new AtomicReference<>();
     private final AtomicReference<RawModbusTcpRequest> vendorRequest = new AtomicReference<>();
 
     @Override
     public Optional<RawModbusTcpResponse> handleRawTcpRequest(
         ModbusTcpRequestContext context, RawModbusTcpRequest request) {
 
-      if (request.functionCode() == 0x5A) {
+      byte[] pdu = request.pdu();
+      if (pdu.length == 0) {
+        emptyRequest.set(request);
+        return Optional.of(new RawModbusTcpResponse(new byte[0]));
+      }
+
+      if (pdu.length > 0 && (pdu[0] & 0xFF) == 0x5A) {
         vendorRequest.set(request);
         return Optional.of(new RawModbusTcpResponse(new byte[] {(byte) 0xDA, 0x04}));
       }
 
-      if (request.functionCode() == 0x03) {
+      if (pdu.length > 0 && (pdu[0] & 0xFF) == 0x03) {
         standardReadDeclined.set(true);
       }
 

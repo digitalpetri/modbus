@@ -3,7 +3,7 @@ package com.digitalpetri.modbus.client;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.digitalpetri.modbus.MbapHeader;
@@ -49,32 +49,47 @@ public class ModbusTcpClientTest {
   }
 
   @Test
-  void sendRawRejectsEmptyRequestPdu() {
+  void sendRawAcceptsEmptyRequestPdu() throws Exception {
     var transport = new TestTransport();
     var client = ModbusTcpClient.create(transport);
 
     CompletionStage<byte[]> cs = client.sendRawAsync(1, new byte[0]);
 
-    ExecutionException ex =
-        assertThrows(ExecutionException.class, () -> cs.toCompletableFuture().get());
+    assertNotNull(transport.lastFrameSent);
+    assertEquals(1, transport.lastFrameSent.header().length());
+    assertEquals(0, transport.lastFrameSent.pdu().remaining());
 
-    ModbusException cause = assertInstanceOf(ModbusException.class, ex.getCause());
-    assertEquals("empty request PDU", cause.getMessage());
-    assertNull(transport.lastFrameSent);
+    transport.frameReceiver.accept(
+        new ModbusTcpFrame(new MbapHeader(0, 1, 1, 1), ByteBuffer.allocate(0)));
+
+    assertArrayEquals(new byte[0], cs.toCompletableFuture().get());
+  }
+
+  @Test
+  void sendRawAcceptsEmptyResponsePdu() throws Exception {
+    var transport = new TestTransport();
+    var client = ModbusTcpClient.create(transport);
+
+    CompletionStage<byte[]> cs = client.sendRawAsync(1, new byte[] {0x5A});
+
+    transport.frameReceiver.accept(
+        new ModbusTcpFrame(new MbapHeader(0, 1, 1, 1), ByteBuffer.allocate(0)));
+
+    assertArrayEquals(new byte[0], cs.toCompletableFuture().get());
   }
 
   /**
-   * Tests handling of an erroneous empty response PDU.
+   * Tests typed handling of an erroneous empty response PDU.
    *
    * @see <a
    *     href="https://github.com/digitalpetri/modbus/issues/121">https://github.com/digitalpetri/modbus/issues/121</a>
    */
   @Test
-  void sendRawStillRejectsEmptyResponsePdu() {
+  void sendAsyncStillRejectsEmptyResponsePdu() {
     var transport = new TestTransport();
     var client = ModbusTcpClient.create(transport);
 
-    CompletionStage<byte[]> cs = client.sendRawAsync(1, new byte[] {0x04, 0x03, 0x00, 0x00, 0x01});
+    var cs = client.sendAsync(1, new ReadHoldingRegistersRequest(0, 1));
 
     transport.frameReceiver.accept(
         new ModbusTcpFrame(new MbapHeader(0, 1, 1, 1), ByteBuffer.allocate(0)));
