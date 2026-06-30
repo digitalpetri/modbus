@@ -37,6 +37,13 @@ contain the specified test class.
 For detailed testing patterns and other Maven commands, see
 `.claude/docs/building-and-testing.md`.
 
+## Dependency Source Code
+
+To examine dependency source code, check the `external/src` directory at the project root. This
+directory contains unpacked source files from all dependencies, organized by package structure for
+easy browsing and searching.
+
+
 ## Additional Resources
 
 - Java conventions: `.claude/docs/java-coding-conventions.md`
