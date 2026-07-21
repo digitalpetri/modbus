@@ -49,12 +49,12 @@
 
     <!-- Dependencies -->
     <jserialcomm.version>2.11.4</jserialcomm.version>
-    <netty.version>4.1.135.Final</netty.version>
+    <netty.version>4.1.136.Final</netty.version>
     <netty-channel-fsm.version>1.0.2</netty-channel-fsm.version>
     <slf4j.version>2.0.18</slf4j.version>
 
     <!-- Test Dependencies -->
-    <bouncycastle.version>1.84</bouncycastle.version>
+    <bouncycastle.version>1.85</bouncycastle.version>
     <junit.version>5.14.4</junit.version>
 
     <!-- Plugin Dependencies -->
