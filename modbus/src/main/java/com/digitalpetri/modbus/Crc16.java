@@ -71,7 +71,7 @@ public class Crc16 {
   public void update(ByteBuffer buffer) {
     int offset = buffer.position();
     for (int i = offset; i < buffer.limit(); i++) {
-      update(buffer.get(offset + i));
+      update(buffer.get(i));
     }
   }
 }
