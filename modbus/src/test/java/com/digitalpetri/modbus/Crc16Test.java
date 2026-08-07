@@ -18,6 +18,19 @@ class Crc16Test {
   }
 
   @Test
+  void crc16WithBufferPosition() {
+    // A buffer whose position is advanced past leading bytes must be CRC'd
+    // over only the remaining bytes [position, limit). Prefixing the known
+    // vector with two bytes and skipping them must yield the same CRC. See #157.
+    Crc16 crc = new Crc16();
+    ByteBuffer buffer = ByteBuffer.wrap(new byte[] {0x00, 0x00, 0x12, 0x34, 0x56, 0x78, 0x09});
+    buffer.position(2);
+    crc.update(buffer);
+
+    assertEquals(0x2590, crc.getValue());
+  }
+
+  @Test
   void reset() {
     Crc16 crc = new Crc16();
     crc.update(ByteBuffer.wrap(new byte[] {0x12, 0x34, 0x56, 0x78, 0x09}));
