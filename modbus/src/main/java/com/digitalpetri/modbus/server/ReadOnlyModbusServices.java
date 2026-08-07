@@ -1,5 +1,6 @@
 package com.digitalpetri.modbus.server;
 
+import com.digitalpetri.modbus.exceptions.ModbusResponseException;
 import com.digitalpetri.modbus.exceptions.UnknownUnitIdException;
 import com.digitalpetri.modbus.pdu.ReadCoilsRequest;
 import com.digitalpetri.modbus.pdu.ReadCoilsResponse;
@@ -20,7 +21,9 @@ public abstract class ReadOnlyModbusServices implements ModbusServices {
   @Override
   public ReadCoilsResponse readCoils(
       ModbusRequestContext context, int unitId, ReadCoilsRequest request)
-      throws UnknownUnitIdException {
+      throws ModbusResponseException, UnknownUnitIdException {
+
+    ModbusServices.checkBitRange(request.getFunctionCode(), request.address(), request.quantity());
 
     ProcessImage processImage =
         getProcessImage(unitId).orElseThrow(() -> new UnknownUnitIdException(unitId));
@@ -36,7 +39,9 @@ public abstract class ReadOnlyModbusServices implements ModbusServices {
   @Override
   public ReadDiscreteInputsResponse readDiscreteInputs(
       ModbusRequestContext context, int unitId, ReadDiscreteInputsRequest request)
-      throws UnknownUnitIdException {
+      throws ModbusResponseException, UnknownUnitIdException {
+
+    ModbusServices.checkBitRange(request.getFunctionCode(), request.address(), request.quantity());
 
     ProcessImage processImage =
         getProcessImage(unitId).orElseThrow(() -> new UnknownUnitIdException(unitId));
@@ -52,7 +57,10 @@ public abstract class ReadOnlyModbusServices implements ModbusServices {
   @Override
   public ReadHoldingRegistersResponse readHoldingRegisters(
       ModbusRequestContext context, int unitId, ReadHoldingRegistersRequest request)
-      throws UnknownUnitIdException {
+      throws ModbusResponseException, UnknownUnitIdException {
+
+    ModbusServices.checkRegisterRange(
+        request.getFunctionCode(), request.address(), request.quantity());
 
     ProcessImage processImage =
         getProcessImage(unitId).orElseThrow(() -> new UnknownUnitIdException(unitId));
@@ -69,7 +77,10 @@ public abstract class ReadOnlyModbusServices implements ModbusServices {
   @Override
   public ReadInputRegistersResponse readInputRegisters(
       ModbusRequestContext context, int unitId, ReadInputRegistersRequest request)
-      throws UnknownUnitIdException {
+      throws ModbusResponseException, UnknownUnitIdException {
+
+    ModbusServices.checkRegisterRange(
+        request.getFunctionCode(), request.address(), request.quantity());
 
     ProcessImage processImage =
         getProcessImage(unitId).orElseThrow(() -> new UnknownUnitIdException(unitId));

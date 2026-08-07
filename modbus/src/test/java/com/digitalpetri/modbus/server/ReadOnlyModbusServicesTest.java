@@ -1,7 +1,12 @@
 package com.digitalpetri.modbus.server;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import com.digitalpetri.modbus.ExceptionCode;
+import com.digitalpetri.modbus.FunctionCode;
+import com.digitalpetri.modbus.exceptions.ModbusResponseException;
+import com.digitalpetri.modbus.exceptions.UnknownUnitIdException;
 import com.digitalpetri.modbus.pdu.ReadCoilsRequest;
 import com.digitalpetri.modbus.pdu.ReadCoilsResponse;
 import com.digitalpetri.modbus.pdu.ReadDiscreteInputsRequest;
@@ -15,6 +20,7 @@ import java.net.SocketAddress;
 import java.util.Optional;
 import java.util.Random;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 public class ReadOnlyModbusServicesTest {
 
@@ -204,6 +210,99 @@ public class ReadOnlyModbusServicesTest {
       remaining -= quantity;
       quantity = Math.min(remaining, random.nextInt(125) + 1);
     }
+  }
+
+  @Test
+  void readCoilsValidatesRange() throws Exception {
+    assertBitRangeValidation(
+        FunctionCode.READ_COILS,
+        (address, quantity) ->
+            services
+                .readCoils(
+                    new TestModbusRequestContext(), 0, new ReadCoilsRequest(address, quantity))
+                .coils()
+                .length);
+  }
+
+  @Test
+  void readDiscreteInputsValidatesRange() throws Exception {
+    assertBitRangeValidation(
+        FunctionCode.READ_DISCRETE_INPUTS,
+        (address, quantity) ->
+            services
+                .readDiscreteInputs(
+                    new TestModbusRequestContext(),
+                    0,
+                    new ReadDiscreteInputsRequest(address, quantity))
+                .inputs()
+                .length);
+  }
+
+  @Test
+  void readHoldingRegistersValidatesRange() throws Exception {
+    assertRegisterRangeValidation(
+        FunctionCode.READ_HOLDING_REGISTERS,
+        (address, quantity) ->
+            services
+                .readHoldingRegisters(
+                    new TestModbusRequestContext(),
+                    0,
+                    new ReadHoldingRegistersRequest(address, quantity))
+                .registers()
+                .length);
+  }
+
+  @Test
+  void readInputRegistersValidatesRange() throws Exception {
+    assertRegisterRangeValidation(
+        FunctionCode.READ_INPUT_REGISTERS,
+        (address, quantity) ->
+            services
+                .readInputRegisters(
+                    new TestModbusRequestContext(),
+                    0,
+                    new ReadInputRegistersRequest(address, quantity))
+                .registers()
+                .length);
+  }
+
+  private static void assertBitRangeValidation(FunctionCode functionCode, ReadOperation operation)
+      throws Exception {
+
+    assertEquals(250, operation.read(0, 2000));
+    assertModbusResponseException(
+        functionCode, ExceptionCode.ILLEGAL_DATA_VALUE, () -> operation.read(0, 0));
+    assertModbusResponseException(
+        functionCode, ExceptionCode.ILLEGAL_DATA_VALUE, () -> operation.read(0, 2001));
+    assertModbusResponseException(
+        functionCode, ExceptionCode.ILLEGAL_DATA_ADDRESS, () -> operation.read(0xFFFF, 2));
+  }
+
+  private static void assertRegisterRangeValidation(
+      FunctionCode functionCode, ReadOperation operation) throws Exception {
+
+    assertEquals(250, operation.read(0, 125));
+    assertModbusResponseException(
+        functionCode, ExceptionCode.ILLEGAL_DATA_VALUE, () -> operation.read(0, 0));
+    assertModbusResponseException(
+        functionCode, ExceptionCode.ILLEGAL_DATA_VALUE, () -> operation.read(0, 126));
+    assertModbusResponseException(
+        functionCode, ExceptionCode.ILLEGAL_DATA_ADDRESS, () -> operation.read(0xFFFF, 2));
+  }
+
+  private static void assertModbusResponseException(
+      FunctionCode functionCode, ExceptionCode exceptionCode, Executable executable) {
+
+    ModbusResponseException exception = assertThrows(ModbusResponseException.class, executable);
+
+    assertEquals(functionCode.getCode(), exception.getFunctionCode());
+    assertEquals(exceptionCode.getCode(), exception.getExceptionCode());
+  }
+
+  @FunctionalInterface
+  private interface ReadOperation {
+
+    int read(int address, int quantity) throws ModbusResponseException, UnknownUnitIdException;
   }
 
   static class TestModbusRequestContext implements ModbusTcpRequestContext {
