@@ -59,7 +59,7 @@ System.out.println("Response: " + response);
 <dependency>
     <groupId>com.digitalpetri.modbus</groupId>
     <artifactId>modbus-tcp</artifactId>
-    <version>2.1.4</version>
+    <version>2.1.6</version>
 </dependency>
 ```
 
@@ -68,7 +68,7 @@ System.out.println("Response: " + response);
 <dependency>
     <groupId>com.digitalpetri.modbus</groupId>
     <artifactId>modbus-serial</artifactId>
-    <version>2.1.4</version>
+    <version>2.1.6</version>
 </dependency>
 ```
 
