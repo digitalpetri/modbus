@@ -84,9 +84,9 @@ the portable Markdown documentation tree.
 
 | Area | Source |
 | --- | --- |
-| Client API | [`ModbusClient.java`](../../modbus/src/main/java/com/digitalpetri/modbus/client/ModbusClient.java) |
-| Server API | [`ModbusServer.java`](../../modbus/src/main/java/com/digitalpetri/modbus/server/ModbusServer.java) |
-| TCP client transports | [`tcp/client`](../../modbus-tcp/src/main/java/com/digitalpetri/modbus/tcp/client) |
-| TCP server transports | [`tcp/server`](../../modbus-tcp/src/main/java/com/digitalpetri/modbus/tcp/server) |
-| Serial transports | [`serial`](../../modbus-serial/src/main/java/com/digitalpetri/modbus/serial) |
-| Integration tests | [`modbus-tests`](../../modbus-tests/src/test/java/com/digitalpetri/modbus/test) |
+| Client API | [`ModbusClient.java`](../../../modbus/src/main/java/com/digitalpetri/modbus/client/ModbusClient.java) |
+| Server API | [`ModbusServer.java`](../../../modbus/src/main/java/com/digitalpetri/modbus/server/ModbusServer.java) |
+| TCP client transports | [`tcp/client`](../../../modbus-tcp/src/main/java/com/digitalpetri/modbus/tcp/client) |
+| TCP server transports | [`tcp/server`](../../../modbus-tcp/src/main/java/com/digitalpetri/modbus/tcp/server) |
+| Serial transports | [`serial`](../../../modbus-serial/src/main/java/com/digitalpetri/modbus/serial) |
+| Integration tests | [`modbus-tests`](../../../modbus-tests/src/test/java/com/digitalpetri/modbus/test) |

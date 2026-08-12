@@ -149,7 +149,7 @@ deployment configuration problem.
 
 The integration tests exercise mutual trust, untrusted client/server rejection, and self-signed
 test identities in
-[`ModbusSecurityIT`](../../../modbus-tests/src/test/java/com/digitalpetri/modbus/test/ModbusSecurityIT.java).
+[`ModbusSecurityIT`](../../../../modbus-tests/src/test/java/com/digitalpetri/modbus/test/ModbusSecurityIT.java).
 
 ## Related reference
 

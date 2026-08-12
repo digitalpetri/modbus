@@ -71,10 +71,10 @@ to their runtime; the published modules depend on the API, not a production logg
 
 | Reactor module | Source purpose |
 | --- | --- |
-| [`modbus`](../../modbus) | Transport-independent implementation and public contracts |
-| [`modbus-tcp`](../../modbus-tcp) | Netty transport implementation and TLS helpers |
-| [`modbus-serial`](../../modbus-serial) | jSerialComm transport implementation |
-| [`modbus-tests`](../../modbus-tests) | Cross-module TCP, RTU, raw-PDU, and TLS integration tests |
+| [`modbus`](../../../modbus) | Transport-independent implementation and public contracts |
+| [`modbus-tcp`](../../../modbus-tcp) | Netty transport implementation and TLS helpers |
+| [`modbus-serial`](../../../modbus-serial) | jSerialComm transport implementation |
+| [`modbus-tests`](../../../modbus-tests) | Cross-module TCP, RTU, raw-PDU, and TLS integration tests |
 
 ## Version and API documentation
 

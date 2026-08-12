@@ -39,7 +39,7 @@ For a Modbus TCP application:
 </dependency>
 ```
 
-See [Installation and modules](docs/reference/installation-and-modules.md) for serial coordinates,
+See [Installation and modules](docs/user/reference/installation-and-modules.md) for serial coordinates,
 Java requirements, and module details.
 
 ## Transport capabilities
@@ -50,29 +50,29 @@ Java requirements, and module details.
 | Modbus RTU over serial | Yes | Yes | No |
 | Modbus RTU over TCP | Yes | Yes | Optional mutual TLS |
 
-See the [feature and transport matrix](docs/reference/feature-and-transport-matrix.md) for typed
+See the [feature and transport matrix](docs/user/reference/feature-and-transport-matrix.md) for typed
 function-code, raw-PDU, and broadcast support.
 
 ## Documentation
 
-The [documentation index](docs/index.md) lists every how-to, concept, and reference page.
+The [documentation index](docs/user/index.md) lists every how-to, concept, and reference page.
 
 Common tasks:
 
-- [Read and write over Modbus TCP](docs/how-to/clients/read-and-write-over-tcp.md)
-- [Communicate over serial RTU](docs/how-to/clients/communicate-over-serial-rtu.md)
-- [Secure a Modbus TCP client with TLS](docs/how-to/clients/secure-a-modbus-tcp-client-with-tls.md)
-- [Expose data over Modbus TCP](docs/how-to/servers/expose-data-over-modbus-tcp.md)
-- [Configure timeouts and reconnection](docs/how-to/operations/configure-timeouts-and-reconnection.md)
-- [Troubleshoot communication](docs/how-to/operations/troubleshoot-communication.md)
+- [Read and write over Modbus TCP](docs/user/how-to/clients/read-and-write-over-tcp.md)
+- [Communicate over serial RTU](docs/user/how-to/clients/communicate-over-serial-rtu.md)
+- [Secure a Modbus TCP client with TLS](docs/user/how-to/clients/secure-a-modbus-tcp-client-with-tls.md)
+- [Expose data over Modbus TCP](docs/user/how-to/servers/expose-data-over-modbus-tcp.md)
+- [Configure timeouts and reconnection](docs/user/how-to/operations/configure-timeouts-and-reconnection.md)
+- [Troubleshoot communication](docs/user/how-to/operations/troubleshoot-communication.md)
 
 Concepts and reference:
 
-- Start with the [Modbus mental model](docs/concepts/modbus-mental-model.md) if the relationship
+- Start with the [Modbus mental model](docs/user/concepts/modbus-mental-model.md) if the relationship
   among data areas, unit IDs, PDUs, and transports is unfamiliar.
-- Use [Addressing, unit IDs, and data](docs/concepts/addressing-unit-ids-and-data.md) before
+- Use [Addressing, unit IDs, and data](docs/user/concepts/addressing-unit-ids-and-data.md) before
   translating a device manual into requests.
-- Browse the [API reference links](docs/reference/api-reference.md) for generated Javadocs.
+- Browse the [API reference links](docs/user/reference/api-reference.md) for generated Javadocs.
 
 ## License
 
