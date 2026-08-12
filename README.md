@@ -1,98 +1,79 @@
-[![Maven Central](https://img.shields.io/maven-central/v/com.digitalpetri.modbus/modbus.svg)](https://search.maven.org/#search%7Cgav%7C1%7Cg%3A%22com.digitalpetri.modbus%22%20AND%20a%3A%22modbus%22)
+# digitalpetri Modbus
 
-A modern, performant, easy to use client and server implementation of Modbus, supporting:
-- Modbus TCP
-- Modbus TCP Security (Modbus TCP with TLS)
-- Modbus RTU on Serial
-- Modbus RTU on TCP
+[![Maven Central](https://img.shields.io/maven-central/v/com.digitalpetri.modbus/modbus.svg)](https://central.sonatype.com/search?q=g%3Acom.digitalpetri.modbus)
 
-### Quick Start Examples
+digitalpetri Modbus is a Java 17 client and server library for Modbus TCP, Modbus TCP Security
+(TLS), Modbus RTU over serial, and Modbus RTU over TCP. It provides typed request and response PDUs,
+pluggable transports and codecs, and both synchronous and asynchronous client operations.
 
-#### Modbus TCP Client
+Reading holding registers from a Modbus TCP device looks like this:
+
 ```java
-var transport = NettyTcpClientTransport.create(cfg -> {
-  cfg.setHostname("172.17.0.2");
-  cfg.setPort(502);
-});
-
+var transport = NettyTcpClientTransport.create(cfg -> cfg.setHostname("10.0.0.100"));
 var client = ModbusTcpClient.create(transport);
-client.connect();
 
-ReadHoldingRegistersResponse response = client.readHoldingRegisters(
-    1,
-    new ReadHoldingRegistersRequest(0, 10)
-);
-
-System.out.println("Response: " + response);
+try (var ignored = client.open()) {
+  var response = client.readHoldingRegisters(1, new ReadHoldingRegistersRequest(0, 2));
+  System.out.println("register bytes: " + HexFormat.of().formatHex(response.registers()));
+}
 ```
 
-```java
-byte[] responsePdu = client.sendRaw(1, new byte[] {(byte) 0x5A, 0x00, 0x01});
-```
+## Installation and modules
 
-#### Modbus RTU on Serial Client
-```java
-var transport = SerialPortClientTransport.create(cfg -> {
-  cfg.setSerialPort("/dev/ttyUSB0");
-  cfg.setBaudRate(115200);
-  cfg.setDataBits(8);
-  cfg.setParity(SerialPort.NO_PARITY);
-  cfg.setStopBits(SerialPort.TWO_STOP_BITS);
-});
+Most applications depend on the transport module they use; Maven brings in the core `modbus`
+module transitively.
 
-var client = ModbusRtuClient.create(transport);
-client.connect();
+| Module | Use it for |
+| --- | --- |
+| `modbus` | Core client/server APIs, PDUs, framing, services, and transport interfaces |
+| `modbus-tcp` | Netty transports for Modbus TCP, TCP with TLS, and RTU over TCP |
+| `modbus-serial` | jSerialComm transports for Modbus RTU over a serial port |
 
-client.readHoldingRegisters(
-    1,
-    new ReadHoldingRegistersRequest(0, 10)
-);
-
-System.out.println("Response: " + response);
-```
-
-### Maven
-
-#### Modbus TCP
+For a Modbus TCP application:
 
 ```xml
 <dependency>
-    <groupId>com.digitalpetri.modbus</groupId>
-    <artifactId>modbus-tcp</artifactId>
-    <version>2.1.6</version>
+  <groupId>com.digitalpetri.modbus</groupId>
+  <artifactId>modbus-tcp</artifactId>
+  <version>2.1.6</version>
 </dependency>
 ```
 
-#### Modbus Serial
-```xml
-<dependency>
-    <groupId>com.digitalpetri.modbus</groupId>
-    <artifactId>modbus-serial</artifactId>
-    <version>2.1.6</version>
-</dependency>
-```
+See [Installation and modules](docs/user/reference/installation-and-modules.md) for serial coordinates,
+Java requirements, and module details.
 
-### Features
+## Transport capabilities
 
-#### Supported Function Codes
-Code     | Function | Client | Server
--------- | -------- | ------ | ------
-0x01     | Read Coils | ✅ | ✅
-0x02     | Read Discrete Inputs | ✅ | ✅
-0x03     | Read Holding Registers | ✅ | ✅
-0x04     | Read Input Registers | ✅ | ✅
-0x05     | Write Single Coil | ✅ | ✅
-0x06     | Write Single Register | ✅ | ✅
-0x0F     | Write Multiple Coils | ✅ | ✅
-0x10     | Write Multiple Registers | ✅ | ✅
-0x16     | Mask Write Register | ✅ | ✅
-0x17     | Read/Write Multiple Registers | ✅ | ✅
+| Transport | Client | Server | TLS |
+| --- | --- | --- | --- |
+| Modbus TCP | Yes | Yes | Optional mutual TLS |
+| Modbus RTU over serial | Yes | Yes | No |
+| Modbus RTU over TCP | Yes | Yes | Optional mutual TLS |
 
-- raw/custom PDUs on Modbus/TCP with MBAP framing, transaction correlation, and raw TCP server hooks
-- broadcast messages on Modbus/RTU
-- pluggable codec implementations
-- pluggable transport implementations
+See the [feature and transport matrix](docs/user/reference/feature-and-transport-matrix.md) for typed
+function-code, raw-PDU, and broadcast support.
 
-### License
+## Documentation
 
-Eclipse Public License - v 2.0
+The [documentation index](docs/user/index.md) lists every how-to, concept, and reference page.
+
+Common tasks:
+
+- [Read and write over Modbus TCP](docs/user/how-to/clients/read-and-write-over-tcp.md)
+- [Communicate over serial RTU](docs/user/how-to/clients/communicate-over-serial-rtu.md)
+- [Secure a Modbus TCP client with TLS](docs/user/how-to/clients/secure-a-modbus-tcp-client-with-tls.md)
+- [Expose data over Modbus TCP](docs/user/how-to/servers/expose-data-over-modbus-tcp.md)
+- [Configure timeouts and reconnection](docs/user/how-to/operations/configure-timeouts-and-reconnection.md)
+- [Troubleshoot communication](docs/user/how-to/operations/troubleshoot-communication.md)
+
+Concepts and reference:
+
+- Start with the [Modbus mental model](docs/user/concepts/modbus-mental-model.md) if the relationship
+  among data areas, unit IDs, PDUs, and transports is unfamiliar.
+- Use [Addressing, unit IDs, and data](docs/user/concepts/addressing-unit-ids-and-data.md) before
+  translating a device manual into requests.
+- Browse the [API reference links](docs/user/reference/api-reference.md) for generated Javadocs.
+
+## License
+
+digitalpetri Modbus is licensed under the [Eclipse Public License 2.0](LICENSE.md).
