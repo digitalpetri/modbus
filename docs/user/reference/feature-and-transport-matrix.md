@@ -41,6 +41,7 @@ client/server dispatch do not provide PDU implementations. See [Function codes a
 | Concurrent in-flight correlation | Yes | No | No | TCP uses MBAP transaction IDs; keep one RTU request in flight |
 | Automatic connection recovery | Yes | No | Yes | Netty client state machine; serial reconnect requires another explicit `connect()` |
 | Mutual TLS | Yes | No | Yes | Netty transports; TLS 1.2 and 1.3 |
+| Non-2-byte Write Single Register values | Yes | No | No | See [Write Single Register values](function-codes-and-pdus.md#write-single-register-values) |
 | Raw PDU client/server path | Yes | No | No | `sendRaw` / `RawModbusTcpServices`, with MBAP handled by the library |
 | RTU broadcast send | No | Yes | Yes | `ModbusRtuClient.broadcast`; send completion only, no response |
 | Pluggable PDU serializers | Yes | Yes | Yes | Client and server configuration accept `ModbusPduSerializer` |

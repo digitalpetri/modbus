@@ -46,6 +46,10 @@ match the outstanding request. The RTU client resets its frame parser after a ti
 to recover from an incomplete or invalid response. Keeping one request in flight preserves the
 serial request/response order that this matching depends on.
 
+RTU has no length field, so the built-in frame parsers derive each frame's length from its function
+code and, where present, its byte count. The parsers assume Write Single Register (`0x06`) frames
+carry a 2-byte value.
+
 Serial correctness also depends on out-of-band settings—baud rate, data bits, parity, stop bits,
 wiring, and sometimes RS-485 direction control. Those settings do not appear inside the Modbus
 frame.
