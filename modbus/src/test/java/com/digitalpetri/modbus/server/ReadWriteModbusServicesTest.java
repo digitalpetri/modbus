@@ -1,7 +1,13 @@
 package com.digitalpetri.modbus.server;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.digitalpetri.modbus.ExceptionCode;
+import com.digitalpetri.modbus.FunctionCode;
+import com.digitalpetri.modbus.exceptions.ModbusResponseException;
 import com.digitalpetri.modbus.pdu.MaskWriteRegisterRequest;
 import com.digitalpetri.modbus.pdu.ReadWriteMultipleRegistersRequest;
 import com.digitalpetri.modbus.pdu.ReadWriteMultipleRegistersResponse;
@@ -9,6 +15,7 @@ import com.digitalpetri.modbus.pdu.WriteMultipleCoilsRequest;
 import com.digitalpetri.modbus.pdu.WriteMultipleRegistersRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleCoilRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterRequest;
+import com.digitalpetri.modbus.pdu.WriteSingleRegisterResponse;
 import com.digitalpetri.modbus.server.ReadOnlyModbusServicesTest.TestModbusRequestContext;
 import java.util.Optional;
 import java.util.Random;
@@ -111,6 +118,38 @@ public class ReadWriteModbusServicesTest {
                         (randomBytes[i * 2] & 0xFF) << 8 | (randomBytes[i * 2 + 1] & 0xFF);
                     assertEquals(expectedValue, registerValue);
                   }
+                  return null;
+                }));
+  }
+
+  @Test
+  void writeSingleRegisterEchoesValue() throws Exception {
+    var request = new WriteSingleRegisterRequest(7, new byte[] {0x12, 0x34});
+
+    WriteSingleRegisterResponse response =
+        services.writeSingleRegister(new TestModbusRequestContext(), 0, request);
+
+    assertEquals(7, response.address());
+    assertArrayEquals(new byte[] {0x12, 0x34}, response.value());
+  }
+
+  @Test
+  void writeSingleRegisterRejectsFourByteValue() {
+    var request = new WriteSingleRegisterRequest(7, new byte[] {0x3F, (byte) 0x80, 0x00, 0x00});
+
+    ModbusResponseException e =
+        assertThrows(
+            ModbusResponseException.class,
+            () -> services.writeSingleRegister(new TestModbusRequestContext(), 0, request));
+
+    assertEquals(FunctionCode.WRITE_SINGLE_REGISTER.getCode(), e.getFunctionCode());
+    assertEquals(ExceptionCode.ILLEGAL_DATA_VALUE.getCode(), e.getExceptionCode());
+
+    processImage.with(
+        tx ->
+            tx.readHoldingRegisters(
+                holdingRegisterMap -> {
+                  assertTrue(holdingRegisterMap.isEmpty());
                   return null;
                 }));
   }

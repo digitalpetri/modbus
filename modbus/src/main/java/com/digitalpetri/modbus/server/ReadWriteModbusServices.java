@@ -1,5 +1,8 @@
 package com.digitalpetri.modbus.server;
 
+import com.digitalpetri.modbus.ExceptionCode;
+import com.digitalpetri.modbus.FunctionCode;
+import com.digitalpetri.modbus.exceptions.ModbusResponseException;
 import com.digitalpetri.modbus.exceptions.UnknownUnitIdException;
 import com.digitalpetri.modbus.pdu.MaskWriteRegisterRequest;
 import com.digitalpetri.modbus.pdu.MaskWriteRegisterResponse;
@@ -76,29 +79,36 @@ public abstract class ReadWriteModbusServices extends ReadOnlyModbusServices
   @Override
   public WriteSingleRegisterResponse writeSingleRegister(
       ModbusRequestContext context, int unitId, WriteSingleRegisterRequest request)
-      throws UnknownUnitIdException {
+      throws ModbusResponseException, UnknownUnitIdException {
 
     ProcessImage processImage =
         getProcessImage(unitId).orElseThrow(() -> new UnknownUnitIdException(unitId));
 
     final int address = request.address();
-    final int value = request.value();
+    final byte[] value = request.value();
+
+    // The process image holds 16-bit registers; 4-byte values need a service that supports them.
+    if (value.length != 2) {
+      throw new ModbusResponseException(
+          FunctionCode.WRITE_SINGLE_REGISTER, ExceptionCode.ILLEGAL_DATA_VALUE);
+    }
+
+    final byte high = value[0];
+    final byte low = value[1];
 
     processImage.with(
         tx ->
             tx.writeHoldingRegisters(
                 registerMap -> {
-                  if (value == 0) {
+                  if (high == 0 && low == 0) {
                     registerMap.remove(address);
                   } else {
-                    byte high = (byte) ((value >> 8) & 0xFF);
-                    byte low = (byte) (value & 0xFF);
                     byte[] bs = new byte[] {high, low};
                     registerMap.put(address, bs);
                   }
                 }));
 
-    return new WriteSingleRegisterResponse(address, value);
+    return new WriteSingleRegisterResponse(address, new byte[] {high, low});
   }
 
   @Override
