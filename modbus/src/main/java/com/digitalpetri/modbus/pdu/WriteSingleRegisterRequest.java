@@ -10,36 +10,16 @@ import java.util.StringJoiner;
 /**
  * A {@link FunctionCode#WRITE_SINGLE_REGISTER} request PDU.
  *
- * <p>A standard Modbus request carries a 2-byte value. A 4-byte value supports devices that store
- * 32-bit values at a single register address, such as Enron/Daniels Modbus devices. Only send a
- * 4-byte value to a device or service that expects it.
- *
- * <p>The built-in Modbus RTU framing assumes a 2-byte value, so 4-byte values are currently only
- * usable over Modbus TCP. The built-in RTU client still sends a 4-byte request, and the device may
- * apply the write, but the longer response then fails the CRC check. Do not send 4-byte values
- * through the built-in RTU transports.
+ * <p>A standard register value is 2 bytes. Other lengths are encoded as-is for devices that expect
+ * them. The built-in Modbus RTU framing only supports 2-byte values.
  *
  * <p>The {@code value} array is not copied. It is encoded as-is, and {@link #value()} returns the
  * same array. Do not modify the array after constructing the request.
  *
  * @param address the address of the register to write. 2 bytes, range [0x0000, 0xFFFF].
- * @param value the value bytes to write, in wire order. Must be exactly 2 or 4 bytes.
+ * @param value the value bytes to write, in wire order. 2 bytes for a standard register.
  */
 public record WriteSingleRegisterRequest(int address, byte[] value) implements ModbusRequestPdu {
-
-  /**
-   * Create a {@link WriteSingleRegisterRequest}.
-   *
-   * @param address the address of the register to write. 2 bytes, range [0x0000, 0xFFFF].
-   * @param value the value bytes to write, in wire order. Must be exactly 2 or 4 bytes.
-   * @throws IllegalArgumentException if {@code value} is not 2 or 4 bytes long.
-   */
-  public WriteSingleRegisterRequest {
-    if (value.length != 2 && value.length != 4) {
-      throw new IllegalArgumentException(
-          "value must be 2 or 4 bytes, got %d".formatted(value.length));
-    }
-  }
 
   /**
    * Create a standard {@link WriteSingleRegisterRequest} with a 2-byte value.
@@ -111,7 +91,6 @@ public record WriteSingleRegisterRequest(int address, byte[] value) implements M
      *
      * @param buffer the buffer to decode from.
      * @return the decoded request.
-     * @throws IllegalArgumentException if the remaining value bytes are not 2 or 4 bytes long.
      */
     public static WriteSingleRegisterRequest decode(ByteBuffer buffer) {
       int functionCode = buffer.get() & 0xFF;

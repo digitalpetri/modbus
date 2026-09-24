@@ -87,7 +87,7 @@ public abstract class ReadWriteModbusServices extends ReadOnlyModbusServices
     final int address = request.address();
     final byte[] value = request.value();
 
-    // The process image holds 16-bit registers; 4-byte values need a service that supports them.
+    // The process image holds 16-bit registers, so only 2-byte values are supported.
     if (value.length != 2) {
       throw new ModbusResponseException(
           FunctionCode.WRITE_SINGLE_REGISTER, ExceptionCode.ILLEGAL_DATA_VALUE);

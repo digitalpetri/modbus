@@ -3,7 +3,6 @@ package com.digitalpetri.modbus.pdu;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.ByteBuffer;
 import java.util.HexFormat;
@@ -74,18 +73,12 @@ class WriteSingleRegisterResponseTest {
   }
 
   @Test
-  void constructorRejectsInvalidValueLength() {
-    for (int length : new int[] {0, 1, 3, 5, 8}) {
-      assertThrows(
-          IllegalArgumentException.class,
-          () -> new WriteSingleRegisterResponse(0, new byte[length]));
-    }
-  }
+  void serializerPreservesAnyValueLength() {
+    for (String hex :
+        new String[] {"060001", "06000100", "060001aabbcc", "0600010102030405060708"}) {
+      WriteSingleRegisterResponse decoded = decode(hex);
 
-  @Test
-  void decodeRejectsInvalidValueLength() {
-    for (String hex : new String[] {"060001", "06000100", "060001000000", "0600010000000000"}) {
-      assertThrows(IllegalArgumentException.class, () -> decode(hex));
+      assertEquals(hex, encode(decoded));
     }
   }
 

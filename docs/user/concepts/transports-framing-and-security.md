@@ -47,11 +47,8 @@ to recover from an incomplete or invalid response. Keeping one request in flight
 serial request/response order that this matching depends on.
 
 RTU has no length field, so the built-in frame parsers derive each frame's length from its function
-code and, where present, its byte count. They assume a Write Single Register (`0x06`) frame carries
-the standard 2-byte value. The 4-byte Write Single Register values that some devices use are
-therefore unsupported on serial RTU and RTU over TCP. The RTU client still sends such a request, and
-the device may apply the write, but the longer response then fails the CRC check. See [Write Single
-Register values](../reference/function-codes-and-pdus.md#write-single-register-values).
+code and, where present, its byte count. The parsers assume Write Single Register (`0x06`) frames
+carry a 2-byte value.
 
 Serial correctness also depends on out-of-band settings—baud rate, data bits, parity, stop bits,
 wiring, and sometimes RS-485 direction control. Those settings do not appear inside the Modbus

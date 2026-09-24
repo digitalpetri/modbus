@@ -134,16 +134,18 @@ public class ReadWriteModbusServicesTest {
   }
 
   @Test
-  void writeSingleRegisterRejectsFourByteValue() {
-    var request = new WriteSingleRegisterRequest(7, new byte[] {0x3F, (byte) 0x80, 0x00, 0x00});
+  void writeSingleRegisterRejectsNonStandardValueLength() {
+    for (int length : new int[] {0, 1, 3, 4}) {
+      var request = new WriteSingleRegisterRequest(7, new byte[length]);
 
-    ModbusResponseException e =
-        assertThrows(
-            ModbusResponseException.class,
-            () -> services.writeSingleRegister(new TestModbusRequestContext(), 0, request));
+      ModbusResponseException e =
+          assertThrows(
+              ModbusResponseException.class,
+              () -> services.writeSingleRegister(new TestModbusRequestContext(), 0, request));
 
-    assertEquals(FunctionCode.WRITE_SINGLE_REGISTER.getCode(), e.getFunctionCode());
-    assertEquals(ExceptionCode.ILLEGAL_DATA_VALUE.getCode(), e.getExceptionCode());
+      assertEquals(FunctionCode.WRITE_SINGLE_REGISTER.getCode(), e.getFunctionCode());
+      assertEquals(ExceptionCode.ILLEGAL_DATA_VALUE.getCode(), e.getExceptionCode());
+    }
 
     processImage.with(
         tx ->
