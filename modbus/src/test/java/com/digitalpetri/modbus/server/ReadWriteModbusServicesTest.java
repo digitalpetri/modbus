@@ -17,6 +17,7 @@ import com.digitalpetri.modbus.pdu.WriteSingleCoilRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterResponse;
 import com.digitalpetri.modbus.server.ReadOnlyModbusServicesTest.TestModbusRequestContext;
+import java.util.Arrays;
 import java.util.Optional;
 import java.util.Random;
 import org.junit.jupiter.api.Test;
@@ -136,7 +137,9 @@ public class ReadWriteModbusServicesTest {
   @Test
   void writeSingleRegisterRejectsNonStandardValueLength() {
     for (int length : new int[] {0, 1, 3, 4}) {
-      var request = new WriteSingleRegisterRequest(7, new byte[length]);
+      var value = new byte[length];
+      Arrays.fill(value, (byte) 0x12);
+      var request = new WriteSingleRegisterRequest(7, value);
 
       ModbusResponseException e =
           assertThrows(
