@@ -75,7 +75,7 @@ public class ModbusRtuRequestFrameParser {
         case 0x0F, 0x10 -> {
           int minimum = 1 + (1 + 2 + 2 + 1) + 2;
           if (readableBytes >= minimum) {
-            int byteCount = buffer.get(6);
+            int byteCount = buffer.get(6) & 0xFF;
             if (readableBytes >= minimum + byteCount) {
               ModbusRtuFrame frame = readFrame(buffer.flip(), minimum + byteCount);
               return new Accumulated(frame);
@@ -100,7 +100,7 @@ public class ModbusRtuRequestFrameParser {
         case 0x17 -> {
           int minimum = 1 + (1 + 2 + 2 + 2 + 2 + 1) + 2;
           if (readableBytes >= minimum) {
-            int byteCount = buffer.get(10);
+            int byteCount = buffer.get(10) & 0xFF;
             if (readableBytes >= minimum + byteCount) {
               ModbusRtuFrame frame = readFrame(buffer.flip(), minimum + byteCount);
               return new Accumulated(frame);
