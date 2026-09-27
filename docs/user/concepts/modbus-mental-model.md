@@ -58,8 +58,8 @@ response or an exception. Synchronous methods block the calling thread on the sa
 stage; asynchronous methods return `CompletionStage` values.
 
 TCP responses carry transaction identifiers, so the TCP client can correlate in-flight requests.
-RTU responses have no transaction identifier, so an application should keep one RTU request in
-flight and preserve request/response order.
+RTU responses have no transaction identifier, so the RTU client sends one request at a time and
+matches each response to the outstanding request.
 
 ## What the server owns
 

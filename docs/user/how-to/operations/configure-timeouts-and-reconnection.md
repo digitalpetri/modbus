@@ -31,7 +31,9 @@ var client =
 The connection timeout applies to each Netty connection attempt. The request timeout starts when
 the client creates an in-flight request and bounds how long its response promise remains pending
 while transport acquisition, send, and response are in progress. Its default is 5 seconds. The
-TCP connect timeout also defaults to 5 seconds.
+TCP connect timeout also defaults to 5 seconds. `ModbusRtuClient` sends one request at a time, so
+its request timeout also includes time spent waiting behind earlier requests. A request that times
+out while waiting there is never sent.
 
 Expiring the promise does not cancel `transport.send(...)` or an underlying `getChannel()` wait.
 A request queued during reconnection can therefore be written after the caller has already

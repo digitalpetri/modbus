@@ -80,7 +80,8 @@ Raw TCP calls return the response PDU bytes without these typed checks.
 | Connection/open failure | Inspect nested cause and endpoint/port/serial/TLS configuration before retrying |
 | Timeout | Verify unit, framing, address, server load, and timeout budget; do not retry writes blindly |
 | Modbus response exception | For typed TCP, branch on numeric exception code and function; for RTU, use endpoint/frame diagnostics — see the [RTU exception-code limitation](#rtu-exception-code-limitation) |
-| CRC/synchronization failure | Stop concurrent RTU requests, inspect the link, then allow parser reset/reconnect before retrying |
+| CRC failure | Inspect the link, then allow parser reset/reconnect before retrying |
+| RTU unit/function mismatch | Usually a late response to a request that timed out, or another master on the bus; raise the request timeout or reduce the number of queued requests |
 | Interrupted synchronous call | Treat it as a cancellation: stop the operation and propagate the interrupt; the library restores the thread's interrupt flag |
 
 ## Related material

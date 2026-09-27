@@ -26,6 +26,19 @@ import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * A {@link ModbusClient} for Modbus RTU, over a serial port or TCP.
+ *
+ * <p>RTU responses carry no transaction ID, so a response can only be matched to the request that
+ * is currently outstanding. This client sends one request at a time, in the order requests are
+ * submitted. A request submitted while another is outstanding waits until that request gets a
+ * response, times out, or fails to send. Concurrent calls are safe, but they are not pipelined.
+ *
+ * <p>The request timeout starts when a request is submitted, so it includes time spent waiting
+ * behind other requests. A request that times out while waiting is never sent.
+ *
+ * <p>Broadcasts are passed to the transport immediately and are not ordered with other requests.
+ */
 public class ModbusRtuClient extends ModbusClient {
 
   /** The unit/slave ID used when sending broadcast messages. */

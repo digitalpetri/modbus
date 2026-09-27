@@ -93,11 +93,12 @@ ordering against the device map.
 | Port cannot be opened | Port name, OS permissions, another process holding the port, and driver state |
 | Every request times out | Unit ID, wiring polarity, baud/data/parity/stop settings, and RS-485 direction control |
 | `ModbusExecutionException` caused by `ModbusCrcException` | Noise, termination, grounding, baud/parity mismatch, or bytes from another device |
-| Unit/function mismatch (reported as `slave id mismatch` / `function code mismatch`) or synchronization error | More than one in-flight RTU request, late responses, or another client on the bus |
+| Unit/function mismatch (reported as `slave id mismatch` / `function code mismatch`) | A late response to an earlier request that timed out, or another master on the bus |
 | Bytes are stable but values are wrong | Device-specific register byte/word ordering and scaling |
 
-Keep only one request in flight on an RTU client. RTU responses do not contain the Modbus TCP
-transaction identifier used to correlate concurrent requests.
+RTU responses do not contain the Modbus TCP transaction identifier used to correlate concurrent
+requests, so the RTU client sends one request at a time. Concurrent calls are safe; each waits for
+the requests submitted before it, and that wait counts toward its request timeout.
 
 Synchronous typed calls wrap a CRC failure in `ModbusExecutionException`; inspect its cause. The
 corresponding asynchronous stage completes exceptionally with `ModbusCrcException` directly.
