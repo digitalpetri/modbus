@@ -39,7 +39,7 @@ synchronous calls wrap failures and how request timeouts interact with in-progre
 | Client | In-flight behavior | Application rule |
 | --- | --- | --- |
 | `ModbusTcpClient` | Concurrent pending map and thread-safe transaction sequence; responses correlate by MBAP transaction ID | Concurrent calls are supported by the correlation design; bound concurrency below transaction-ID reuse and endpoint capacity |
-| `ModbusRtuClient` | Responses have no transaction ID; correlation is described in [RTU client behavior](client-and-server-behavior.md#rtu-client-behavior) | Keep one request in flight for serial RTU and RTU over TCP |
+| `ModbusRtuClient` | Responses have no transaction ID, so the client sends one request at a time in submission order; see [RTU client behavior](client-and-server-behavior.md#rtu-client-behavior) | Concurrent calls are safe but not pipelined; size request timeouts to include time spent waiting behind other requests |
 
 The typed default request and response serializer singletons are stateless and documented as safe
 for concurrent use. A custom serializer must define and enforce its own thread-safety policy.

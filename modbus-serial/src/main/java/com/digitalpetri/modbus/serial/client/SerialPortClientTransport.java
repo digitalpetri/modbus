@@ -28,6 +28,7 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
   private final AtomicReference<Consumer<ModbusRtuFrame>> frameReceiver = new AtomicReference<>();
 
   private final ExecutionQueue executionQueue;
+  private final ExecutionQueue writeQueue;
 
   private volatile SerialPort serialPort;
 
@@ -37,12 +38,15 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
     this.config = config;
 
     executionQueue = new ExecutionQueue(config.executor());
+    writeQueue = new ExecutionQueue(config.executor());
   }
 
   /**
    * Return the underlying {@link SerialPort} used by this transport.
    *
-   * <p>The serial port is lazily instantiated on first access.
+   * <p>The serial port is lazily instantiated on first access. After {@link #disconnect()} closes
+   * the port, the next access creates a new instance, so changes made to the previous instance are
+   * not carried over.
    *
    * @return the configured {@link SerialPort} instance.
    * @throws ModbusException if the serial port could not be created.
@@ -125,6 +129,10 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
       if (sp.closePort()) {
         frameParser.reset();
 
+        // Create a new SerialPort on the next connect(). Writes still queued for this one then
+        // fail instead of being sent on the reopened port.
+        this.serialPort = null;
+
         return CompletableFuture.completedFuture(null);
       } else {
         return CompletableFuture.failedFuture(
@@ -146,6 +154,12 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
   /**
    * {@inheritDoc}
    *
+   * <p>The frame is written to the serial port on the configured executor, so this method does not
+   * block the caller if the write stalls. Writes are performed serially, in the order submitted.
+   *
+   * <p>If the returned {@link CompletionStage} is cancelled before its write starts, the frame is
+   * not written. A write that stalls indefinitely is released by {@link #disconnect()}.
+   *
    * <p>The returned {@link CompletionStage} may complete exceptionally with a {@link
    * ModbusException} if the transport is not connected or if writing to the serial port fails.
    */
@@ -162,26 +176,49 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
       buffer.put((byte) frame.unitId());
       buffer.put(frame.pdu());
       buffer.put(frame.crc());
-
-      byte[] data = new byte[buffer.position()];
-      buffer.flip();
-      buffer.get(data);
-
-      int totalWritten = 0;
-      while (totalWritten < data.length) {
-        int written = sp.writeBytes(data, data.length - totalWritten, totalWritten);
-        if (written == -1) {
-          int errorCode = sp.getLastErrorCode();
-          throw new ModbusException(
-              "failed to write to port '%s', lastErrorCode=%d"
-                  .formatted(config.serialPort(), errorCode));
-        }
-        totalWritten += written;
-      }
-
-      return CompletableFuture.completedFuture(null);
     } catch (Exception e) {
       return CompletableFuture.failedFuture(e);
+    }
+
+    byte[] data = new byte[buffer.position()];
+    buffer.flip();
+    buffer.get(data);
+
+    var future = new CompletableFuture<Void>();
+
+    try {
+      writeQueue.submit(
+          () -> {
+            if (future.isDone()) {
+              // Cancelled, e.g. the request timed out while this write was queued.
+              return;
+            }
+            try {
+              writeFully(sp, data);
+              future.complete(null);
+            } catch (Exception e) {
+              future.completeExceptionally(e);
+            }
+          });
+    } catch (Exception e) {
+      // e.g. RejectedExecutionException if the executor has been shut down
+      future.completeExceptionally(e);
+    }
+
+    return future;
+  }
+
+  private void writeFully(SerialPort sp, byte[] data) throws ModbusException {
+    int totalWritten = 0;
+    while (totalWritten < data.length) {
+      int written = sp.writeBytes(data, data.length - totalWritten, totalWritten);
+      if (written <= 0) {
+        int errorCode = sp.getLastErrorCode();
+        throw new ModbusException(
+            "failed to write to port '%s', written=%d, lastErrorCode=%d"
+                .formatted(config.serialPort(), written, errorCode));
+      }
+      totalWritten += written;
     }
   }
 

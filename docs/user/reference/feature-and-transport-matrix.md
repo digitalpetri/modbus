@@ -38,7 +38,7 @@ client/server dispatch do not provide PDU implementations. See [Function codes a
 | --- | --- | --- | --- | --- |
 | Synchronous typed client calls | Yes | Yes | Yes | Implemented over asynchronous stages |
 | Asynchronous typed client calls | Yes | Yes | Yes | Return `CompletionStage` |
-| Concurrent in-flight correlation | Yes | No | No | TCP uses MBAP transaction IDs; keep one RTU request in flight |
+| Concurrent in-flight correlation | Yes | No | No | TCP uses MBAP transaction IDs; the RTU client sends one request at a time and queues concurrent calls |
 | Automatic connection recovery | Yes | No | Yes | Netty client state machine; serial reconnect requires another explicit `connect()` |
 | Mutual TLS | Yes | No | Yes | Netty transports; TLS 1.2 and 1.3 |
 | Raw PDU client/server path | Yes | No | No | `sendRaw` / `RawModbusTcpServices`, with MBAP handled by the library |
