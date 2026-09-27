@@ -145,6 +145,11 @@ public record SerialPortTransportConfig(
      * thread from this executor until it completes or the transport is disconnected. Use an
      * executor that can spare that thread, such as the default.
      *
+     * <p>The executor must run tasks on its own threads. An executor that runs tasks on the
+     * submitting thread, e.g. a saturated {@link java.util.concurrent.ThreadPoolExecutor} that uses
+     * {@link java.util.concurrent.ThreadPoolExecutor.CallerRunsPolicy}, can run a write on the
+     * caller of {@code send()} and block it.
+     *
      * <p>Defaults to {@link Modbus#sharedExecutor()} if not set explicitly.
      */
     public ExecutorService executor;
