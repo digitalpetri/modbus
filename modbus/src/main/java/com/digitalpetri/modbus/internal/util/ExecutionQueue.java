@@ -2,6 +2,7 @@ package com.digitalpetri.modbus.internal.util;
 
 import java.util.ArrayDeque;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,6 +15,10 @@ import org.slf4j.LoggerFactory;
  *
  * <p>When {@code concurrency > 1} there are no guarantees beyond the fact that tasks are still
  * pulled from a queue to be executed.
+ *
+ * <p>If the executor rejects a task passed from one queued task to the next, the task runs on the
+ * current thread instead. If it rejects the task dispatched by {@link #submit(Runnable)}, the
+ * {@link RejectedExecutionException} is thrown to the caller.
  */
 public class ExecutionQueue {
 
@@ -139,18 +144,30 @@ public class ExecutionQueue {
 
     @Override
     public void run() {
-      try {
-        runnable.run();
-      } catch (Throwable throwable) {
-        LOGGER.warn("Uncaught Throwable during execution", throwable);
-      }
+      Runnable next = runnable;
 
-      synchronized (queueLock) {
-        if (queue.isEmpty() || paused) {
-          pending--;
-        } else {
-          // pending count remains the same
-          executor.execute(new Task(queue.poll()));
+      while (next != null) {
+        try {
+          next.run();
+        } catch (Throwable throwable) {
+          LOGGER.warn("Uncaught Throwable during execution", throwable);
+        }
+
+        synchronized (queueLock) {
+          if (queue.isEmpty() || paused) {
+            pending--;
+            next = null;
+          } else {
+            // pending count remains the same
+            Runnable polled = queue.poll();
+            try {
+              executor.execute(new Task(polled));
+              next = null;
+            } catch (RejectedExecutionException e) {
+              // Run it on this thread instead, so the task isn't lost and the queue doesn't stall.
+              next = polled;
+            }
+          }
         }
       }
     }

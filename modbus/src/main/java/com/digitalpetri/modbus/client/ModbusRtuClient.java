@@ -102,6 +102,17 @@ public class ModbusRtuClient extends ModbusClient {
                   timeouts.remove(promise);
 
                   if (removed) {
+                    // Cancel the send so a transport that queues writes doesn't write this request
+                    // after it timed out. Responses aren't matched to requests by any ID, so the
+                    // late request's response would be taken as the response to another request.
+                    // Cancel before completing the promise, which can run callers' callbacks on
+                    // this thread first.
+                    try {
+                      sendFuture.toCompletableFuture().cancel(false);
+                    } catch (UnsupportedOperationException ignored) {
+                      // This CompletionStage implementation can't be cancelled.
+                    }
+
                     // The frame parser needs to be reset!
                     // It could be "stuck" in Accumulating or ParseError states if the timeout was
                     // caused by an incomplete or invalid response rather than no response.
@@ -110,11 +121,6 @@ public class ModbusRtuClient extends ModbusClient {
                     promise.future.completeExceptionally(
                         new TimeoutException(
                             "request timed out after %sms".formatted(timeoutMillis)));
-
-                    // Cancel the send so a transport that queues writes doesn't write this request
-                    // after it timed out. Responses aren't matched to requests by any ID, so the
-                    // late request's response would be taken as the response to another request.
-                    sendFuture.toCompletableFuture().cancel(false);
                   }
                 },
                 timeoutMillis,

@@ -2,13 +2,13 @@ package com.digitalpetri.modbus.client;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.digitalpetri.modbus.ModbusRtuFrame;
 import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
 import com.digitalpetri.modbus.exceptions.ModbusTimeoutException;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersRequest;
 import java.time.Duration;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.TimeUnit;
@@ -33,7 +33,7 @@ public class ModbusRtuClientTest {
   }
 
   @Test
-  void sendIsCancelledWhenRequestTimesOut() throws ModbusExecutionException {
+  void sendIsCancelledBeforeRequestTimesOut() throws Exception {
     var sendFuture = new CompletableFuture<Void>();
     var transport =
         new TimeoutRtuTransport() {
@@ -47,12 +47,14 @@ public class ModbusRtuClientTest {
 
     client.connect();
 
-    assertThrows(
-        ModbusTimeoutException.class,
-        () -> client.readHoldingRegisters(1, new ReadHoldingRegistersRequest(0, 10)));
+    // Callbacks run when the request fails must already see the send cancelled, or a queued
+    // write could still go out while they run.
+    var cancelledWhenFailed = new CompletableFuture<Boolean>();
+    client
+        .readHoldingRegistersAsync(1, new ReadHoldingRegistersRequest(0, 10))
+        .whenComplete((r, ex) -> cancelledWhenFailed.complete(sendFuture.isCancelled()));
 
-    // The send is cancelled on the timer thread after the request fails, so wait for it.
-    assertThrows(CancellationException.class, () -> sendFuture.get(1, TimeUnit.SECONDS));
+    assertTrue(cancelledWhenFailed.get(5, TimeUnit.SECONDS));
     assertEquals(0, client.timeouts.size());
   }
 
