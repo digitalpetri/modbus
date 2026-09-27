@@ -59,7 +59,10 @@ debug level and ignored.
 
 Unit ID 0 is the RTU broadcast address in the library's dedicated broadcast path.
 `ModbusRtuClient.broadcast(...)` sends a request with unit 0 and returns after the frame is sent;
-it does not create a response promise or wait for a reply. Broadcasts are write-only.
+it does not create a response promise or wait for a reply. Broadcasts are write-only. The RTU
+client sends a broadcast in submission order with other requests. Set
+`ModbusClientConfig.Builder.setBroadcastTurnaroundDelay(...)` to give slaves time to process a
+broadcast before the next request is sent.
 
 Calling an ordinary request method with unit 0 is not equivalent: it creates a normal in-flight
 request and waits for a response. Modbus TCP client/server code does not add special broadcast

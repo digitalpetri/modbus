@@ -37,7 +37,10 @@ import org.slf4j.LoggerFactory;
  * <p>The request timeout starts when a request is submitted, so it includes time spent waiting
  * behind other requests. A request that times out while waiting is never sent.
  *
- * <p>Broadcasts are passed to the transport immediately and are not ordered with other requests.
+ * <p>Broadcasts wait their turn with other requests. A broadcast gets no response, so it completes
+ * when it's written, and the next request is sent after {@link
+ * ModbusClientConfig#broadcastTurnaroundDelay()}. The request timeout also applies to broadcasts,
+ * from submission until the broadcast is written.
  */
 public class ModbusRtuClient extends ModbusClient {
 
@@ -58,14 +61,20 @@ public class ModbusRtuClient extends ModbusClient {
    */
   private final ExecutionQueue requestQueue = new ExecutionQueue(executor);
 
-  /** Requests waiting to be sent, in the order submitted. */
-  private final ArrayDeque<PendingRequest> queued = new ArrayDeque<>();
+  /** Requests and broadcasts waiting to be sent, in the order submitted. */
+  private final ArrayDeque<Pending<?>> queued = new ArrayDeque<>();
 
-  /** The request that has been sent and is waiting for a response, or {@code null}. */
-  private PendingRequest inFlight;
+  /**
+   * The request that has been sent and is waiting for a response, the broadcast that is being
+   * written, or {@code null}.
+   */
+  private Pending<?> inFlight;
+
+  /** The turnaround delay that holds the queue after a broadcast, or {@code null}. */
+  private TimeoutHandle turnaround;
 
   // package visibility for testing
-  final Map<PendingRequest, TimeoutHandle> timeouts = new ConcurrentHashMap<>();
+  final Map<Pending<?>, TimeoutHandle> timeouts = new ConcurrentHashMap<>();
 
   private final ModbusClientConfig config;
   private final ModbusRtuClientTransport transport;
@@ -114,11 +123,22 @@ public class ModbusRtuClient extends ModbusClient {
     var pending =
         new PendingRequest(unitId, request.getFunctionCode(), new ModbusRtuFrame(unitId, pdu, crc));
 
+    enqueue(pending);
+
+    return pending.future;
+  }
+
+  /**
+   * Schedule the timeout for {@code pending} and queue it to be sent.
+   *
+   * <p>The timeout starts when the request is submitted, so it bounds how long the caller waits,
+   * including time spent queued behind other requests.
+   */
+  private void enqueue(Pending<?> pending) {
     requestQueue.submit(
         () -> {
-          // The timeout starts when the request is submitted, so it bounds how long the caller
-          // waits, including time spent queued behind other requests. It's scheduled on the queue
-          // so the timeout task can't run before the request is queued.
+          // The timeout is scheduled on the queue so the timeout task can't run before the
+          // request is queued.
           TimeoutHandle timeout;
           try {
             timeout =
@@ -140,18 +160,17 @@ public class ModbusRtuClient extends ModbusClient {
           queued.addLast(pending);
           sendNext();
         });
-
-    return pending.future;
   }
 
   /**
-   * Send the next queued request, unless a request is already in flight.
+   * Send the next queued request, unless a request is already in flight or the turnaround delay
+   * after a broadcast hasn't elapsed.
    *
    * <p>Must be called from a task on {@link #requestQueue}.
    */
   private void sendNext() {
-    while (inFlight == null && !queued.isEmpty()) {
-      PendingRequest pending = queued.poll();
+    while (inFlight == null && turnaround == null && !queued.isEmpty()) {
+      Pending<?> pending = queued.poll();
 
       if (pending.future.isDone()) {
         // The caller cancelled or completed the future before the request was sent.
@@ -166,17 +185,69 @@ public class ModbusRtuClient extends ModbusClient {
           (v, ex) -> {
             if (ex != null) {
               requestQueue.submit(() -> onSendFailure(pending, ex));
+            } else if (pending instanceof PendingBroadcast broadcast) {
+              requestQueue.submit(() -> onBroadcastSent(broadcast));
             }
           });
     }
   }
 
   /**
-   * Handle the timeout of a request, whether it's queued or in flight.
+   * Complete a broadcast that was written and hold the queue for the turnaround delay.
    *
    * <p>Must be called from a task on {@link #requestQueue}.
    */
-  private void onTimeout(PendingRequest pending) {
+  private void onBroadcastSent(PendingBroadcast broadcast) {
+    // Ignore it if the broadcast already timed out.
+    if (broadcast == inFlight) {
+      inFlight = null;
+
+      completeRequest(broadcast, null);
+      startTurnaround();
+      sendNext();
+    }
+  }
+
+  /**
+   * Hold the queue for the turnaround delay after a broadcast, if one is configured.
+   *
+   * <p>Must be called from a task on {@link #requestQueue}.
+   */
+  private void startTurnaround() {
+    long delay = config.broadcastTurnaroundDelay().toNanos();
+    if (delay > 0) {
+      try {
+        turnaround =
+            config
+                .timeoutScheduler()
+                .newTimeout(
+                    t -> requestQueue.submit(this::onTurnaroundElapsed),
+                    delay,
+                    TimeUnit.NANOSECONDS);
+      } catch (Exception e) {
+        // e.g. RejectedExecutionException if the scheduler has been shut down. Send the next
+        // request now rather than never.
+        logger.warn("Failed to schedule broadcast turnaround delay", e);
+      }
+    }
+  }
+
+  /**
+   * Send the next queued request after the turnaround delay following a broadcast.
+   *
+   * <p>Must be called from a task on {@link #requestQueue}.
+   */
+  private void onTurnaroundElapsed() {
+    turnaround = null;
+    sendNext();
+  }
+
+  /**
+   * Handle the timeout of a request or broadcast, whether it's queued or in flight.
+   *
+   * <p>Must be called from a task on {@link #requestQueue}.
+   */
+  private void onTimeout(Pending<?> pending) {
     var ex =
         new TimeoutException(
             "request timed out after %sms".formatted(config.requestTimeout().toMillis()));
@@ -200,6 +271,12 @@ public class ModbusRtuClient extends ModbusClient {
       }
 
       failRequest(pending, ex);
+
+      if (pending instanceof PendingBroadcast) {
+        // A write that already started may still finish, so slaves may yet receive it.
+        startTurnaround();
+      }
+
       sendNext();
     } else if (queued.remove(pending)) {
       // Timed out while waiting behind other requests; it was never sent.
@@ -212,7 +289,7 @@ public class ModbusRtuClient extends ModbusClient {
    *
    * <p>Must be called from a task on {@link #requestQueue}.
    */
-  private void onSendFailure(PendingRequest pending, Throwable failure) {
+  private void onSendFailure(Pending<?> pending, Throwable failure) {
     // Ignore the failure if the request already completed, e.g. it timed out and the timeout
     // cancelled the send.
     if (pending == inFlight) {
@@ -223,15 +300,15 @@ public class ModbusRtuClient extends ModbusClient {
     }
   }
 
-  private void completeRequest(PendingRequest pending, ModbusResponsePdu response) {
+  private <T> void completeRequest(Pending<T> pending, T result) {
     cancelTimeout(pending);
 
     // Complete off the request queue so caller callbacks, which may block on another request
     // from this client, don't hold up the queue.
-    executor.execute(() -> pending.future.complete(response));
+    executor.execute(() -> pending.future.complete(result));
   }
 
-  private void failRequest(PendingRequest pending, Throwable failure) {
+  private void failRequest(Pending<?> pending, Throwable failure) {
     cancelTimeout(pending);
 
     // Complete off the request queue so caller callbacks, which may block on another request
@@ -239,7 +316,7 @@ public class ModbusRtuClient extends ModbusClient {
     executor.execute(() -> pending.future.completeExceptionally(failure));
   }
 
-  private void cancelTimeout(PendingRequest pending) {
+  private void cancelTimeout(Pending<?> pending) {
     TimeoutHandle t = timeouts.remove(pending);
     if (t != null) {
       t.cancel();
@@ -264,8 +341,12 @@ public class ModbusRtuClient extends ModbusClient {
    *
    * <p>Broadcast requests are necessarily write commands.
    *
+   * <p>The broadcast is sent in submission order with other requests; see {@link
+   * #broadcastAsync(ModbusRequestPdu)}.
+   *
    * @param request the request to broadcast. Must be a write command.
-   * @throws ModbusExecutionException if an error occurs while sending the request.
+   * @throws ModbusExecutionException if an error occurs while sending the request, or if the
+   *     request timeout elapses before the request is sent.
    */
   public void broadcast(ModbusRequestPdu request) throws ModbusExecutionException {
     try {
@@ -285,8 +366,13 @@ public class ModbusRtuClient extends ModbusClient {
    *
    * <p>Broadcast requests are necessarily write commands.
    *
+   * <p>The broadcast is sent in submission order with other requests, after the request before it
+   * gets a response, times out, or fails to send. After the broadcast is written, the next request
+   * waits for {@link ModbusClientConfig#broadcastTurnaroundDelay()}.
+   *
    * @param request the request to broadcast. Must be a write command.
-   * @return a {@link CompletionStage} that completes when the request has been sent.
+   * @return a {@link CompletionStage} that completes when the request has been sent, or completes
+   *     exceptionally with a {@link TimeoutException} if the request timeout elapses first.
    */
   public CompletionStage<Void> broadcastAsync(ModbusRequestPdu request) {
     ByteBuffer pdu = ByteBuffer.allocate(256);
@@ -300,15 +386,18 @@ public class ModbusRtuClient extends ModbusClient {
 
     ByteBuffer crc = calculateCrc16(BROADCAST_ID, pdu);
 
-    return transport.send(new ModbusRtuFrame(BROADCAST_ID, pdu, crc));
+    var pending = new PendingBroadcast(new ModbusRtuFrame(BROADCAST_ID, pdu, crc));
+
+    enqueue(pending);
+
+    return pending.future;
   }
 
   private void onFrameReceived(ModbusRtuFrame frame) {
     requestQueue.submit(
         () -> {
-          PendingRequest pending = inFlight;
-
-          if (pending != null) {
+          // A broadcast gets no response, so a frame received while one is in flight is unexpected.
+          if (inFlight instanceof PendingRequest pending) {
             inFlight = null;
 
             handleResponse(pending, frame);
@@ -439,21 +528,45 @@ public class ModbusRtuClient extends ModbusClient {
     return new ModbusRtuClient(builder.build(), transport);
   }
 
-  // Not a record: requests are compared by identity, and sendFuture is assigned when it's sent.
-  private static final class PendingRequest {
+  /**
+   * A request or broadcast waiting to be sent or completed.
+   *
+   * <p>Not a record: requests are compared by identity, and sendFuture is assigned when it's sent.
+   *
+   * @param <T> the type {@link #future} completes with.
+   */
+  private abstract static sealed class Pending<T> permits PendingRequest, PendingBroadcast {
 
-    final int slaveId;
-    final int functionCode;
     final ModbusRtuFrame frame;
-    final CompletableFuture<ModbusResponsePdu> future = new CompletableFuture<>();
+    final CompletableFuture<T> future = new CompletableFuture<>();
 
     /** Assigned on the request queue when the request is sent. */
     CompletionStage<Void> sendFuture;
 
+    Pending(ModbusRtuFrame frame) {
+      this.frame = frame;
+    }
+  }
+
+  /** A request that completes when it gets a response. */
+  private static final class PendingRequest extends Pending<ModbusResponsePdu> {
+
+    final int slaveId;
+    final int functionCode;
+
     PendingRequest(int slaveId, int functionCode, ModbusRtuFrame frame) {
+      super(frame);
+
       this.slaveId = slaveId;
       this.functionCode = functionCode;
-      this.frame = frame;
+    }
+  }
+
+  /** A broadcast, which gets no response and completes when it's written. */
+  private static final class PendingBroadcast extends Pending<Void> {
+
+    PendingBroadcast(ModbusRtuFrame frame) {
+      super(frame);
     }
   }
 }

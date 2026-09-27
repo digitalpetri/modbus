@@ -2,6 +2,7 @@ package com.digitalpetri.modbus.client;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -19,6 +20,7 @@ import com.digitalpetri.modbus.pdu.ModbusResponsePdu;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersRequest;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersResponse;
 import com.digitalpetri.modbus.pdu.ReadInputRegistersResponse;
+import com.digitalpetri.modbus.pdu.WriteSingleRegisterRequest;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.concurrent.BlockingQueue;
@@ -256,6 +258,124 @@ public class ModbusRtuClientTest {
     assertEquals(0, client.timeouts.size());
   }
 
+  @Test
+  void broadcastIsSentInSubmissionOrder() throws Exception {
+    var transport = new RecordingRtuTransport();
+    var client = ModbusRtuClient.create(transport);
+
+    client.connect();
+
+    CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
+    CompletableFuture<Void> x = broadcastAsync(client, 50);
+    CompletableFuture<ReadHoldingRegistersResponse> b = readAsync(client, 100);
+
+    // The broadcast waits for A's response.
+    assertEquals(0, startAddress(transport.nextSentFrame()));
+    transport.assertNoFrameSent();
+
+    transport.respond(client, registers(0x0A));
+    assertArrayEquals(registers(0x0A), a.get(1, TimeUnit.SECONDS).registers());
+
+    ModbusRtuFrame broadcast = transport.nextSentFrame();
+    assertEquals(0, broadcast.unitId());
+    assertEquals(50, startAddress(broadcast));
+    x.get(1, TimeUnit.SECONDS);
+
+    // No turnaround delay by default, and no response to wait for.
+    assertEquals(100, startAddress(transport.nextSentFrame()));
+    transport.respond(client, registers(0x0B));
+    assertArrayEquals(registers(0x0B), b.get(1, TimeUnit.SECONDS).registers());
+    assertEquals(0, client.timeouts.size());
+  }
+
+  @Test
+  void nextRequestWaitsForBroadcastTurnaroundDelay() throws Exception {
+    var scheduler = new ManualTimeoutScheduler();
+    var transport = new RecordingRtuTransport();
+    var client =
+        ModbusRtuClient.create(
+            transport,
+            cfg -> {
+              cfg.timeoutScheduler = scheduler;
+              cfg.broadcastTurnaroundDelay = Duration.ofMillis(100);
+            });
+
+    client.connect();
+
+    CompletableFuture<Void> x = broadcastAsync(client, 50);
+    assertEquals(50, startAddress(transport.nextSentFrame()));
+    x.get(1, TimeUnit.SECONDS);
+
+    CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
+
+    scheduler.nextTimeout(); // the broadcast's request timeout, cancelled when it was written
+    Runnable turnaroundElapsed = scheduler.nextTimeout();
+    transport.assertNoFrameSent();
+
+    turnaroundElapsed.run();
+    assertEquals(0, startAddress(transport.nextSentFrame()));
+    transport.respond(client, registers(0x0A));
+    assertArrayEquals(registers(0x0A), a.get(1, TimeUnit.SECONDS).registers());
+    assertEquals(0, client.timeouts.size());
+  }
+
+  @Test
+  void nextRequestWaitsForTurnaroundWhenBroadcastTimesOut() throws Exception {
+    var scheduler = new ManualTimeoutScheduler();
+    var broadcastSendFuture = new CompletableFuture<Void>();
+    var transport =
+        new RecordingRtuTransport() {
+          @Override
+          public CompletionStage<Void> send(ModbusRtuFrame frame) {
+            super.send(frame);
+            if (frame.unitId() == 0) {
+              return broadcastSendFuture;
+            } else {
+              return CompletableFuture.completedFuture(null);
+            }
+          }
+        };
+    var client =
+        ModbusRtuClient.create(
+            transport,
+            cfg -> {
+              cfg.timeoutScheduler = scheduler;
+              cfg.broadcastTurnaroundDelay = Duration.ofMillis(100);
+            });
+
+    client.connect();
+
+    CompletableFuture<Void> x = broadcastAsync(client, 50);
+    CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
+    Runnable timeoutX = scheduler.nextTimeout();
+    scheduler.nextTimeout(); // A's request timeout
+
+    // The broadcast write stalls, so A waits. A stray frame isn't taken as a broadcast response.
+    assertEquals(50, startAddress(transport.nextSentFrame()));
+    transport.respond(client, registers(0xFF));
+    transport.assertNoFrameSent();
+    assertFalse(x.isDone());
+
+    timeoutX.run();
+    var e = assertThrows(ExecutionException.class, () -> x.get(1, TimeUnit.SECONDS));
+    assertInstanceOf(TimeoutException.class, e.getCause());
+    assertTrue(broadcastSendFuture.isCancelled());
+
+    // The cancelled write may have gone out anyway, so A still waits for the turnaround delay.
+    Runnable turnaroundElapsed = scheduler.nextTimeout();
+    transport.assertNoFrameSent();
+
+    turnaroundElapsed.run();
+    assertEquals(0, startAddress(transport.nextSentFrame()));
+    transport.respond(client, registers(0x0A));
+    assertArrayEquals(registers(0x0A), a.get(1, TimeUnit.SECONDS).registers());
+    assertEquals(0, client.timeouts.size());
+  }
+
+  private static CompletableFuture<Void> broadcastAsync(ModbusRtuClient client, int address) {
+    return client.broadcastAsync(new WriteSingleRegisterRequest(address, 1)).toCompletableFuture();
+  }
+
   private static CompletableFuture<ReadHoldingRegistersResponse> readAsync(
       ModbusRtuClient client, int address) {
 
@@ -266,7 +386,7 @@ public class ModbusRtuClientTest {
 
   private static int startAddress(ModbusRtuFrame frame) {
     ByteBuffer pdu = frame.pdu();
-    // function code, then the 2-byte starting address
+    // function code, then the 2-byte starting (or register) address
     return pdu.getShort(pdu.position() + 1) & 0xFFFF;
   }
 
