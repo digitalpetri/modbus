@@ -14,6 +14,7 @@ import com.digitalpetri.modbus.ModbusRtuFrame;
 import com.digitalpetri.modbus.TimeoutScheduler;
 import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
+import com.digitalpetri.modbus.exceptions.ModbusResponseException;
 import com.digitalpetri.modbus.exceptions.ModbusTimeoutException;
 import com.digitalpetri.modbus.pdu.ModbusResponsePdu;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersRequest;
@@ -167,6 +168,58 @@ public class ModbusRtuClientTest {
   }
 
   @Test
+  void exceptionResponseFailsWithExceptionCode() throws Exception {
+    var transport = new RecordingRtuTransport();
+    var client = ModbusRtuClient.create(transport);
+
+    client.connect();
+
+    CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
+
+    transport.nextSentFrame();
+    // ILLEGAL_DATA_ADDRESS in response to READ_HOLDING_REGISTERS
+    transport.respondRaw(client, (byte) 0x83, (byte) 0x02);
+    var e = assertThrows(ExecutionException.class, () -> a.get(1, TimeUnit.SECONDS));
+    var re = assertInstanceOf(ModbusResponseException.class, e.getCause());
+    assertEquals(0x03, re.getFunctionCode());
+    assertEquals(0x02, re.getExceptionCode());
+    assertEquals(0, client.timeouts.size());
+  }
+
+  @Test
+  void exceptionResponseForAnotherFunctionIsMismatch() throws Exception {
+    var transport = new RecordingRtuTransport();
+    var client = ModbusRtuClient.create(transport);
+
+    client.connect();
+
+    CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
+
+    transport.nextSentFrame();
+    // An exception response to READ_INPUT_REGISTERS, not READ_HOLDING_REGISTERS
+    transport.respondRaw(client, (byte) 0x84, (byte) 0x02);
+    var e = assertThrows(ExecutionException.class, () -> a.get(1, TimeUnit.SECONDS));
+    assertEquals(ModbusException.class, e.getCause().getClass());
+    assertTrue(e.getCause().getMessage().startsWith("function code mismatch"));
+  }
+
+  @Test
+  void exceptionResponseWithoutExceptionCodeIsMalformed() throws Exception {
+    var transport = new RecordingRtuTransport();
+    var client = ModbusRtuClient.create(transport);
+
+    client.connect();
+
+    CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
+
+    transport.nextSentFrame();
+    transport.respondRaw(client, (byte) 0x83);
+    var e = assertThrows(ExecutionException.class, () -> a.get(1, TimeUnit.SECONDS));
+    assertEquals(ModbusException.class, e.getCause().getClass());
+    assertEquals("malformed exception response PDU: 83", e.getCause().getMessage());
+  }
+
+  @Test
   void queuedRequestCancelledByCallerIsNotSent() throws Exception {
     var transport = new RecordingRtuTransport();
     var client = ModbusRtuClient.create(transport);
@@ -311,6 +364,15 @@ public class ModbusRtuClientTest {
       DefaultResponseSerializer.INSTANCE.encode(response, pdu);
       pdu.flip();
 
+      respondRaw(client, pdu);
+    }
+
+    /** Respond with {@code pdu} as-is, e.g. an exception response. */
+    void respondRaw(ModbusRtuClient client, byte... pdu) {
+      respondRaw(client, ByteBuffer.wrap(pdu));
+    }
+
+    private void respondRaw(ModbusRtuClient client, ByteBuffer pdu) {
       frameReceiver.accept(new ModbusRtuFrame(1, pdu, client.calculateCrc16(1, pdu)));
     }
   }
