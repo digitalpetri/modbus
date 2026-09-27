@@ -44,7 +44,9 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
   /**
    * Return the underlying {@link SerialPort} used by this transport.
    *
-   * <p>The serial port is lazily instantiated on first access.
+   * <p>The serial port is lazily instantiated on first access. After {@link #disconnect()} closes
+   * the port, the next access creates a new instance, so changes made to the previous instance are
+   * not carried over.
    *
    * @return the configured {@link SerialPort} instance.
    * @throws ModbusException if the serial port could not be created.
@@ -126,6 +128,10 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
     if (sp != null && sp.isOpen()) {
       if (sp.closePort()) {
         frameParser.reset();
+
+        // Create a new SerialPort on the next connect(). Writes still queued for this one then
+        // fail instead of being sent on the reopened port.
+        this.serialPort = null;
 
         return CompletableFuture.completedFuture(null);
       } else {

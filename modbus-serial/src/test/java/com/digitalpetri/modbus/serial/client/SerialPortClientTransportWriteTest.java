@@ -18,7 +18,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.AfterEach;
@@ -62,6 +65,7 @@ class SerialPortClientTransportWriteTest {
   private Process helper;
   private BufferedReader helperOut;
   private OutputStream helperIn;
+  private String ptyPath;
   private SerialPortClientTransport transport;
 
   @BeforeEach
@@ -75,7 +79,7 @@ class SerialPortClientTransportWriteTest {
         new BufferedReader(new InputStreamReader(helper.getInputStream(), StandardCharsets.UTF_8));
     helperIn = helper.getOutputStream();
 
-    String ptyPath = helperOut.readLine();
+    ptyPath = helperOut.readLine();
     assumeTrue(ptyPath != null, "failed to open pty");
 
     transport = SerialPortClientTransport.create(cfg -> cfg.setSerialPort(ptyPath));
@@ -124,6 +128,42 @@ class SerialPortClientTransportWriteTest {
       ExecutionException e =
           assertThrows(ExecutionException.class, () -> f.get(5, TimeUnit.SECONDS));
       assertInstanceOf(ModbusException.class, e.getCause());
+    }
+  }
+
+  @Test
+  void writeQueuedBeforeReconnectIsNotSent() throws Exception {
+    transport.disconnect().get(5, TimeUnit.SECONDS);
+
+    ExecutorService executor = Executors.newSingleThreadExecutor();
+    var gate = new CountDownLatch(1);
+    try {
+      // Occupy the executor's only thread so the write stays queued until the gate opens.
+      executor.execute(
+          () -> {
+            try {
+              gate.await();
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+            }
+          });
+
+      transport =
+          SerialPortClientTransport.create(cfg -> cfg.setSerialPort(ptyPath).setExecutor(executor));
+      transport.connect().get(5, TimeUnit.SECONDS);
+
+      CompletableFuture<Void> queued = send();
+
+      transport.disconnect().get(5, TimeUnit.SECONDS);
+      transport.connect().get(5, TimeUnit.SECONDS);
+      gate.countDown();
+
+      ExecutionException e =
+          assertThrows(ExecutionException.class, () -> queued.get(5, TimeUnit.SECONDS));
+      assertInstanceOf(ModbusException.class, e.getCause());
+    } finally {
+      gate.countDown();
+      executor.shutdown();
     }
   }
 

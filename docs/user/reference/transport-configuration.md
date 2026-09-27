@@ -87,11 +87,17 @@ active client channel and closes additional channels until that client disconnec
 | `setRs485RxDuringTx` | `boolean` | `false` | Receive while transmitting; effective only on Linux |
 | `setRs485DelayBefore` | `int` microseconds | 0 | Delay after transmit enable; effective only on Linux |
 | `setRs485DelayAfter` | `int` microseconds | 0 | Delay before transmit disable; effective only on Linux |
-| `setExecutor` | `ExecutorService` | `Modbus.sharedExecutor()` | Delivers parsed frame callbacks |
+| `setExecutor` | `ExecutorService` | `Modbus.sharedExecutor()` | Delivers parsed frame callbacks; the client transport also writes frames on it |
 
 The port object is created lazily. `connect()`/`bind()` opens it and installs a data listener;
-`disconnect()`/`unbind()` closes it. Open and close failures report jSerialComm's last error code.
-Client write failures also include the code; the serial server logs a generic write error.
+`disconnect()`/`unbind()` closes it. After `disconnect()`, the client transport discards the port
+object, and the next `connect()` creates a new one. Settings changed through `getSerialPort()` are
+not carried over. Open and close failures report jSerialComm's last error code. Client write
+failures also include the code; the serial server logs a generic write error.
+
+The client transport writes frames on the executor, so `send()` returns without waiting for the
+port. Writes run one at a time, in order. A write that stalls, for example because the port stops
+accepting data, holds one executor thread until it completes or `disconnect()` closes the port.
 
 ## Client protocol configuration
 
