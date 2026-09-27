@@ -59,7 +59,7 @@ multi-register value conversion. Once one register succeeds, expand one variable
 | --- | --- |
 | `ModbusConnectException` or a cause wrapped by `ModbusExecutionException` | The transport could not connect/open; inspect the root cause, endpoint, permissions, and TLS handshake |
 | `ModbusTimeoutException` | No matching response arrived before the request deadline; check unit, framing, server load, and timeout budget |
-| `ModbusResponseException` | The server returned a Modbus exception; TCP exposes both numeric fields, while RTU is subject to the [RTU exception-code limitation](../../reference/errors-and-exceptions.md#rtu-exception-code-limitation) |
+| `ModbusResponseException` | The server returned a Modbus exception; `getFunctionCode()` and `getExceptionCode()` identify the request function and the reason |
 | `ModbusExecutionException` caused by `ModbusCrcException` | A synchronous RTU call received a frame with the wrong CRC; inspect physical/link settings and interference |
 | Unit/function mismatch (reported as `slave id mismatch` / `function code mismatch`) | An RTU response did not match the outstanding request, often a late response to an earlier request that timed out, or another master on the bus |
 | Successful response with unexpected bytes | Communication works; move to byte/word order, signedness, scale, and data-map diagnosis |
