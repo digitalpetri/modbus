@@ -86,6 +86,8 @@ public class ModbusRtuClient extends ModbusClient {
       promises.push(promise);
     }
 
+    CompletionStage<Void> sendFuture = send(new ModbusRtuFrame(unitId, pdu, crc));
+
     long timeoutMillis = config.requestTimeout().toMillis();
     TimeoutHandle timeout =
         config
@@ -108,6 +110,11 @@ public class ModbusRtuClient extends ModbusClient {
                     promise.future.completeExceptionally(
                         new TimeoutException(
                             "request timed out after %sms".formatted(timeoutMillis)));
+
+                    // Cancel the send so a transport that queues writes doesn't write this request
+                    // after it timed out. Responses aren't matched to requests by any ID, so the
+                    // late request's response would be taken as the response to another request.
+                    sendFuture.toCompletableFuture().cancel(false);
                   }
                 },
                 timeoutMillis,
@@ -115,26 +122,36 @@ public class ModbusRtuClient extends ModbusClient {
 
     timeouts.put(promise, timeout);
 
-    transport
-        .send(new ModbusRtuFrame(unitId, pdu, crc))
-        .whenComplete(
-            (v, ex) -> {
-              if (ex != null) {
-                boolean removed;
-                synchronized (promises) {
-                  removed = promises.remove(promise);
-                }
-                if (removed) {
-                  promise.future.completeExceptionally(ex);
-                }
-                TimeoutHandle t = timeouts.remove(promise);
-                if (t != null) {
-                  t.cancel();
-                }
-              }
-            });
+    sendFuture.whenComplete(
+        (v, ex) -> {
+          if (ex != null) {
+            boolean removed;
+            synchronized (promises) {
+              removed = promises.remove(promise);
+            }
+            if (removed) {
+              promise.future.completeExceptionally(ex);
+            }
+            TimeoutHandle t = timeouts.remove(promise);
+            if (t != null) {
+              t.cancel();
+            }
+          }
+        });
 
     return promise.future;
+  }
+
+  /**
+   * Send {@code frame} using the transport, converting an exception thrown by the transport into a
+   * failed {@link CompletionStage}.
+   */
+  private CompletionStage<Void> send(ModbusRtuFrame frame) {
+    try {
+      return transport.send(frame);
+    } catch (Exception e) {
+      return CompletableFuture.failedFuture(e);
+    }
   }
 
   /**

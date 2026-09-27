@@ -25,7 +25,8 @@ import java.util.function.Consumer;
  *     sending the first data bit. Effective only on Linux.
  * @param rs485DelayAfter the time to wait in microseconds after sending the last data bit before
  *     disabling transmit mode. Effective only on Linux.
- * @param executor the {@link ExecutorService} to use when delivering frame received callbacks.
+ * @param executor the {@link ExecutorService} to use when delivering frame received callbacks and,
+ *     for a {@link SerialPortClientTransport}, when writing frames to the serial port.
  * @see SerialPortTransportConfig#create(Consumer)
  */
 public record SerialPortTransportConfig(
@@ -137,7 +138,12 @@ public record SerialPortTransportConfig(
     public int rs485DelayAfter = 0;
 
     /**
-     * The {@link ExecutorService} to use when delivering frame received callbacks.
+     * The {@link ExecutorService} to use when delivering frame received callbacks and, for a {@link
+     * SerialPortClientTransport}, when writing frames to the serial port.
+     *
+     * <p>A write that stalls, e.g. because the serial port stops accepting data, occupies one
+     * thread from this executor until it completes or the transport is disconnected. Use an
+     * executor that can spare that thread, such as the default.
      *
      * <p>Defaults to {@link Modbus#sharedExecutor()} if not set explicitly.
      */
@@ -286,7 +292,8 @@ public record SerialPortTransportConfig(
     }
 
     /**
-     * Set the {@link ExecutorService} to use when delivering frame received callbacks.
+     * Set the {@link ExecutorService} to use when delivering frame received callbacks and, for a
+     * {@link SerialPortClientTransport}, when writing frames to the serial port.
      *
      * @param executor the executor service.
      * @return this {@link Builder}.
