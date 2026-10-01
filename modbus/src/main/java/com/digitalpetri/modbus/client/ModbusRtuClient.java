@@ -8,6 +8,7 @@ import com.digitalpetri.modbus.exceptions.ModbusCrcException;
 import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
+import com.digitalpetri.modbus.exceptions.ModbusTimeoutException;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
 import com.digitalpetri.modbus.pdu.ModbusPdu;
 import com.digitalpetri.modbus.pdu.ModbusRequestPdu;
@@ -15,6 +16,7 @@ import com.digitalpetri.modbus.pdu.ModbusResponsePdu;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
@@ -22,6 +24,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,7 +40,9 @@ import org.slf4j.LoggerFactory;
  * <p>The request timeout starts when a request is submitted, so it includes time spent waiting
  * behind other requests. A request that times out while waiting is never sent.
  *
- * <p>Broadcasts are passed to the transport immediately and are not ordered with other requests.
+ * <p>Broadcasts are passed to the transport immediately and are not ordered with other requests. A
+ * broadcast completes when the frame has been written, or fails with a timeout if the write does
+ * not complete within the request timeout.
  */
 public class ModbusRtuClient extends ModbusClient {
 
@@ -266,13 +271,20 @@ public class ModbusRtuClient extends ModbusClient {
    *
    * @param request the request to broadcast. Must be a write command.
    * @throws ModbusExecutionException if an error occurs while sending the request.
+   * @throws ModbusTimeoutException if the write does not complete within the request timeout.
    */
-  public void broadcast(ModbusRequestPdu request) throws ModbusExecutionException {
+  public void broadcast(ModbusRequestPdu request)
+      throws ModbusExecutionException, ModbusTimeoutException {
+
     try {
       broadcastAsync(request).toCompletableFuture().get();
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
-      throw new ModbusExecutionException(cause);
+      if (cause instanceof TimeoutException ex) {
+        throw new ModbusTimeoutException(ex);
+      } else {
+        throw new ModbusExecutionException(cause);
+      }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new ModbusExecutionException(e);
@@ -286,7 +298,9 @@ public class ModbusRtuClient extends ModbusClient {
    * <p>Broadcast requests are necessarily write commands.
    *
    * @param request the request to broadcast. Must be a write command.
-   * @return a {@link CompletionStage} that completes when the request has been sent.
+   * @return a {@link CompletionStage} that completes when the request has been sent, or completes
+   *     exceptionally with a {@link TimeoutException} if the write does not complete within the
+   *     request timeout.
    */
   public CompletionStage<Void> broadcastAsync(ModbusRequestPdu request) {
     ByteBuffer pdu = ByteBuffer.allocate(256);
@@ -300,7 +314,64 @@ public class ModbusRtuClient extends ModbusClient {
 
     ByteBuffer crc = calculateCrc16(BROADCAST_ID, pdu);
 
-    return transport.send(new ModbusRtuFrame(BROADCAST_ID, pdu, crc));
+    var future = new CompletableFuture<Void>();
+    // Set once the frame has been handed to the transport; the timeout task uses it to cancel the
+    // send so a transport that queues writes doesn't write the broadcast after it timed out.
+    var sendFutureRef = new AtomicReference<CompletionStage<Void>>();
+
+    TimeoutHandle timeout;
+    TimeoutException timeoutException;
+    try {
+      long timeoutMillis = config.requestTimeout().toMillis();
+
+      timeoutException =
+          new TimeoutException("broadcast timed out after %sms".formatted(timeoutMillis));
+
+      timeout =
+          config
+              .timeoutScheduler()
+              .newTimeout(
+                  t -> {
+                    CompletionStage<Void> sendFuture = sendFutureRef.get();
+                    if (sendFuture != null) {
+                      try {
+                        sendFuture.toCompletableFuture().cancel(false);
+                      } catch (UnsupportedOperationException ignored) {
+                        // This CompletionStage implementation can't be cancelled.
+                      }
+                    }
+
+                    future.completeExceptionally(timeoutException);
+                  },
+                  timeoutMillis,
+                  TimeUnit.MILLISECONDS);
+    } catch (Exception e) {
+      // e.g. RejectedExecutionException if the scheduler has been shut down. Without a timeout the
+      // caller could wait forever, so fail the broadcast instead of sending it.
+      future.completeExceptionally(e);
+      return future;
+    }
+
+    CompletionStage<Void> sendFuture = send(new ModbusRtuFrame(BROADCAST_ID, pdu, crc));
+    sendFutureRef.set(sendFuture);
+
+    sendFuture.whenComplete(
+        (v, ex) -> {
+          timeout.cancel();
+
+          if (ex == null) {
+            future.complete(null);
+          } else if (ex instanceof CancellationException) {
+            // The send was cancelled, e.g. by the timeout task, which cancels the send before
+            // failing the broadcast. The timeout task is currently the only canceller of the
+            // send future, so the caller sees a timeout either way.
+            future.completeExceptionally(timeoutException);
+          } else {
+            future.completeExceptionally(ex);
+          }
+        });
+
+    return future;
   }
 
   private void onFrameReceived(ModbusRtuFrame frame) {
