@@ -342,6 +342,34 @@ public class ModbusRtuClientTest {
   }
 
   @Test
+  void broadcastTimedOutBeforeSendIsPublishedCancelsSend() throws Exception {
+    var scheduler = new ManualTimeoutScheduler();
+    var sendFuture = new CompletableFuture<Void>();
+    var transport =
+        new TimeoutRtuTransport() {
+          @Override
+          public CompletionStage<Void> send(ModbusRtuFrame frame) {
+            // Fire the timeout while send() is still running, before the client publishes the
+            // send future, to exercise the re-check after publication.
+            scheduler.timeouts.remove().run();
+            return sendFuture;
+          }
+        };
+    var client = ModbusRtuClient.create(transport, cfg -> cfg.timeoutScheduler = scheduler);
+
+    client.connect();
+
+    CompletableFuture<Void> broadcast =
+        client.broadcastAsync(new WriteSingleRegisterRequest(0, 0x0A)).toCompletableFuture();
+
+    var e = assertThrows(ExecutionException.class, () -> broadcast.get(1, TimeUnit.SECONDS));
+    assertInstanceOf(TimeoutException.class, e.getCause());
+
+    // The re-check after publication cancelled the send so a queued write is skipped.
+    assertTrue(sendFuture.isCancelled());
+  }
+
+  @Test
   void broadcastFailsWhenSendFails() throws Exception {
     var failure = new ModbusException("write failed");
     var transport =

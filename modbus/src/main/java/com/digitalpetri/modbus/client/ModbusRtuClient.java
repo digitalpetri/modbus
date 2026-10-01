@@ -355,6 +355,16 @@ public class ModbusRtuClient extends ModbusClient {
     CompletionStage<Void> sendFuture = send(new ModbusRtuFrame(BROADCAST_ID, pdu, crc));
     sendFutureRef.set(sendFuture);
 
+    // The timeout may have fired before the send future was published, in which case the timeout
+    // task saw no send future to cancel. Re-check and cancel so a queued write is still skipped.
+    if (future.isDone()) {
+      try {
+        sendFuture.toCompletableFuture().cancel(false);
+      } catch (UnsupportedOperationException ignored) {
+        // This CompletionStage implementation can't be cancelled.
+      }
+    }
+
     sendFuture.whenComplete(
         (v, ex) -> {
           timeout.cancel();
