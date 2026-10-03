@@ -9,6 +9,7 @@ import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
+import com.digitalpetri.modbus.internal.util.Hex;
 import com.digitalpetri.modbus.pdu.ModbusPdu;
 import com.digitalpetri.modbus.pdu.ModbusRequestPdu;
 import com.digitalpetri.modbus.pdu.ModbusResponsePdu;
@@ -390,28 +391,40 @@ public class ModbusRtuClient extends ModbusClient {
     }
 
     ByteBuffer buffer = frame.pdu();
+
+    if (buffer.remaining() == 0) {
+      failRequest(pending, new ModbusException("empty response PDU"));
+      return;
+    }
+
     int functionCode = buffer.get(buffer.position()) & 0xFF;
 
-    if (functionCode < 0x80) {
-      if (functionCode != pending.functionCode) {
-        // Response might be out of sync, e.g. the timeout elapsed in request A,
-        // we sent request B, and now we're receiving response A.
+    if (functionCode == pending.functionCode) {
+      try {
+        ModbusPdu modbusPdu = config.responseSerializer().decode(functionCode, buffer);
+        completeRequest(pending, (ModbusResponsePdu) modbusPdu);
+      } catch (Exception e) {
+        failRequest(pending, e);
+      }
+    } else if (functionCode == pending.functionCode + 0x80) {
+      if (buffer.remaining() >= 2) {
+        buffer.get(); // skip FC byte
+        int exceptionCode = buffer.get() & 0xFF;
+
+        failRequest(pending, new ModbusResponseException(pending.functionCode, exceptionCode));
+      } else {
         failRequest(
             pending,
             new ModbusException(
-                "function code mismatch: %s != %s".formatted(pending.functionCode, functionCode)));
-      } else {
-        try {
-          ModbusPdu modbusPdu = config.responseSerializer().decode(functionCode, buffer);
-          completeRequest(pending, (ModbusResponsePdu) modbusPdu);
-        } catch (Exception e) {
-          failRequest(pending, e);
-        }
+                "malformed exception response PDU: %s".formatted(Hex.format(buffer))));
       }
     } else {
-      int exceptionCode = buffer.get();
-
-      failRequest(pending, new ModbusResponseException(pending.functionCode, exceptionCode));
+      // Response might be out of sync, e.g. the timeout elapsed in request A,
+      // we sent request B, and now we're receiving response A.
+      failRequest(
+          pending,
+          new ModbusException(
+              "function code mismatch: %s != %s".formatted(pending.functionCode, functionCode)));
     }
   }
 

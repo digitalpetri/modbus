@@ -38,14 +38,14 @@ reused while its previous request remains in flight.
 | Behavior | Detail |
 | --- | --- |
 | Request order | One request is outstanding at a time. Other requests wait in submission order and are sent when the current request gets a response, times out, or fails to send |
-| Correlation | A response is matched to the outstanding request. The client checks the unit ID and, for normal responses, the function code. There is no transaction ID or ordering field |
+| Correlation | A response is matched to the outstanding request. The client checks the unit ID and the function code. An exception response must carry the request's function code plus `0x80`. There is no transaction ID or ordering field |
 | Request timeout | Starts when the request is submitted, so it includes time spent waiting behind other requests. A request that times out while waiting is never sent |
 | CRC | Calculated on send and verified on receive |
 | Timeout recovery | Fails the outstanding request, resets the transport frame parser, and sends the next waiting request |
 | CRC recovery | Fails with `ModbusCrcException` and resets the frame parser |
 | Unit/function mismatch (reported as `slave id mismatch` / `function code mismatch`) | Fails the outstanding request only; requests waiting behind it are not failed. A late response with a matching unit and function code is accepted as the response to the next request |
 | Broadcast | `broadcast` sends with unit ID 0 and waits only for send completion, bounded by the request timeout. If the write does not complete in time, the queued write is cancelled and `broadcast` throws `ModbusExecutionException` with a `TimeoutException` cause. Cancelling the `broadcastAsync` future also cancels a queued write. Broadcasts are passed to the transport immediately, even while a request is outstanding, and are not ordered with other requests |
-| Exception response | Produces `ModbusResponseException`, but `getExceptionCode()` is currently unreliable for RTU; see the [RTU exception-code limitation](errors-and-exceptions.md#rtu-exception-code-limitation) |
+| Exception response | Produces `ModbusResponseException` with the request's function code and the response's exception code. An exception response without an exception code fails with `malformed exception response PDU` |
 
 These behaviors apply to both serial RTU and RTU over TCP. For concurrent callers, see
 [Client concurrency](lifecycle-concurrency-and-resources.md#client-concurrency).
