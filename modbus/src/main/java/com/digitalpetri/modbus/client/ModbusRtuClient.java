@@ -9,6 +9,7 @@ import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
+import com.digitalpetri.modbus.internal.util.Hex;
 import com.digitalpetri.modbus.pdu.ModbusPdu;
 import com.digitalpetri.modbus.pdu.ModbusRequestPdu;
 import com.digitalpetri.modbus.pdu.ModbusResponsePdu;
@@ -183,6 +184,9 @@ public class ModbusRtuClient extends ModbusClient {
       inFlight = pending;
 
       pending.sendFuture = send(pending.frame);
+      if (pending instanceof PendingBroadcast broadcast) {
+        ((BroadcastFuture) broadcast.future).setSendFuture(pending.sendFuture);
+      }
       pending.sendFuture.whenComplete(
           (v, ex) -> {
             if (ex != null) {
@@ -370,8 +374,8 @@ public class ModbusRtuClient extends ModbusClient {
    * #broadcastAsync(ModbusRequestPdu)}.
    *
    * @param request the request to broadcast. Must be a write command.
-   * @throws ModbusExecutionException if an error occurs while sending the request, or if the
-   *     request timeout elapses before the request is sent.
+   * @throws ModbusExecutionException if an error occurs while sending the request. If the request
+   *     timeout elapses before the write completes, the cause is a {@link TimeoutException}.
    */
   public void broadcast(ModbusRequestPdu request) throws ModbusExecutionException {
     try {
@@ -395,6 +399,9 @@ public class ModbusRtuClient extends ModbusClient {
    * gets a response, times out, or fails to send. After the broadcast is written, the next request
    * waits for {@link ModbusClientConfig#broadcastTurnaroundDelay()}. That includes a broadcast that
    * times out while it's being written, if the transport can't cancel the write.
+   *
+   * <p>Cancelling the returned future attempts to cancel the transport send. A queued broadcast
+   * whose write has not started is skipped.
    *
    * @param request the request to broadcast. Must be a write command.
    * @return a {@link CompletionStage} that completes when the request has been sent, or completes
@@ -457,28 +464,40 @@ public class ModbusRtuClient extends ModbusClient {
     }
 
     ByteBuffer buffer = frame.pdu();
+
+    if (buffer.remaining() == 0) {
+      failRequest(pending, new ModbusException("empty response PDU"));
+      return;
+    }
+
     int functionCode = buffer.get(buffer.position()) & 0xFF;
 
-    if (functionCode < 0x80) {
-      if (functionCode != pending.functionCode) {
-        // Response might be out of sync, e.g. the timeout elapsed in request A,
-        // we sent request B, and now we're receiving response A.
+    if (functionCode == pending.functionCode) {
+      try {
+        ModbusPdu modbusPdu = config.responseSerializer().decode(functionCode, buffer);
+        completeRequest(pending, (ModbusResponsePdu) modbusPdu);
+      } catch (Exception e) {
+        failRequest(pending, e);
+      }
+    } else if (functionCode == pending.functionCode + 0x80) {
+      if (buffer.remaining() >= 2) {
+        buffer.get(); // skip FC byte
+        int exceptionCode = buffer.get() & 0xFF;
+
+        failRequest(pending, new ModbusResponseException(pending.functionCode, exceptionCode));
+      } else {
         failRequest(
             pending,
             new ModbusException(
-                "function code mismatch: %s != %s".formatted(pending.functionCode, functionCode)));
-      } else {
-        try {
-          ModbusPdu modbusPdu = config.responseSerializer().decode(functionCode, buffer);
-          completeRequest(pending, (ModbusResponsePdu) modbusPdu);
-        } catch (Exception e) {
-          failRequest(pending, e);
-        }
+                "malformed exception response PDU: %s".formatted(Hex.format(buffer))));
       }
     } else {
-      int exceptionCode = buffer.get();
-
-      failRequest(pending, new ModbusResponseException(pending.functionCode, exceptionCode));
+      // Response might be out of sync, e.g. the timeout elapsed in request A,
+      // we sent request B, and now we're receiving response A.
+      failRequest(
+          pending,
+          new ModbusException(
+              "function code mismatch: %s != %s".formatted(pending.functionCode, functionCode)));
     }
   }
 
@@ -564,7 +583,7 @@ public class ModbusRtuClient extends ModbusClient {
   private abstract static sealed class Pending<T> permits PendingRequest, PendingBroadcast {
 
     final ModbusRtuFrame frame;
-    final CompletableFuture<T> future = new CompletableFuture<>();
+    final CompletableFuture<T> future;
 
     /** Assigned on the request queue when the request is sent. */
     CompletionStage<Void> sendFuture;
@@ -576,7 +595,12 @@ public class ModbusRtuClient extends ModbusClient {
     boolean timedOut;
 
     Pending(ModbusRtuFrame frame) {
+      this(frame, new CompletableFuture<>());
+    }
+
+    Pending(ModbusRtuFrame frame, CompletableFuture<T> future) {
       this.frame = frame;
+      this.future = future;
     }
   }
 
@@ -598,7 +622,41 @@ public class ModbusRtuClient extends ModbusClient {
   private static final class PendingBroadcast extends Pending<Void> {
 
     PendingBroadcast(ModbusRtuFrame frame) {
-      super(frame);
+      super(frame, new BroadcastFuture());
+    }
+  }
+
+  /** Cancels a broadcast's transport send before notifying its caller. */
+  private static final class BroadcastFuture extends CompletableFuture<Void> {
+
+    private volatile CompletionStage<Void> sendFuture;
+    private volatile boolean cancellationRequested;
+
+    @Override
+    public boolean cancel(boolean mayInterruptIfRunning) {
+      cancellationRequested = true;
+      cancelSend();
+      return super.cancel(mayInterruptIfRunning);
+    }
+
+    void setSendFuture(CompletionStage<Void> sendFuture) {
+      this.sendFuture = sendFuture;
+      // Cancellation marks its intent before reading sendFuture, so either cancel sees the
+      // published send or publication sees the cancellation, even if send() was still returning.
+      if (cancellationRequested) {
+        cancelSend();
+      }
+    }
+
+    private void cancelSend() {
+      CompletionStage<Void> send = sendFuture;
+      if (send != null) {
+        try {
+          send.toCompletableFuture().cancel(false);
+        } catch (UnsupportedOperationException ignored) {
+          // This CompletionStage implementation can't be cancelled.
+        }
+      }
     }
   }
 }

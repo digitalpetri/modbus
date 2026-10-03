@@ -38,14 +38,14 @@ reused while its previous request remains in flight.
 | Behavior | Detail |
 | --- | --- |
 | Request order | One request is outstanding at a time. Other requests wait in submission order and are sent when the current request gets a response, times out, or fails to send |
-| Correlation | A response is matched to the outstanding request. The client checks the unit ID and, for normal responses, the function code. There is no transaction ID or ordering field |
+| Correlation | A response is matched to the outstanding request. The client checks the unit ID and the function code. An exception response must carry the request's function code plus `0x80`. There is no transaction ID or ordering field |
 | Request timeout | Starts when the request is submitted, so it includes time spent waiting behind other requests. A request that times out while waiting is never sent |
 | CRC | Calculated on send and verified on receive |
 | Timeout recovery | Fails the outstanding request, resets the transport frame parser, and sends the next waiting request |
 | CRC recovery | Fails with `ModbusCrcException` and resets the frame parser |
 | Unit/function mismatch (reported as `slave id mismatch` / `function code mismatch`) | Fails the outstanding request only; requests waiting behind it are not failed. A late response with a matching unit and function code is accepted as the response to the next request |
-| Broadcast | `broadcast` sends with unit ID 0 and waits only for send completion. Broadcasts wait their turn in submission order like other requests, and the request timeout applies until the broadcast is written. After a broadcast is written, the next request waits for `broadcastTurnaroundDelay`, which defaults to zero. If a broadcast times out while the serial transport is still writing it, the caller gets the timeout, but the next request waits for the write to finish and then for the turnaround delay |
-| Exception response | Produces `ModbusResponseException`, but `getExceptionCode()` is currently unreliable for RTU; see the [RTU exception-code limitation](errors-and-exceptions.md#rtu-exception-code-limitation) |
+| Broadcast | `broadcast` sends with unit ID 0 and waits only for send completion. Broadcasts wait their turn in submission order like other requests, and the request timeout applies until the broadcast is written. A timeout is reported by `broadcast` as `ModbusExecutionException` with a `TimeoutException` cause. Cancelling the `broadcastAsync` future attempts to cancel its transport send; a queued write that has not started is skipped. After a broadcast is written, the next request waits for `broadcastTurnaroundDelay`, which defaults to zero. If a broadcast times out while the serial transport is still writing it, the caller gets the timeout, but the next request waits for the write to finish and then for the turnaround delay |
+| Exception response | Produces `ModbusResponseException` with the request's function code and the response's exception code. An exception response without an exception code fails with `malformed exception response PDU` |
 
 These behaviors apply to both serial RTU and RTU over TCP. For concurrent callers, see
 [Client concurrency](lifecycle-concurrency-and-resources.md#client-concurrency).
