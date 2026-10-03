@@ -8,7 +8,6 @@ import com.digitalpetri.modbus.exceptions.ModbusCrcException;
 import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
-import com.digitalpetri.modbus.exceptions.ModbusTimeoutException;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
 import com.digitalpetri.modbus.pdu.ModbusPdu;
 import com.digitalpetri.modbus.pdu.ModbusRequestPdu;
@@ -24,7 +23,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -270,21 +268,15 @@ public class ModbusRtuClient extends ModbusClient {
    * <p>Broadcast requests are necessarily write commands.
    *
    * @param request the request to broadcast. Must be a write command.
-   * @throws ModbusExecutionException if an error occurs while sending the request.
-   * @throws ModbusTimeoutException if the write does not complete within the request timeout.
+   * @throws ModbusExecutionException if an error occurs while sending the request. If the write
+   *     does not complete within the request timeout, the cause is a {@link TimeoutException}.
    */
-  public void broadcast(ModbusRequestPdu request)
-      throws ModbusExecutionException, ModbusTimeoutException {
-
+  public void broadcast(ModbusRequestPdu request) throws ModbusExecutionException {
     try {
       broadcastAsync(request).toCompletableFuture().get();
     } catch (ExecutionException e) {
       Throwable cause = e.getCause();
-      if (cause instanceof TimeoutException ex) {
-        throw new ModbusTimeoutException(ex);
-      } else {
-        throw new ModbusExecutionException(cause);
-      }
+      throw new ModbusExecutionException(cause);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new ModbusExecutionException(e);
@@ -296,6 +288,9 @@ public class ModbusRtuClient extends ModbusClient {
    * sent by the master.
    *
    * <p>Broadcast requests are necessarily write commands.
+   *
+   * <p>Cancelling the returned future cancels the send, so a transport that queues writes skips a
+   * broadcast whose write has not started.
    *
    * @param request the request to broadcast. Must be a write command.
    * @return a {@link CompletionStage} that completes when the request has been sent, or completes
@@ -314,10 +309,7 @@ public class ModbusRtuClient extends ModbusClient {
 
     ByteBuffer crc = calculateCrc16(BROADCAST_ID, pdu);
 
-    var future = new CompletableFuture<Void>();
-    // Set once the frame has been handed to the transport; the timeout task uses it to cancel the
-    // send so a transport that queues writes doesn't write the broadcast after it timed out.
-    var sendFutureRef = new AtomicReference<CompletionStage<Void>>();
+    var future = new BroadcastFuture();
 
     TimeoutHandle timeout;
     TimeoutException timeoutException;
@@ -331,20 +323,7 @@ public class ModbusRtuClient extends ModbusClient {
           config
               .timeoutScheduler()
               .newTimeout(
-                  t -> {
-                    CompletionStage<Void> sendFuture = sendFutureRef.get();
-                    if (sendFuture != null) {
-                      try {
-                        sendFuture.toCompletableFuture().cancel(false);
-                      } catch (UnsupportedOperationException ignored) {
-                        // This CompletionStage implementation can't be cancelled.
-                      }
-                    }
-
-                    future.completeExceptionally(timeoutException);
-                  },
-                  timeoutMillis,
-                  TimeUnit.MILLISECONDS);
+                  t -> future.timeout(timeoutException), timeoutMillis, TimeUnit.MILLISECONDS);
     } catch (Exception e) {
       // e.g. RejectedExecutionException if the scheduler has been shut down. Without a timeout the
       // caller could wait forever, so fail the broadcast instead of sending it.
@@ -353,17 +332,7 @@ public class ModbusRtuClient extends ModbusClient {
     }
 
     CompletionStage<Void> sendFuture = send(new ModbusRtuFrame(BROADCAST_ID, pdu, crc));
-    sendFutureRef.set(sendFuture);
-
-    // The timeout may have fired before the send future was published, in which case the timeout
-    // task saw no send future to cancel. Re-check and cancel so a queued write is still skipped.
-    if (future.isDone()) {
-      try {
-        sendFuture.toCompletableFuture().cancel(false);
-      } catch (UnsupportedOperationException ignored) {
-        // This CompletionStage implementation can't be cancelled.
-      }
-    }
+    future.setSendFuture(sendFuture);
 
     sendFuture.whenComplete(
         (v, ex) -> {
@@ -371,10 +340,8 @@ public class ModbusRtuClient extends ModbusClient {
 
           if (ex == null) {
             future.complete(null);
-          } else if (ex instanceof CancellationException) {
-            // The send was cancelled, e.g. by the timeout task, which cancels the send before
-            // failing the broadcast. The timeout task is currently the only canceller of the
-            // send future, so the caller sees a timeout either way.
+          } else if (ex instanceof CancellationException && future.timedOut) {
+            // The timeout task cancelled the send before failing the broadcast.
             future.completeExceptionally(timeoutException);
           } else {
             future.completeExceptionally(ex);
@@ -535,6 +502,61 @@ public class ModbusRtuClient extends ModbusClient {
       this.slaveId = slaveId;
       this.functionCode = functionCode;
       this.frame = frame;
+    }
+  }
+
+  /**
+   * The future returned by {@link #broadcastAsync(ModbusRequestPdu)}.
+   *
+   * <p>Cancelling it cancels the send first, so a transport that queues writes skips the broadcast,
+   * and callbacks on this future see the send already cancelled.
+   */
+  private static final class BroadcastFuture extends CompletableFuture<Void> {
+
+    /** Set once the frame has been handed to the transport. */
+    private volatile CompletionStage<Void> sendFuture;
+
+    /**
+     * Set by {@link #timeout} before it cancels the send, so a send cancelled by the timeout can be
+     * told apart from one cancelled by the caller or by the transport.
+     */
+    volatile boolean timedOut;
+
+    @Override
+    public boolean cancel(boolean mayInterruptIfRunning) {
+      cancelSend();
+
+      return super.cancel(mayInterruptIfRunning);
+    }
+
+    /** Cancel the send, then fail this future, so callbacks see the send cancelled. */
+    void timeout(TimeoutException ex) {
+      timedOut = true;
+      cancelSend();
+      completeExceptionally(ex);
+    }
+
+    void setSendFuture(CompletionStage<Void> sendFuture) {
+      this.sendFuture = sendFuture;
+
+      // The timeout may have fired before the send future was set, in which case it saw no send
+      // to cancel. It sets timedOut before reading sendFuture, so either it saw this send future
+      // or this check sees timedOut, and a queued write is skipped either way.
+      if (timedOut) {
+        cancelSend();
+      }
+    }
+
+    /** Cancel the send, if it has been set, so a transport that queues writes skips it. */
+    void cancelSend() {
+      CompletionStage<Void> f = sendFuture;
+      if (f != null) {
+        try {
+          f.toCompletableFuture().cancel(false);
+        } catch (UnsupportedOperationException ignored) {
+          // This CompletionStage implementation can't be cancelled.
+        }
+      }
     }
   }
 }
