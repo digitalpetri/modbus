@@ -16,6 +16,7 @@ import com.digitalpetri.modbus.pdu.ModbusResponsePdu;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Map;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,7 +39,9 @@ import org.slf4j.LoggerFactory;
  * <p>The request timeout starts when a request is submitted, so it includes time spent waiting
  * behind other requests. A request that times out while waiting is never sent.
  *
- * <p>Broadcasts are passed to the transport immediately and are not ordered with other requests.
+ * <p>Broadcasts are passed to the transport immediately and are not ordered with other requests. A
+ * broadcast completes when the frame has been written, or fails with a timeout if the write does
+ * not complete within the request timeout.
  */
 public class ModbusRtuClient extends ModbusClient {
 
@@ -266,7 +269,8 @@ public class ModbusRtuClient extends ModbusClient {
    * <p>Broadcast requests are necessarily write commands.
    *
    * @param request the request to broadcast. Must be a write command.
-   * @throws ModbusExecutionException if an error occurs while sending the request.
+   * @throws ModbusExecutionException if an error occurs while sending the request. If the write
+   *     does not complete within the request timeout, the cause is a {@link TimeoutException}.
    */
   public void broadcast(ModbusRequestPdu request) throws ModbusExecutionException {
     try {
@@ -286,8 +290,13 @@ public class ModbusRtuClient extends ModbusClient {
    *
    * <p>Broadcast requests are necessarily write commands.
    *
+   * <p>Cancelling the returned future cancels the send, so a transport that queues writes skips a
+   * broadcast whose write has not started.
+   *
    * @param request the request to broadcast. Must be a write command.
-   * @return a {@link CompletionStage} that completes when the request has been sent.
+   * @return a {@link CompletionStage} that completes when the request has been sent, or completes
+   *     exceptionally with a {@link TimeoutException} if the write does not complete within the
+   *     request timeout.
    */
   public CompletionStage<Void> broadcastAsync(ModbusRequestPdu request) {
     ByteBuffer pdu = ByteBuffer.allocate(256);
@@ -301,7 +310,46 @@ public class ModbusRtuClient extends ModbusClient {
 
     ByteBuffer crc = calculateCrc16(BROADCAST_ID, pdu);
 
-    return transport.send(new ModbusRtuFrame(BROADCAST_ID, pdu, crc));
+    var future = new BroadcastFuture();
+
+    TimeoutHandle timeout;
+    TimeoutException timeoutException;
+    try {
+      long timeoutMillis = config.requestTimeout().toMillis();
+
+      timeoutException =
+          new TimeoutException("broadcast timed out after %sms".formatted(timeoutMillis));
+
+      timeout =
+          config
+              .timeoutScheduler()
+              .newTimeout(
+                  t -> future.timeout(timeoutException), timeoutMillis, TimeUnit.MILLISECONDS);
+    } catch (Exception e) {
+      // e.g. RejectedExecutionException if the scheduler has been shut down. Without a timeout the
+      // caller could wait forever, so fail the broadcast instead of sending it.
+      future.completeExceptionally(e);
+      return future;
+    }
+
+    CompletionStage<Void> sendFuture = send(new ModbusRtuFrame(BROADCAST_ID, pdu, crc));
+    future.setSendFuture(sendFuture);
+
+    sendFuture.whenComplete(
+        (v, ex) -> {
+          timeout.cancel();
+
+          if (ex == null) {
+            future.complete(null);
+          } else if (ex instanceof CancellationException && future.timedOut) {
+            // The timeout task cancelled the send before failing the broadcast.
+            future.completeExceptionally(timeoutException);
+          } else {
+            future.completeExceptionally(ex);
+          }
+        });
+
+    return future;
   }
 
   private void onFrameReceived(ModbusRtuFrame frame) {
@@ -467,6 +515,61 @@ public class ModbusRtuClient extends ModbusClient {
       this.slaveId = slaveId;
       this.functionCode = functionCode;
       this.frame = frame;
+    }
+  }
+
+  /**
+   * The future returned by {@link #broadcastAsync(ModbusRequestPdu)}.
+   *
+   * <p>Cancelling it cancels the send first, so a transport that queues writes skips the broadcast,
+   * and callbacks on this future see the send already cancelled.
+   */
+  private static final class BroadcastFuture extends CompletableFuture<Void> {
+
+    /** Set once the frame has been handed to the transport. */
+    private volatile CompletionStage<Void> sendFuture;
+
+    /**
+     * Set by {@link #timeout} before it cancels the send, so a send cancelled by the timeout can be
+     * told apart from one cancelled by the caller or by the transport.
+     */
+    volatile boolean timedOut;
+
+    @Override
+    public boolean cancel(boolean mayInterruptIfRunning) {
+      cancelSend();
+
+      return super.cancel(mayInterruptIfRunning);
+    }
+
+    /** Cancel the send, then fail this future, so callbacks see the send cancelled. */
+    void timeout(TimeoutException ex) {
+      timedOut = true;
+      cancelSend();
+      completeExceptionally(ex);
+    }
+
+    void setSendFuture(CompletionStage<Void> sendFuture) {
+      this.sendFuture = sendFuture;
+
+      // The timeout may have fired before the send future was set, in which case it saw no send
+      // to cancel. It sets timedOut before reading sendFuture, so either it saw this send future
+      // or this check sees timedOut, and a queued write is skipped either way.
+      if (timedOut) {
+        cancelSend();
+      }
+    }
+
+    /** Cancel the send, if it has been set, so a transport that queues writes skips it. */
+    void cancelSend() {
+      CompletionStage<Void> f = sendFuture;
+      if (f != null) {
+        try {
+          f.toCompletableFuture().cancel(false);
+        } catch (UnsupportedOperationException ignored) {
+          // This CompletionStage implementation can't be cancelled.
+        }
+      }
     }
   }
 }

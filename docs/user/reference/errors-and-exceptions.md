@@ -10,7 +10,7 @@ All library exceptions below extend the checked `ModbusException`.
 | `ModbusCrcException` | RTU client when a received frame's CRC differs | `getFrame()` returns the rejected RTU frame; synchronous typed calls wrap it in `ModbusExecutionException` |
 | `ModbusExecutionException` | Synchronous client wrapper for unexpected connection, transport, serialization, correlation, or interruption failures | Inspect `getCause()`; interruption also restores the thread interrupt flag |
 | `ModbusResponseException` | Typed client for a Modbus exception response; server services to request a Modbus exception response | `getFunctionCode()` and `getExceptionCode()` |
-| `ModbusTimeoutException` | Synchronous request when the configured request deadline expires | Cause is the internal `TimeoutException` |
+| `ModbusTimeoutException` | Synchronous request when the configured request deadline expires; `ModbusRtuClient.broadcast` instead throws `ModbusExecutionException` with a `TimeoutException` cause | Cause is the internal `TimeoutException` |
 | `UnknownUnitIdException` | Server service cannot route the requested unit | Unit ID appears in the message; supplied transports ignore the request |
 
 Synchronous `connect()` wraps a transport connection failure in `ModbusExecutionException`. For a
