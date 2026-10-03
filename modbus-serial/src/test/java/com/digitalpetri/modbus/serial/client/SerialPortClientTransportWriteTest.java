@@ -98,7 +98,7 @@ class SerialPortClientTransportWriteTest {
 
   @Test
   void cancelledWriteIsSkipped() throws Exception {
-    int stalledFrames = sendUntilStalled();
+    int stalledFrames = sendUntilStalled().frames();
 
     CompletableFuture<Void> cancelled = send();
     CompletableFuture<Void> last = send();
@@ -107,6 +107,20 @@ class SerialPortClientTransportWriteTest {
     int written = drain(last);
 
     assertEquals((stalledFrames + 1) * FRAME_LENGTH, written);
+  }
+
+  @Test
+  void startedWriteIsNotCancelled() throws Exception {
+    Stall stall = sendUntilStalled();
+
+    // The write can't be stopped, so cancelling it fails, and its future completes when the
+    // frame has been written.
+    assertFalse(stall.write().cancel(false));
+    assertFalse(stall.write().isDone());
+
+    int written = drain(stall.write());
+
+    assertEquals(stall.frames() * FRAME_LENGTH, written);
   }
 
   @Test
@@ -170,18 +184,25 @@ class SerialPortClientTransportWriteTest {
   /**
    * Send frames until one doesn't complete, meaning the pty buffer is full and a write is stuck.
    *
-   * @return the number of frames sent, including the stuck one.
+   * @return the number of frames sent, including the stuck one, and the stuck write.
    */
-  private int sendUntilStalled() throws Exception {
+  private Stall sendUntilStalled() throws Exception {
     for (int i = 1; i <= 10_000; i++) {
+      CompletableFuture<Void> write = send();
       try {
-        send().get(200, TimeUnit.MILLISECONDS);
+        write.get(200, TimeUnit.MILLISECONDS);
       } catch (TimeoutException e) {
-        return i;
+        return new Stall(i, write);
       }
     }
     throw new AssertionError("writes never stalled");
   }
+
+  /**
+   * @param frames the number of frames sent, including the stuck one.
+   * @param write the stuck write.
+   */
+  private record Stall(int frames, CompletableFuture<Void> write) {}
 
   /**
    * Tell the helper to drain the pty, wait for {@code last} to be written, and return the total

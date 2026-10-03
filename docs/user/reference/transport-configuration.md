@@ -98,6 +98,8 @@ failures also include the code; the serial server logs a generic write error.
 The client transport writes frames on the executor, so `send()` returns without waiting for the
 port. Writes run one at a time, in order. A write that stalls, for example because the port stops
 accepting data, holds one executor thread until it completes or `disconnect()` closes the port.
+Cancelling the future returned by `send()` skips a write that hasn't started. A write that has
+started can't be stopped, so cancelling it fails, and the future completes when the write does.
 The executor must run tasks on its own threads. One that runs tasks on the submitting thread, such
 as a saturated `ThreadPoolExecutor` with `CallerRunsPolicy`, can run a write on the caller of
 `send()` and block it.
@@ -109,9 +111,10 @@ as a saturated `ThreadPoolExecutor` with `CallerRunsPolicy`, can run a write on 
 | Setter | Type | Default | Behavior |
 | --- | --- | --- | --- |
 | `setRequestTimeout` | `Duration` | 5 seconds | Deadline for each typed or raw client request |
-| `setTimeoutScheduler` | `TimeoutScheduler` | Scheduler backed by `Modbus` shared executor and scheduled executor | Creates/cancels per-request timeouts |
+| `setTimeoutScheduler` | `TimeoutScheduler` | Scheduler backed by `Modbus` shared executor and scheduled executor | Schedules per-request timeouts and the RTU broadcast turnaround delay |
 | `setRequestSerializer` | `ModbusPduSerializer` | `DefaultRequestSerializer.INSTANCE` | Encodes outgoing typed request PDUs |
 | `setResponseSerializer` | `ModbusPduSerializer` | `DefaultResponseSerializer.INSTANCE` | Decodes incoming typed response PDUs |
+| `setBroadcastTurnaroundDelay` | `Duration` | Zero | How long `ModbusRtuClient` waits after writing a broadcast before it sends the next request. Must not be negative. Other clients ignore it |
 
 `NettyTimeoutScheduler` is an alternative adapter over `Netty.sharedWheelTimer()`; the integration
 tests use it explicitly. It is not the default client scheduler.

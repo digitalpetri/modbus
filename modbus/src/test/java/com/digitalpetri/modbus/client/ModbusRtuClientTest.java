@@ -2,6 +2,7 @@ package com.digitalpetri.modbus.client;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -27,12 +28,14 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
@@ -312,6 +315,237 @@ public class ModbusRtuClientTest {
   }
 
   @Test
+  void broadcastIsSentInSubmissionOrder() throws Exception {
+    var transport = new RecordingRtuTransport();
+    var client = ModbusRtuClient.create(transport);
+
+    client.connect();
+
+    CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
+    CompletableFuture<Void> x = broadcastAsync(client, 50);
+    CompletableFuture<ReadHoldingRegistersResponse> b = readAsync(client, 100);
+
+    // The broadcast waits for A's response.
+    assertEquals(0, startAddress(transport.nextSentFrame()));
+    transport.assertNoFrameSent();
+
+    transport.respond(client, registers(0x0A));
+    assertArrayEquals(registers(0x0A), a.get(1, TimeUnit.SECONDS).registers());
+
+    ModbusRtuFrame broadcast = transport.nextSentFrame();
+    assertEquals(0, broadcast.unitId());
+    assertEquals(50, startAddress(broadcast));
+    x.get(1, TimeUnit.SECONDS);
+
+    // No turnaround delay by default, and no response to wait for.
+    assertEquals(100, startAddress(transport.nextSentFrame()));
+    transport.respond(client, registers(0x0B));
+    assertArrayEquals(registers(0x0B), b.get(1, TimeUnit.SECONDS).registers());
+    assertEquals(0, client.timeouts.size());
+  }
+
+  @Test
+  void nextRequestWaitsForBroadcastTurnaroundDelay() throws Exception {
+    var scheduler = new ManualTimeoutScheduler();
+    var transport = new RecordingRtuTransport();
+    var client =
+        ModbusRtuClient.create(
+            transport,
+            cfg -> {
+              cfg.timeoutScheduler = scheduler;
+              cfg.broadcastTurnaroundDelay = Duration.ofMillis(100);
+            });
+
+    client.connect();
+
+    CompletableFuture<Void> x = broadcastAsync(client, 50);
+    assertEquals(50, startAddress(transport.nextSentFrame()));
+    x.get(1, TimeUnit.SECONDS);
+
+    CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
+
+    scheduler.nextTimeout(); // the broadcast's request timeout, cancelled when it was written
+    Runnable turnaroundElapsed = scheduler.nextTimeout();
+    transport.assertNoFrameSent();
+
+    turnaroundElapsed.run();
+    assertEquals(0, startAddress(transport.nextSentFrame()));
+    transport.respond(client, registers(0x0A));
+    assertArrayEquals(registers(0x0A), a.get(1, TimeUnit.SECONDS).registers());
+    assertEquals(0, client.timeouts.size());
+  }
+
+  @Test
+  void nextRequestWaitsForTurnaroundWhenBroadcastTimesOut() throws Exception {
+    var scheduler = new ManualTimeoutScheduler();
+    var broadcastSendFuture = new CompletableFuture<Void>();
+    var transport = new BroadcastRtuTransport(broadcastSendFuture);
+    var client =
+        ModbusRtuClient.create(
+            transport,
+            cfg -> {
+              cfg.timeoutScheduler = scheduler;
+              cfg.broadcastTurnaroundDelay = Duration.ofMillis(100);
+            });
+
+    client.connect();
+
+    CompletableFuture<Void> x = broadcastAsync(client, 50);
+    CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
+    Runnable timeoutX = scheduler.nextTimeout();
+    scheduler.nextTimeout(); // A's request timeout
+
+    // The broadcast write stalls, so A waits. A stray frame isn't taken as a broadcast response.
+    assertEquals(50, startAddress(transport.nextSentFrame()));
+    transport.respond(client, registers(0xFF));
+    transport.assertNoFrameSent();
+    assertFalse(x.isDone());
+
+    timeoutX.run();
+    var e = assertThrows(ExecutionException.class, () -> x.get(1, TimeUnit.SECONDS));
+    assertInstanceOf(TimeoutException.class, e.getCause());
+    assertTrue(broadcastSendFuture.isCancelled());
+
+    // The cancelled write may have gone out anyway, so A still waits for the turnaround delay.
+    Runnable turnaroundElapsed = scheduler.nextTimeout();
+    transport.assertNoFrameSent();
+
+    turnaroundElapsed.run();
+    assertEquals(0, startAddress(transport.nextSentFrame()));
+    transport.respond(client, registers(0x0A));
+    assertArrayEquals(registers(0x0A), a.get(1, TimeUnit.SECONDS).registers());
+    assertEquals(0, client.timeouts.size());
+  }
+
+  @Test
+  void nextRequestWaitsForTimedOutBroadcastToFinishWriting() throws Exception {
+    var scheduler = new ManualTimeoutScheduler();
+    var broadcastWrite = new StartedWriteFuture();
+    var transport = new BroadcastRtuTransport(broadcastWrite);
+    var client =
+        ModbusRtuClient.create(
+            transport,
+            cfg -> {
+              cfg.timeoutScheduler = scheduler;
+              cfg.broadcastTurnaroundDelay = Duration.ofMillis(100);
+            });
+
+    client.connect();
+
+    CompletableFuture<Void> x = broadcastAsync(client, 50);
+    CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
+    Runnable timeoutX = scheduler.nextTimeout();
+    scheduler.nextTimeout(); // A's request timeout
+
+    assertEquals(50, startAddress(transport.nextSentFrame()));
+
+    // The caller stops waiting at the request timeout, even though the write goes on.
+    timeoutX.run();
+    var e = assertThrows(ExecutionException.class, () -> x.get(1, TimeUnit.SECONDS));
+    assertInstanceOf(TimeoutException.class, e.getCause());
+    assertFalse(broadcastWrite.isDone());
+
+    // A serial transport writes frames one at a time, so A's write would start the moment the
+    // broadcast's write finished. A waits for the write, then for the turnaround delay.
+    transport.assertNoFrameSent();
+    scheduler.assertNoTimeoutScheduled();
+
+    broadcastWrite.complete(null);
+    Runnable turnaroundElapsed = scheduler.nextTimeout();
+    transport.assertNoFrameSent();
+
+    turnaroundElapsed.run();
+    assertEquals(0, startAddress(transport.nextSentFrame()));
+    transport.respond(client, registers(0x0A));
+    assertArrayEquals(registers(0x0A), a.get(1, TimeUnit.SECONDS).registers());
+    assertEquals(0, client.timeouts.size());
+  }
+
+  @Test
+  void requestsWaitingBehindTimedOutBroadcastWriteTimeOut() throws Exception {
+    var scheduler = new ManualTimeoutScheduler();
+    var broadcastWrite = new StartedWriteFuture();
+    var transport = new BroadcastRtuTransport(broadcastWrite);
+    var client =
+        ModbusRtuClient.create(
+            transport,
+            cfg -> {
+              cfg.timeoutScheduler = scheduler;
+              cfg.broadcastTurnaroundDelay = Duration.ofMillis(100);
+            });
+
+    client.connect();
+
+    CompletableFuture<Void> x = broadcastAsync(client, 50);
+    CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
+    Runnable timeoutX = scheduler.nextTimeout();
+    Runnable timeoutA = scheduler.nextTimeout();
+
+    assertEquals(50, startAddress(transport.nextSentFrame()));
+    timeoutX.run();
+    var e = assertThrows(ExecutionException.class, () -> x.get(1, TimeUnit.SECONDS));
+    assertInstanceOf(TimeoutException.class, e.getCause());
+
+    // The broadcast write is stalled, so A times out without being sent.
+    timeoutA.run();
+    e = assertThrows(ExecutionException.class, () -> a.get(1, TimeUnit.SECONDS));
+    assertInstanceOf(TimeoutException.class, e.getCause());
+    transport.assertNoFrameSent();
+
+    // e.g. disconnect() closes the port. Slaves discard the partial frame, so there's no
+    // turnaround delay.
+    broadcastWrite.completeExceptionally(new ModbusException("port closed"));
+
+    CompletableFuture<ReadHoldingRegistersResponse> b = readAsync(client, 100);
+    scheduler.nextTimeout(); // B's request timeout
+    assertEquals(100, startAddress(transport.nextSentFrame()));
+    transport.respond(client, registers(0x0B));
+    assertArrayEquals(registers(0x0B), b.get(1, TimeUnit.SECONDS).registers());
+    scheduler.assertNoTimeoutScheduled();
+    assertEquals(0, client.timeouts.size());
+  }
+
+  @Test
+  void nextRequestIsSentWhenTurnaroundDelayCannotBeScheduled() throws Exception {
+    var calls = new AtomicInteger();
+    var scheduler =
+        new ManualTimeoutScheduler() {
+          @Override
+          public TimeoutHandle newTimeout(Task task, long delay, TimeUnit unit) {
+            // The broadcast's request timeout, then the turnaround delay.
+            if (calls.incrementAndGet() == 2) {
+              throw new RejectedExecutionException("scheduler shut down");
+            }
+            return super.newTimeout(task, delay, unit);
+          }
+        };
+    var transport = new RecordingRtuTransport();
+    var client =
+        ModbusRtuClient.create(
+            transport,
+            cfg -> {
+              cfg.timeoutScheduler = scheduler;
+              cfg.broadcastTurnaroundDelay = Duration.ofMillis(100);
+            });
+
+    client.connect();
+
+    CompletableFuture<Void> x = broadcastAsync(client, 50);
+    assertEquals(50, startAddress(transport.nextSentFrame()));
+    x.get(1, TimeUnit.SECONDS);
+
+    CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
+    assertEquals(0, startAddress(transport.nextSentFrame()));
+    transport.respond(client, registers(0x0A));
+    assertArrayEquals(registers(0x0A), a.get(1, TimeUnit.SECONDS).registers());
+    assertEquals(0, client.timeouts.size());
+  }
+
+  private static CompletableFuture<Void> broadcastAsync(ModbusRtuClient client, int address) {
+    return client.broadcastAsync(new WriteSingleRegisterRequest(address, 1)).toCompletableFuture();
+  }
+
+  @Test
   void broadcastTimesOutWhenSendNeverCompletes() throws Exception {
     var transport =
         new TimeoutRtuTransport() {
@@ -428,6 +662,7 @@ public class ModbusRtuClientTest {
   @Test
   void cancellingBroadcastCancelsSend() throws Exception {
     var sendFuture = new CompletableFuture<Void>();
+    var scheduler = new ManualTimeoutScheduler();
     var transport =
         new TimeoutRtuTransport() {
           @Override
@@ -435,14 +670,18 @@ public class ModbusRtuClientTest {
             return sendFuture;
           }
         };
-    var client =
-        ModbusRtuClient.create(
-            transport, cfg -> cfg.timeoutScheduler = new ManualTimeoutScheduler());
+    var client = ModbusRtuClient.create(transport, cfg -> cfg.timeoutScheduler = scheduler);
 
     client.connect();
 
     CompletableFuture<Void> broadcast =
         client.broadcastAsync(new WriteSingleRegisterRequest(0, 0x0A)).toCompletableFuture();
+
+    // Scheduling another request's timeout on the queue establishes that the broadcast send
+    // future has been published. The separate test below covers cancellation before publication.
+    readAsync(client, 100);
+    scheduler.nextTimeout(); // broadcast timeout
+    scheduler.nextTimeout(); // next request timeout
 
     // Callbacks run when the broadcast is cancelled must already see the send cancelled, or a
     // queued write could still go out while they run.
@@ -453,6 +692,43 @@ public class ModbusRtuClientTest {
     assertTrue(broadcast.isCancelled());
     assertTrue(sendFuture.isCancelled());
     assertTrue(cancelledWhenCompleted.get());
+  }
+
+  @Test
+  void cancellingBroadcastBeforeSendIsPublishedCancelsSend() throws Exception {
+    var sendFuture = new CompletableFuture<Void>();
+    var sendStarted = new CountDownLatch(1);
+    var releaseSend = new CountDownLatch(1);
+    var transport =
+        new TimeoutRtuTransport() {
+          @Override
+          public CompletionStage<Void> send(ModbusRtuFrame frame) {
+            sendStarted.countDown();
+            try {
+              if (!releaseSend.await(5, TimeUnit.SECONDS)) {
+                return CompletableFuture.failedFuture(new TimeoutException("send not released"));
+              }
+            } catch (InterruptedException e) {
+              Thread.currentThread().interrupt();
+              return CompletableFuture.failedFuture(e);
+            }
+            return sendFuture;
+          }
+        };
+    var client =
+        ModbusRtuClient.create(
+            transport, cfg -> cfg.timeoutScheduler = new ManualTimeoutScheduler());
+    client.connect();
+
+    CompletableFuture<Void> broadcast = broadcastAsync(client, 50);
+    try {
+      assertTrue(sendStarted.await(1, TimeUnit.SECONDS));
+      assertTrue(broadcast.cancel(false));
+    } finally {
+      releaseSend.countDown();
+    }
+
+    assertThrows(CancellationException.class, () -> sendFuture.get(1, TimeUnit.SECONDS));
   }
 
   @Test
@@ -538,7 +814,7 @@ public class ModbusRtuClientTest {
 
   private static int startAddress(ModbusRtuFrame frame) {
     ByteBuffer pdu = frame.pdu();
-    // function code, then the 2-byte starting address
+    // function code, then the 2-byte starting (or register) address
     return pdu.getShort(pdu.position() + 1) & 0xFFFF;
   }
 
@@ -596,6 +872,26 @@ public class ModbusRtuClientTest {
     }
   }
 
+  /** Returns a given send future for broadcasts, and a completed one for other requests. */
+  private static class BroadcastRtuTransport extends RecordingRtuTransport {
+
+    final CompletableFuture<Void> broadcastSendFuture;
+
+    BroadcastRtuTransport(CompletableFuture<Void> broadcastSendFuture) {
+      this.broadcastSendFuture = broadcastSendFuture;
+    }
+
+    @Override
+    public CompletionStage<Void> send(ModbusRtuFrame frame) {
+      super.send(frame);
+      if (frame.unitId() == 0) {
+        return broadcastSendFuture;
+      } else {
+        return CompletableFuture.completedFuture(null);
+      }
+    }
+  }
+
   /** A {@link TimeoutScheduler} whose timeouts only fire when the test runs them. */
   private static class ManualTimeoutScheduler implements TimeoutScheduler {
 
@@ -633,6 +929,22 @@ public class ModbusRtuClientTest {
       Runnable timeout = timeouts.poll(1, TimeUnit.SECONDS);
       assertNotNull(timeout, "expected a timeout to be scheduled");
       return timeout;
+    }
+
+    void assertNoTimeoutScheduled() throws InterruptedException {
+      assertNull(timeouts.poll(100, TimeUnit.MILLISECONDS), "expected no timeout to be scheduled");
+    }
+  }
+
+  /**
+   * A send future for a write that has started. Like {@code SerialPortClientTransport}, it can't be
+   * cancelled, and it completes when the write does.
+   */
+  private static class StartedWriteFuture extends CompletableFuture<Void> {
+
+    @Override
+    public boolean cancel(boolean mayInterruptIfRunning) {
+      return false;
     }
   }
 
