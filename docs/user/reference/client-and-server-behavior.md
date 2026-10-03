@@ -44,7 +44,7 @@ reused while its previous request remains in flight.
 | Timeout recovery | Fails the outstanding request, resets the transport frame parser, and sends the next waiting request |
 | CRC recovery | Fails with `ModbusCrcException` and resets the frame parser |
 | Unit/function mismatch (reported as `slave id mismatch` / `function code mismatch`) | Fails the outstanding request only; requests waiting behind it are not failed. A late response with a matching unit and function code is accepted as the response to the next request |
-| Broadcast | `broadcast` sends with unit ID 0 and waits only for send completion. Broadcasts wait their turn in submission order like other requests, and the request timeout applies until the broadcast is written. After a broadcast is written, the next request waits for `broadcastTurnaroundDelay`, which defaults to zero |
+| Broadcast | `broadcast` sends with unit ID 0 and waits only for send completion. Broadcasts wait their turn in submission order like other requests, and the request timeout applies until the broadcast is written. After a broadcast is written, the next request waits for `broadcastTurnaroundDelay`, which defaults to zero. If a broadcast times out while the serial transport is still writing it, the caller gets the timeout, but the next request waits for the write to finish and then for the turnaround delay |
 | Exception response | Produces `ModbusResponseException`, but `getExceptionCode()` is currently unreliable for RTU; see the [RTU exception-code limitation](errors-and-exceptions.md#rtu-exception-code-limitation) |
 
 These behaviors apply to both serial RTU and RTU over TCP. For concurrent callers, see

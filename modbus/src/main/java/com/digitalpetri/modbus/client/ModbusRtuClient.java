@@ -40,7 +40,9 @@ import org.slf4j.LoggerFactory;
  * <p>Broadcasts wait their turn with other requests. A broadcast gets no response, so it completes
  * when it's written, and the next request is sent after {@link
  * ModbusClientConfig#broadcastTurnaroundDelay()}. The request timeout also applies to broadcasts,
- * from submission until the broadcast is written.
+ * from submission until the broadcast is written. If a broadcast times out after its write has
+ * started, and the transport can't cancel the write, the next request waits for the write to finish
+ * and then for the turnaround delay. Requests waiting behind it still time out.
  */
 public class ModbusRtuClient extends ModbusClient {
 
@@ -198,11 +200,15 @@ public class ModbusRtuClient extends ModbusClient {
    * <p>Must be called from a task on {@link #requestQueue}.
    */
   private void onBroadcastSent(PendingBroadcast broadcast) {
-    // Ignore it if the broadcast already timed out.
+    // Ignore it if the broadcast timed out and is no longer in flight.
     if (broadcast == inFlight) {
       inFlight = null;
 
-      completeRequest(broadcast, null);
+      // A broadcast kept in flight after it timed out has already failed. Completing it again
+      // could overtake that failure on the executor.
+      if (!broadcast.timedOut) {
+        completeRequest(broadcast, null);
+      }
       startTurnaround();
       sendNext();
     }
@@ -253,8 +259,6 @@ public class ModbusRtuClient extends ModbusClient {
             "request timed out after %sms".formatted(config.requestTimeout().toMillis()));
 
     if (pending == inFlight) {
-      inFlight = null;
-
       // The frame parser needs to be reset!
       // It could be "stuck" in Accumulating or ParseError states if the timeout was
       // caused by an incomplete or invalid response rather than no response.
@@ -264,8 +268,14 @@ public class ModbusRtuClient extends ModbusClient {
       // after it timed out. Responses aren't matched to requests by any ID, so the
       // late request's response would be taken as the response to another request.
       // This happens before failRequest, so callers' callbacks see the send cancelled.
+      boolean writing = false;
       try {
-        pending.sendFuture.toCompletableFuture().cancel(false);
+        CompletableFuture<Void> sendFuture = pending.sendFuture.toCompletableFuture();
+        sendFuture.cancel(false);
+
+        // A transport can refuse to cancel a write that has already started, e.g.
+        // SerialPortClientTransport. Then the send completes when the write does.
+        writing = !sendFuture.isDone();
       } catch (UnsupportedOperationException ignored) {
         // This CompletionStage implementation can't be cancelled.
       }
@@ -273,10 +283,19 @@ public class ModbusRtuClient extends ModbusClient {
       failRequest(pending, ex);
 
       if (pending instanceof PendingBroadcast) {
-        // A write that already started may still finish, so slaves may yet receive it.
+        if (writing) {
+          // Slaves will receive the broadcast, so the turnaround delay has to start when the
+          // write finishes. Keep the broadcast in flight until then; onBroadcastSent starts the
+          // delay, or onSendFailure sends the next request if the write fails.
+          pending.timedOut = true;
+          return;
+        }
+
+        // A transport may not stop a write it reported cancelled, so slaves may yet receive it.
         startTurnaround();
       }
 
+      inFlight = null;
       sendNext();
     } else if (queued.remove(pending)) {
       // Timed out while waiting behind other requests; it was never sent.
@@ -295,7 +314,13 @@ public class ModbusRtuClient extends ModbusClient {
     if (pending == inFlight) {
       inFlight = null;
 
-      failRequest(pending, failure);
+      // A broadcast kept in flight after it timed out has already failed with the timeout.
+      if (!pending.timedOut) {
+        failRequest(pending, failure);
+      }
+
+      // No turnaround delay after a broadcast: a write that fails doesn't send the whole frame,
+      // and slaves discard a partial frame.
       sendNext();
     }
   }
@@ -368,7 +393,8 @@ public class ModbusRtuClient extends ModbusClient {
    *
    * <p>The broadcast is sent in submission order with other requests, after the request before it
    * gets a response, times out, or fails to send. After the broadcast is written, the next request
-   * waits for {@link ModbusClientConfig#broadcastTurnaroundDelay()}.
+   * waits for {@link ModbusClientConfig#broadcastTurnaroundDelay()}. That includes a broadcast that
+   * times out while it's being written, if the transport can't cancel the write.
    *
    * @param request the request to broadcast. Must be a write command.
    * @return a {@link CompletionStage} that completes when the request has been sent, or completes
@@ -542,6 +568,12 @@ public class ModbusRtuClient extends ModbusClient {
 
     /** Assigned on the request queue when the request is sent. */
     CompletionStage<Void> sendFuture;
+
+    /**
+     * Set on the request queue when a broadcast times out while it's still being written. Its
+     * future has already failed, but it stays in flight until the write finishes.
+     */
+    boolean timedOut;
 
     Pending(ModbusRtuFrame frame) {
       this.frame = frame;

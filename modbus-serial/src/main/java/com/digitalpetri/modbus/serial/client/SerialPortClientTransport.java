@@ -15,6 +15,7 @@ import com.fazecast.jSerialComm.SerialPortEvent;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -158,7 +159,9 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
    * block the caller if the write stalls. Writes are performed serially, in the order submitted.
    *
    * <p>If the returned {@link CompletionStage} is cancelled before its write starts, the frame is
-   * not written. A write that stalls indefinitely is released by {@link #disconnect()}.
+   * not written. A write that has started can't be stopped, so cancelling it fails, and the {@link
+   * CompletionStage} completes when the write does. A write that stalls indefinitely is released by
+   * {@link #disconnect()}.
    *
    * <p>The returned {@link CompletionStage} may complete exceptionally with a {@link
    * ModbusException} if the transport is not connected or if writing to the serial port fails.
@@ -184,12 +187,12 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
     buffer.flip();
     buffer.get(data);
 
-    var future = new CompletableFuture<Void>();
+    var future = new WriteFuture();
 
     try {
       writeQueue.submit(
           () -> {
-            if (future.isDone()) {
+            if (!future.startWrite()) {
               // Cancelled, e.g. the request timed out while this write was queued.
               return;
             }
@@ -267,6 +270,40 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
       Consumer<ModbusRtuFrame> frameReceiver = SerialPortClientTransport.this.frameReceiver.get();
       if (frameReceiver != null) {
         executionQueue.submit(() -> frameReceiver.accept(frame));
+      }
+    }
+  }
+
+  /**
+   * A send future that can only be cancelled before its write starts.
+   *
+   * <p>A write in progress can't be stopped. If cancelling it succeeded, the frame would still be
+   * written after the future reported it cancelled, and the caller couldn't tell when the write
+   * finished. Instead, cancelling fails, and the future completes when the write does. Unlike
+   * {@link CompletableFuture#cancel(boolean)}, a cancel that fails leaves this future incomplete.
+   */
+  private static final class WriteFuture extends CompletableFuture<Void> {
+
+    /** Set by whichever comes first: the write starting, or this future being cancelled. */
+    private final AtomicBoolean claimed = new AtomicBoolean(false);
+
+    /**
+     * Claim this future for its write.
+     *
+     * @return {@code true} if the write may start, or {@code false} if this future was cancelled or
+     *     otherwise completed first.
+     */
+    boolean startWrite() {
+      return claimed.compareAndSet(false, true) && !isDone();
+    }
+
+    @Override
+    public boolean cancel(boolean mayInterruptIfRunning) {
+      if (claimed.compareAndSet(false, true)) {
+        return super.cancel(mayInterruptIfRunning);
+      } else {
+        // The write has started, or this future was already cancelled.
+        return isCancelled();
       }
     }
   }
