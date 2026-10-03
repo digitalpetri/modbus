@@ -7,6 +7,7 @@ import com.digitalpetri.modbus.Modbus;
 import com.digitalpetri.modbus.ModbusPduSerializer;
 import com.digitalpetri.modbus.TimeoutScheduler;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.function.Consumer;
 
 /**
@@ -18,7 +19,8 @@ import java.util.function.Consumer;
  * @param requestSerializer the {@link ModbusPduSerializer} used to encode requests.
  * @param responseSerializer the {@link ModbusPduSerializer} used to decode responses.
  * @param broadcastTurnaroundDelay how long {@link ModbusRtuClient} waits after writing a broadcast
- *     before it sends the next request. Other clients ignore it.
+ *     before it sends the next request. Other clients ignore it. Must not be negative or longer
+ *     than {@link Long#MAX_VALUE} nanoseconds.
  */
 public record ModbusClientConfig(
     Duration requestTimeout,
@@ -26,6 +28,24 @@ public record ModbusClientConfig(
     ModbusPduSerializer requestSerializer,
     ModbusPduSerializer responseSerializer,
     Duration broadcastTurnaroundDelay) {
+
+  /**
+   * Create a new {@link ModbusClientConfig} instance.
+   *
+   * @throws NullPointerException if {@code broadcastTurnaroundDelay} is {@code null}.
+   * @throws IllegalArgumentException if {@code broadcastTurnaroundDelay} is negative or longer than
+   *     {@link Long#MAX_VALUE} nanoseconds.
+   */
+  public ModbusClientConfig {
+    Objects.requireNonNull(broadcastTurnaroundDelay, "broadcastTurnaroundDelay");
+
+    // ModbusRtuClient schedules the delay in nanoseconds.
+    if (broadcastTurnaroundDelay.isNegative()
+        || broadcastTurnaroundDelay.compareTo(Duration.ofNanos(Long.MAX_VALUE)) > 0) {
+      throw new IllegalArgumentException(
+          "broadcastTurnaroundDelay out of range: " + broadcastTurnaroundDelay);
+    }
+  }
 
   /**
    * Create a new {@link ModbusClientConfig} instance.
@@ -115,6 +135,9 @@ public record ModbusClientConfig(
      * the next request goes out. The Modbus over Serial Line specification calls this the
      * turnaround delay. The default is zero, so the next request is sent as soon as the broadcast
      * is written. Other clients ignore this setting.
+     *
+     * <p>{@link #build()} throws if the delay is {@code null}, negative, or longer than {@link
+     * Long#MAX_VALUE} nanoseconds.
      *
      * @param broadcastTurnaroundDelay the broadcast turnaround delay.
      * @return this {@link Builder}.

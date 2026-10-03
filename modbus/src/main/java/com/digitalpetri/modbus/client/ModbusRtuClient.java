@@ -214,9 +214,9 @@ public class ModbusRtuClient extends ModbusClient {
    * <p>Must be called from a task on {@link #requestQueue}.
    */
   private void startTurnaround() {
-    long delay = config.broadcastTurnaroundDelay().toNanos();
-    if (delay > 0) {
-      try {
+    try {
+      long delay = config.broadcastTurnaroundDelay().toNanos();
+      if (delay > 0) {
         turnaround =
             config
                 .timeoutScheduler()
@@ -224,11 +224,11 @@ public class ModbusRtuClient extends ModbusClient {
                     t -> requestQueue.submit(this::onTurnaroundElapsed),
                     delay,
                     TimeUnit.NANOSECONDS);
-      } catch (Exception e) {
-        // e.g. RejectedExecutionException if the scheduler has been shut down. Send the next
-        // request now rather than never.
-        logger.warn("Failed to schedule broadcast turnaround delay", e);
       }
+    } catch (Exception e) {
+      // e.g. RejectedExecutionException if the scheduler has been shut down. Send the next
+      // request now rather than never.
+      logger.warn("Failed to schedule broadcast turnaround delay", e);
     }
   }
 

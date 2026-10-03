@@ -112,7 +112,7 @@ as a saturated `ThreadPoolExecutor` with `CallerRunsPolicy`, can run a write on 
 | `setTimeoutScheduler` | `TimeoutScheduler` | Scheduler backed by `Modbus` shared executor and scheduled executor | Schedules per-request timeouts and the RTU broadcast turnaround delay |
 | `setRequestSerializer` | `ModbusPduSerializer` | `DefaultRequestSerializer.INSTANCE` | Encodes outgoing typed request PDUs |
 | `setResponseSerializer` | `ModbusPduSerializer` | `DefaultResponseSerializer.INSTANCE` | Decodes incoming typed response PDUs |
-| `setBroadcastTurnaroundDelay` | `Duration` | Zero | How long `ModbusRtuClient` waits after writing a broadcast before it sends the next request. Other clients ignore it |
+| `setBroadcastTurnaroundDelay` | `Duration` | Zero | How long `ModbusRtuClient` waits after writing a broadcast before it sends the next request. Must not be negative. Other clients ignore it |
 
 `NettyTimeoutScheduler` is an alternative adapter over `Netty.sharedWheelTimer()`; the integration
 tests use it explicitly. It is not the default client scheduler.

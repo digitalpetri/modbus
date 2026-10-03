@@ -32,6 +32,7 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
@@ -366,6 +367,42 @@ public class ModbusRtuClientTest {
     transport.assertNoFrameSent();
 
     turnaroundElapsed.run();
+    assertEquals(0, startAddress(transport.nextSentFrame()));
+    transport.respond(client, registers(0x0A));
+    assertArrayEquals(registers(0x0A), a.get(1, TimeUnit.SECONDS).registers());
+    assertEquals(0, client.timeouts.size());
+  }
+
+  @Test
+  void nextRequestIsSentWhenTurnaroundDelayCannotBeScheduled() throws Exception {
+    var calls = new AtomicInteger();
+    var scheduler =
+        new ManualTimeoutScheduler() {
+          @Override
+          public TimeoutHandle newTimeout(Task task, long delay, TimeUnit unit) {
+            // The broadcast's request timeout, then the turnaround delay.
+            if (calls.incrementAndGet() == 2) {
+              throw new RejectedExecutionException("scheduler shut down");
+            }
+            return super.newTimeout(task, delay, unit);
+          }
+        };
+    var transport = new RecordingRtuTransport();
+    var client =
+        ModbusRtuClient.create(
+            transport,
+            cfg -> {
+              cfg.timeoutScheduler = scheduler;
+              cfg.broadcastTurnaroundDelay = Duration.ofMillis(100);
+            });
+
+    client.connect();
+
+    CompletableFuture<Void> x = broadcastAsync(client, 50);
+    assertEquals(50, startAddress(transport.nextSentFrame()));
+    x.get(1, TimeUnit.SECONDS);
+
+    CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
     assertEquals(0, startAddress(transport.nextSentFrame()));
     transport.respond(client, registers(0x0A));
     assertArrayEquals(registers(0x0A), a.get(1, TimeUnit.SECONDS).registers());
