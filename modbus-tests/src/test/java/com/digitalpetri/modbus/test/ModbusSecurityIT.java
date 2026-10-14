@@ -7,6 +7,10 @@ import com.digitalpetri.modbus.server.ModbusServer;
 import com.digitalpetri.modbus.server.ModbusTcpServer;
 import com.digitalpetri.modbus.server.ProcessImage;
 import com.digitalpetri.modbus.server.ReadWriteModbusServices;
+import com.digitalpetri.modbus.server.authz.AuthzContext;
+import com.digitalpetri.modbus.server.authz.AuthzHandler.AuthzResult;
+import com.digitalpetri.modbus.server.authz.AuthzModbusServices;
+import com.digitalpetri.modbus.server.authz.ReadWriteAuthzHandler;
 import com.digitalpetri.modbus.tcp.client.NettyTcpClientTransport;
 import com.digitalpetri.modbus.tcp.security.SecurityUtil;
 import com.digitalpetri.modbus.tcp.server.NettyTcpServerTransport;
@@ -48,6 +52,7 @@ public class ModbusSecurityIT {
     Assertions.assertDoesNotThrow(
         () -> {
           client.connect();
+          client.readCoils(1, new ReadCoilsRequest(0, 1));
           client.readCoils(1, new ReadCoilsRequest(0, 1));
         });
 
@@ -193,6 +198,22 @@ public class ModbusSecurityIT {
           }
         };
 
-    return ModbusTcpServer.create(serverTransport, modbusServices);
+    var authzHandler =
+        new ReadWriteAuthzHandler() {
+          @Override
+          protected AuthzResult authorizeRead(int unitId, AuthzContext authzContext) {
+            return authzContext.clientRole().filter("Operator"::equals).isPresent()
+                ? AuthzResult.AUTHORIZED
+                : AuthzResult.NOT_AUTHORIZED;
+          }
+
+          @Override
+          protected AuthzResult authorizeWrite(int unitId, AuthzContext authzContext) {
+            return authorizeRead(unitId, authzContext);
+          }
+        };
+
+    return ModbusTcpServer.create(
+        serverTransport, new AuthzModbusServices(authzHandler, modbusServices));
   }
 }

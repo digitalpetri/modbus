@@ -7,7 +7,7 @@ import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.Locale;
 import org.bouncycastle.asn1.ASN1ObjectIdentifier;
-import org.bouncycastle.asn1.DEROctetString;
+import org.bouncycastle.asn1.DERUTF8String;
 import org.bouncycastle.asn1.x500.X500Name;
 import org.bouncycastle.asn1.x500.X500NameBuilder;
 import org.bouncycastle.asn1.x500.style.BCStyle;
@@ -100,7 +100,7 @@ public class CertificateUtil {
         certificateBuilder.addExtension(
             new ASN1ObjectIdentifier("1.3.6.1.4.1.50316.802.1"),
             false,
-            new DEROctetString("Operator".getBytes()));
+            new DERUTF8String("Operator"));
       }
 
       var contentSigner =
@@ -189,7 +189,7 @@ public class CertificateUtil {
         certificateBuilder.addExtension(
             new ASN1ObjectIdentifier("1.3.6.1.4.1.50316.802.1"),
             false,
-            new DEROctetString("Operator".getBytes()));
+            new DERUTF8String("Operator"));
       }
 
       var contentSigner =
