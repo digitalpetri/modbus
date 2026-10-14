@@ -10,7 +10,6 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.SimpleChannelInboundHandler;
@@ -21,6 +20,7 @@ import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProtocols;
+import io.netty.util.ReferenceCountUtil;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -70,27 +70,29 @@ public class NettyTcpServerTransport implements ModbusTcpServerTransport {
               @Override
               protected void initChannel(SocketChannel channel) throws Exception {
                 clientChannels.add(channel);
+                channel.closeFuture().addListener(f -> clientChannels.remove(channel));
 
                 if (config.tlsEnabled()) {
-                  SslContext sslContext =
+                  SslContextBuilder sslContextBuilder =
                       SslContextBuilder.forServer(config.keyManagerFactory().orElseThrow())
                           .clientAuth(ClientAuth.REQUIRE)
                           .trustManager(config.trustManagerFactory().orElseThrow())
-                          .protocols(SslProtocols.TLS_v1_2, SslProtocols.TLS_v1_3)
-                          .build();
+                          .protocols(SslProtocols.TLS_v1_2, SslProtocols.TLS_v1_3);
 
-                  channel.pipeline().addLast(sslContext.newHandler(channel.alloc()));
+                  config.sslContextCustomizer().accept(sslContextBuilder);
+                  SslContext sslContext = sslContextBuilder.build();
+
+                  try {
+                    channel.pipeline().addLast(sslContext.newHandler(channel.alloc()));
+                  } finally {
+                    // Native TLS engines retain their context until the handler releases the
+                    // engine.
+                    ReferenceCountUtil.release(sslContext);
+                  }
                 }
 
                 channel
                     .pipeline()
-                    .addLast(
-                        new ChannelInboundHandlerAdapter() {
-                          @Override
-                          public void channelInactive(ChannelHandlerContext ctx) {
-                            clientChannels.remove(ctx.channel());
-                          }
-                        })
                     .addLast(new ModbusTcpCodec())
                     .addLast(new ModbusTcpFrameHandler());
 

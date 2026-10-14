@@ -6,7 +6,9 @@ import com.digitalpetri.netty.fsm.ChannelFsmConfigBuilder;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
+import io.netty.handler.ssl.SslContextBuilder;
 import java.time.Duration;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
@@ -14,7 +16,10 @@ import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.TrustManagerFactory;
 
 /**
- * Configuration for a {@link NettyTcpClientTransport}.
+ * Configuration for {@link NettyTcpClientTransport} and {@link NettyRtuClientTransport}.
+ *
+ * <p>See {@link Builder#sslContextCustomizer} for TLS callback timing, ownership, and mutual
+ * authentication requirements.
  *
  * @param hostname the hostname or IP address to connect to.
  * @param port the port to connect to.
@@ -32,6 +37,7 @@ import javax.net.ssl.TrustManagerFactory;
  * @param tlsEnabled whether to enable TLS (Modbus/TCP Security).
  * @param keyManagerFactory the {@link KeyManagerFactory} to use if TLS is enabled.
  * @param trustManagerFactory the {@link TrustManagerFactory} to use if TLS is enabled.
+ * @param sslContextCustomizer the callback that customizes TLS context construction.
  */
 public record NettyClientTransportConfig(
     String hostname,
@@ -46,7 +52,62 @@ public record NettyClientTransportConfig(
     Consumer<ChannelFsmConfigBuilder> channelFsmCustomizer,
     boolean tlsEnabled,
     Optional<KeyManagerFactory> keyManagerFactory,
-    Optional<TrustManagerFactory> trustManagerFactory) {
+    Optional<TrustManagerFactory> trustManagerFactory,
+    Consumer<SslContextBuilder> sslContextCustomizer) {
+
+  private static final Consumer<SslContextBuilder> DEFAULT_SSL_CONTEXT_CUSTOMIZER = b -> {};
+
+  public NettyClientTransportConfig {
+    Objects.requireNonNull(sslContextCustomizer, "sslContextCustomizer must not be null");
+  }
+
+  /**
+   * Create a configuration with default TLS context construction.
+   *
+   * @param hostname the hostname or IP address to connect to.
+   * @param port the transport port.
+   * @param connectTimeout the connect timeout.
+   * @param connectPersistent whether to connect persistently.
+   * @param reconnectLazy whether to reconnect lazily.
+   * @param eventLoopGroup the event loop group to use.
+   * @param executor the executor to use.
+   * @param bootstrapCustomizer the bootstrap customizer.
+   * @param pipelineCustomizer the pipeline customizer.
+   * @param channelFsmCustomizer the channel FSM customizer.
+   * @param tlsEnabled whether to enable TLS.
+   * @param keyManagerFactory the key manager factory to use if TLS is enabled.
+   * @param trustManagerFactory the trust manager factory to use if TLS is enabled.
+   */
+  public NettyClientTransportConfig(
+      String hostname,
+      int port,
+      Duration connectTimeout,
+      boolean connectPersistent,
+      boolean reconnectLazy,
+      EventLoopGroup eventLoopGroup,
+      ExecutorService executor,
+      Consumer<Bootstrap> bootstrapCustomizer,
+      Consumer<ChannelPipeline> pipelineCustomizer,
+      Consumer<ChannelFsmConfigBuilder> channelFsmCustomizer,
+      boolean tlsEnabled,
+      Optional<KeyManagerFactory> keyManagerFactory,
+      Optional<TrustManagerFactory> trustManagerFactory) {
+    this(
+        hostname,
+        port,
+        connectTimeout,
+        connectPersistent,
+        reconnectLazy,
+        eventLoopGroup,
+        executor,
+        bootstrapCustomizer,
+        pipelineCustomizer,
+        channelFsmCustomizer,
+        tlsEnabled,
+        keyManagerFactory,
+        trustManagerFactory,
+        DEFAULT_SSL_CONTEXT_CUSTOMIZER);
+  }
 
   /**
    * Create a new {@link NettyClientTransportConfig} with a callback that allows customizing the
@@ -109,6 +170,22 @@ public record NettyClientTransportConfig(
 
     /** The {@link TrustManagerFactory} to use if TLS is enabled. */
     public TrustManagerFactory trustManagerFactory = null;
+
+    /**
+     * Customizes the TLS context builder for each connection attempt, including reconnects when TLS
+     * is enabled.
+     *
+     * <p>The configured key and trust managers, required client authentication, and TLS 1.2/1.3
+     * protocols are applied before this callback. Overrides must preserve mutual authentication,
+     * including trusted peer certificates and a client identity. Servers must require client
+     * certificates.
+     *
+     * <p>Only configure the supplied builder; do not retain it or call its build method. The
+     * transport builds and owns a context per connection and releases its native reference after
+     * creating the TLS handler. Netty releases the handler's engine reference when the handler is
+     * removed.
+     */
+    public Consumer<SslContextBuilder> sslContextCustomizer = DEFAULT_SSL_CONTEXT_CUSTOMIZER;
 
     /**
      * Set the hostname or IP address to connect to.
@@ -258,6 +335,18 @@ public record NettyClientTransportConfig(
       return this;
     }
 
+    /**
+     * Set the callback that customizes TLS context construction after the transport's defaults.
+     *
+     * @param sslContextCustomizer the TLS context builder customizer.
+     * @return this Builder.
+     * @see #sslContextCustomizer
+     */
+    public Builder setSslContextCustomizer(Consumer<SslContextBuilder> sslContextCustomizer) {
+      this.sslContextCustomizer = sslContextCustomizer;
+      return this;
+    }
+
     public NettyClientTransportConfig build() {
       if (hostname == null) {
         throw new NullPointerException("hostname must not be null");
@@ -293,7 +382,8 @@ public record NettyClientTransportConfig(
           channelFsmCustomizer,
           tlsEnabled,
           Optional.ofNullable(keyManagerFactory),
-          Optional.ofNullable(trustManagerFactory));
+          Optional.ofNullable(trustManagerFactory),
+          sslContextCustomizer);
     }
   }
 }
