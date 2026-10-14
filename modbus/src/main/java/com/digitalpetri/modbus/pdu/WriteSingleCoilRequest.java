@@ -10,7 +10,7 @@ import java.nio.ByteBuffer;
  * starting at 0.
  *
  * @param address the address of the coil to force. 2 bytes, range [0x0000, 0xFFFF].
- * @param value the value to force.
+ * @param value the value to force, either 0x0000 (OFF) or 0xFF00 (ON).
  */
 public record WriteSingleCoilRequest(int address, int value) implements ModbusRequestPdu {
 
@@ -19,6 +19,14 @@ public record WriteSingleCoilRequest(int address, int value) implements ModbusRe
    */
   public WriteSingleCoilRequest(int address, boolean value) {
     this(address, value ? 0xFF00 : 0x0000);
+  }
+
+  @Override
+  public void validate() {
+    RequestValidation.checkRange("address", address, 0, 65535);
+    if (value != 0x0000 && value != 0xFF00) {
+      throw new IllegalArgumentException("value must be 0x0000 or 0xFF00: " + value);
+    }
   }
 
   @Override
@@ -38,6 +46,8 @@ public record WriteSingleCoilRequest(int address, int value) implements ModbusRe
      * @param buffer the buffer to encode into.
      */
     public static void encode(WriteSingleCoilRequest request, ByteBuffer buffer) {
+      request.validate();
+
       buffer.put((byte) request.getFunctionCode());
       buffer.putShort((short) request.address);
       buffer.putShort((short) request.value);

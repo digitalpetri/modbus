@@ -19,7 +19,7 @@ components, implemented interfaces, and declared exceptions. These links use jav
 | `ModbusClient` | [Class](https://javadoc.io/doc/com.digitalpetri.modbus/modbus/latest/com.digitalpetri.modbus/com/digitalpetri/modbus/client/ModbusClient.html) | Lifecycle and typed synchronous/asynchronous operations |
 | `ModbusTcpClient` | [Class](https://javadoc.io/doc/com.digitalpetri.modbus/modbus/latest/com.digitalpetri.modbus/com/digitalpetri/modbus/client/ModbusTcpClient.html) | MBAP correlation and raw TCP PDU operations |
 | `ModbusRtuClient` | [Class](https://javadoc.io/doc/com.digitalpetri.modbus/modbus/latest/com.digitalpetri.modbus/com/digitalpetri/modbus/client/ModbusRtuClient.html) | RTU framing, CRC, and broadcasts |
-| `ModbusClientConfig` | [Record](https://javadoc.io/doc/com.digitalpetri.modbus/modbus/latest/com.digitalpetri.modbus/com/digitalpetri/modbus/client/ModbusClientConfig.html) | Request timeout, scheduler, and serializers |
+| `ModbusClientConfig` | [Record](https://javadoc.io/doc/com.digitalpetri.modbus/modbus/latest/com.digitalpetri.modbus/com/digitalpetri/modbus/client/ModbusClientConfig.html) | Request timeout, scheduler, serializers, and response validator |
 
 See [Client and server behavior](client-and-server-behavior.md#client-request-semantics) and
 [Client operations](lifecycle-concurrency-and-resources.md#client-operations) for cross-cutting
@@ -47,6 +47,9 @@ use the generated record page for exact components and serializer methods.
 
 `ModbusPduSerializer` and its default implementations are documented in the
 [core Javadocs](https://javadoc.io/doc/com.digitalpetri.modbus/modbus/latest/com.digitalpetri.modbus/com/digitalpetri/modbus/ModbusPduSerializer.html).
+
+`ModbusResponseValidator` provides the separately configurable request-relative checks described in
+[Typed response validation](client-and-server-behavior.md#typed-response-validation).
 
 ## Transport and security API
 

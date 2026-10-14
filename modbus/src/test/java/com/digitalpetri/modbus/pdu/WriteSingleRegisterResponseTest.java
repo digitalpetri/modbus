@@ -3,6 +3,7 @@ package com.digitalpetri.modbus.pdu;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.ByteBuffer;
 import java.util.HexFormat;
@@ -79,6 +80,13 @@ class WriteSingleRegisterResponseTest {
       WriteSingleRegisterResponse decoded = decode(hex);
 
       assertEquals(hex, encode(decoded));
+    }
+  }
+
+  @Test
+  void decoderRejectsTruncatedHeaders() {
+    for (String hex : new String[] {"", "06", "0600"}) {
+      assertThrows(IllegalArgumentException.class, () -> decode(hex));
     }
   }
 

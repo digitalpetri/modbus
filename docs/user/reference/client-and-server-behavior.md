@@ -16,6 +16,45 @@ send or channel wait already in progress. A request can still reach the server a
 timeout. Applications must resolve the outcome of timed-out writes or use idempotent application
 semantics before retrying.
 
+## Typed response validation
+
+TCP and RTU clients decode normal responses with `responseSerializer`, then call
+`responseValidator.validate(request, response)` before completing the request successfully.
+This applies to `send` / `sendAsync` and all synchronous and asynchronous typed operations.
+Raw TCP calls bypass both the codec and the validator. Modbus exception responses keep their
+existing exception handling and do not invoke the validator.
+
+The default `ModbusResponseValidator.DefaultResponseValidator` checks matching built-in request
+and response record pairs. Register reads must contain two bytes per requested register. Coil and
+discrete-input reads must contain the requested packed byte count, rounded up to a whole byte.
+Writes must echo the request's address, quantity, value, or masks. Write Single Register (`0x06`)
+values may have any length, but every value byte must be echoed exactly. Other PDU types are ignored by
+the standard validator, including custom PDUs that use a standard function code.
+
+Replace the validator independently of the codec with
+`ModbusClientConfig.Builder.setResponseValidator(...)` or the builder's `responseValidator` field.
+Applications using built-in records with a different register width or echo semantics must replace
+both the codec and the validator. Replacing only the codec retains standard semantic validation.
+Write Single Register already supports arbitrary value lengths with the built-in codec and validator.
+Validators must support concurrent use by the clients that share them.
+
+Format checks belong to the selected codec. Built-in response decoders require the buffer's
+remaining bytes to contain exactly one complete PDU. They reject truncation, unexpected trailing
+bytes, invalid byte counts, and invalid standard response fields with an `IllegalArgumentException`
+that describes the protocol error. Custom codecs determine their own format and consumption rules;
+the generic client path does not require their buffers to be fully consumed.
+For Write Single Register, every byte after the address is part of the value, so the decoder only
+requires a complete function code and address and consumes all remaining value bytes.
+
+Validation failures complete asynchronous operations exceptionally. Synchronous calls wrap them in
+`ModbusExecutionException`. A rejected complete response fails that request only. TCP correlation
+continues normally, and RTU sends the next queued request without resetting the frame parser when
+the frame has a valid CRC. Existing timeout and CRC recovery still apply when needed.
+
+`ModbusClientConfig` has six record components. The five-argument constructor selects the default
+validator. Record reflection and generated `equals`, `hashCode`, and `toString` include the
+validator.
+
 ## TCP client behavior
 
 | Behavior | Detail |
@@ -23,7 +62,7 @@ semantics before retrying.
 | Transaction ID | Allocated in the range 0 through 65535 and wraps to 0 |
 | Correlation | Pending responses are selected by MBAP transaction ID |
 | Request timeout | One timeout per in-flight request; default 5 seconds |
-| Typed response validation | Empty PDUs, malformed exception PDUs, and unexpected function codes fail the request |
+| Typed response validation | Empty PDUs, malformed exception PDUs, unexpected function codes, codec failures, and request-relative validation failures fail the request |
 | Standard exception response | Function code `request + 0x80` and an exception byte become `ModbusResponseException` |
 | Late/unmatched response | Logged when its transaction ID has no promise; after ID wrap/reuse, a sufficiently late response can match the newer promise |
 | Raw request | `sendRaw` accepts PDU bytes only, adds MBAP, and returns response PDU bytes only |
@@ -37,15 +76,17 @@ reused while its previous request remains in flight.
 
 | Behavior | Detail |
 | --- | --- |
-| Correlation | The client dequeues one pending promise and checks the unit ID; for normal responses it also checks the function code. There is no transaction ID or ordering field |
+| Request order | One request is outstanding at a time. Other requests wait in submission order and are sent when the current request gets a response, times out, or fails to send |
+| Correlation | A response is matched to the outstanding request. The client checks the unit ID and the function code. An exception response must carry the request's function code plus `0x80`. There is no transaction ID or ordering field |
+| Request timeout | Starts when the request is submitted, so it includes time spent waiting behind other requests. A request that times out while waiting is never sent |
 | CRC | Calculated on send and verified on receive |
-| Timeout recovery | Removes the promise and resets the transport frame parser |
+| Timeout recovery | Fails the outstanding request, resets the transport frame parser, and sends the next waiting request |
 | CRC recovery | Fails with `ModbusCrcException` and resets the frame parser |
-| Unit/function mismatch (reported as `slave id mismatch` / `function code mismatch`) | Fails the request; a function mismatch also fails remaining promises as a synchronization error |
-| Broadcast | `broadcast` sends with unit ID 0 and waits only for send completion |
-| Exception response | Produces `ModbusResponseException`, but `getExceptionCode()` is currently unreliable for RTU; see the [RTU exception-code limitation](errors-and-exceptions.md#rtu-exception-code-limitation) |
+| Unit/function mismatch (reported as `slave id mismatch` / `function code mismatch`) | Fails the outstanding request only; requests waiting behind it are not failed. A late response with a matching unit and function code is accepted as the response to the next request |
+| Broadcast | `broadcast` sends with unit ID 0 and waits only for send completion. Broadcasts wait their turn in submission order like other requests, and the request timeout applies until the broadcast is written. A timeout is reported by `broadcast` as `ModbusExecutionException` with a `TimeoutException` cause. Cancelling the `broadcastAsync` future attempts to cancel its transport send; a queued write that has not started is skipped. After a broadcast is written, the next request waits for `broadcastTurnaroundDelay`, which defaults to zero. If a broadcast times out while the serial transport is still writing it, the caller gets the timeout, but the next request waits for the write to finish and then for the turnaround delay |
+| Exception response | Produces `ModbusResponseException` with the request's function code and the response's exception code. An exception response without an exception code fails with `malformed exception response PDU` |
 
-Keep a single RTU request in flight. This applies to both serial RTU and RTU over TCP; see
+These behaviors apply to both serial RTU and RTU over TCP. For concurrent callers, see
 [Client concurrency](lifecycle-concurrency-and-resources.md#client-concurrency).
 
 ## Server lifecycle

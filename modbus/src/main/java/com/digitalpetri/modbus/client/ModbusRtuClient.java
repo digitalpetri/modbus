@@ -1,29 +1,50 @@
 package com.digitalpetri.modbus.client;
 
 import com.digitalpetri.modbus.Crc16;
+import com.digitalpetri.modbus.Modbus;
 import com.digitalpetri.modbus.ModbusRtuFrame;
 import com.digitalpetri.modbus.TimeoutScheduler.TimeoutHandle;
 import com.digitalpetri.modbus.exceptions.ModbusCrcException;
 import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
+import com.digitalpetri.modbus.internal.util.ExecutionQueue;
+import com.digitalpetri.modbus.internal.util.Hex;
 import com.digitalpetri.modbus.pdu.ModbusPdu;
 import com.digitalpetri.modbus.pdu.ModbusRequestPdu;
 import com.digitalpetri.modbus.pdu.ModbusResponsePdu;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Consumer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * A {@link ModbusClient} for Modbus RTU, over a serial port or TCP.
+ *
+ * <p>RTU responses carry no transaction ID, so a response can only be matched to the request that
+ * is currently outstanding. This client sends one request at a time, in the order requests are
+ * submitted. A request submitted while another is outstanding waits until that request gets a
+ * response, times out, or fails to send. Concurrent calls are safe, but they are not pipelined.
+ *
+ * <p>The request timeout starts when a request is submitted, so it includes time spent waiting
+ * behind other requests. A request that times out while waiting is never sent.
+ *
+ * <p>Broadcasts wait their turn with other requests. A broadcast gets no response, so it completes
+ * when it's written, and the next request is sent after {@link
+ * ModbusClientConfig#broadcastTurnaroundDelay()}. The request timeout also applies to broadcasts,
+ * from submission until the broadcast is written. If a broadcast times out after its write has
+ * started, and the transport can't cancel the write, the next request waits for the write to finish
+ * and then for the turnaround delay. Requests waiting behind it still time out.
+ */
 public class ModbusRtuClient extends ModbusClient {
 
   /** The unit/slave ID used when sending broadcast messages. */
@@ -31,10 +52,32 @@ public class ModbusRtuClient extends ModbusClient {
 
   private final Logger logger = LoggerFactory.getLogger(getClass());
 
-  private final ArrayDeque<ResponsePromise> promises = new ArrayDeque<>();
+  /** Executor used to run request state changes and to complete request futures. */
+  private final Executor executor = Modbus.sharedExecutor();
+
+  /**
+   * Runs every request state change (submit, send, response, timeout, and send failure) serially.
+   *
+   * <p>RTU responses carry no transaction ID, so a response can only be matched to a request if at
+   * most one request is outstanding at a time. The fields below are only accessed from tasks on
+   * this queue, which lets the transport be called without holding a lock.
+   */
+  private final ExecutionQueue requestQueue = new ExecutionQueue(executor);
+
+  /** Requests and broadcasts waiting to be sent, in the order submitted. */
+  private final ArrayDeque<Pending<?>> queued = new ArrayDeque<>();
+
+  /**
+   * The request that has been sent and is waiting for a response, the broadcast that is being
+   * written, or {@code null}.
+   */
+  private Pending<?> inFlight;
+
+  /** The turnaround delay that holds the queue after a broadcast, or {@code null}. */
+  private TimeoutHandle turnaround;
 
   // package visibility for testing
-  final Map<ResponsePromise, TimeoutHandle> timeouts = new ConcurrentHashMap<>();
+  final Map<Pending<?>, TimeoutHandle> timeouts = new ConcurrentHashMap<>();
 
   private final ModbusClientConfig config;
   private final ModbusRtuClientTransport transport;
@@ -72,6 +115,7 @@ public class ModbusRtuClient extends ModbusClient {
     ByteBuffer pdu = ByteBuffer.allocate(256);
 
     try {
+      request.validate();
       config.requestSerializer().encode(request, pdu);
       pdu.flip();
     } catch (Exception e) {
@@ -80,61 +124,244 @@ public class ModbusRtuClient extends ModbusClient {
 
     ByteBuffer crc = calculateCrc16(unitId, pdu);
 
-    var promise = new ResponsePromise(unitId, request.getFunctionCode(), new CompletableFuture<>());
+    var pending = new PendingRequest(unitId, request, new ModbusRtuFrame(unitId, pdu, crc));
 
-    synchronized (promises) {
-      promises.push(promise);
+    enqueue(pending);
+
+    return pending.future;
+  }
+
+  /**
+   * Schedule the timeout for {@code pending} and queue it to be sent.
+   *
+   * <p>The timeout starts when the request is submitted, so it bounds how long the caller waits,
+   * including time spent queued behind other requests.
+   */
+  private void enqueue(Pending<?> pending) {
+    requestQueue.submit(
+        () -> {
+          // The timeout is scheduled on the queue so the timeout task can't run before the
+          // request is queued.
+          TimeoutHandle timeout;
+          try {
+            timeout =
+                config
+                    .timeoutScheduler()
+                    .newTimeout(
+                        t -> requestQueue.submit(() -> onTimeout(pending)),
+                        config.requestTimeout().toMillis(),
+                        TimeUnit.MILLISECONDS);
+          } catch (Exception e) {
+            // e.g. RejectedExecutionException if the scheduler has been shut down. Without a
+            // timeout the request could wait forever, so fail it instead of sending it.
+            failRequest(pending, e);
+            return;
+          }
+
+          timeouts.put(pending, timeout);
+
+          queued.addLast(pending);
+          sendNext();
+        });
+  }
+
+  /**
+   * Send the next queued request, unless a request is already in flight or the turnaround delay
+   * after a broadcast hasn't elapsed.
+   *
+   * <p>Must be called from a task on {@link #requestQueue}.
+   */
+  private void sendNext() {
+    while (inFlight == null && turnaround == null && !queued.isEmpty()) {
+      Pending<?> pending = queued.poll();
+
+      if (pending.future.isDone()) {
+        // The caller cancelled or completed the future before the request was sent.
+        cancelTimeout(pending);
+        continue;
+      }
+
+      inFlight = pending;
+
+      pending.sendFuture = send(pending.frame);
+      if (pending instanceof PendingBroadcast broadcast) {
+        ((BroadcastFuture) broadcast.future).setSendFuture(pending.sendFuture);
+      }
+      pending.sendFuture.whenComplete(
+          (v, ex) -> {
+            if (ex != null) {
+              requestQueue.submit(() -> onSendFailure(pending, ex));
+            } else if (pending instanceof PendingBroadcast broadcast) {
+              requestQueue.submit(() -> onBroadcastSent(broadcast));
+            }
+          });
     }
+  }
 
-    long timeoutMillis = config.requestTimeout().toMillis();
-    TimeoutHandle timeout =
-        config
-            .timeoutScheduler()
-            .newTimeout(
-                t -> {
-                  boolean removed;
-                  synchronized (promises) {
-                    removed = promises.remove(promise);
-                  }
+  /**
+   * Complete a broadcast that was written and hold the queue for the turnaround delay.
+   *
+   * <p>Must be called from a task on {@link #requestQueue}.
+   */
+  private void onBroadcastSent(PendingBroadcast broadcast) {
+    // Ignore it if the broadcast timed out and is no longer in flight.
+    if (broadcast == inFlight) {
+      inFlight = null;
 
-                  timeouts.remove(promise);
+      // A broadcast kept in flight after it timed out has already failed. Completing it again
+      // could overtake that failure on the executor.
+      if (!broadcast.timedOut) {
+        completeRequest(broadcast, null);
+      }
+      startTurnaround();
+      sendNext();
+    }
+  }
 
-                  if (removed) {
-                    // The frame parser needs to be reset!
-                    // It could be "stuck" in Accumulating or ParseError states if the timeout was
-                    // caused by an incomplete or invalid response rather than no response.
-                    resetFrameParser();
+  /**
+   * Hold the queue for the turnaround delay after a broadcast, if one is configured.
+   *
+   * <p>Must be called from a task on {@link #requestQueue}.
+   */
+  private void startTurnaround() {
+    try {
+      long delay = config.broadcastTurnaroundDelay().toNanos();
+      if (delay > 0) {
+        turnaround =
+            config
+                .timeoutScheduler()
+                .newTimeout(
+                    t -> requestQueue.submit(this::onTurnaroundElapsed),
+                    delay,
+                    TimeUnit.NANOSECONDS);
+      }
+    } catch (Exception e) {
+      // e.g. RejectedExecutionException if the scheduler has been shut down. Send the next
+      // request now rather than never.
+      logger.warn("Failed to schedule broadcast turnaround delay", e);
+    }
+  }
 
-                    promise.future.completeExceptionally(
-                        new TimeoutException(
-                            "request timed out after %sms".formatted(timeoutMillis)));
-                  }
-                },
-                timeoutMillis,
-                TimeUnit.MILLISECONDS);
+  /**
+   * Send the next queued request after the turnaround delay following a broadcast.
+   *
+   * <p>Must be called from a task on {@link #requestQueue}.
+   */
+  private void onTurnaroundElapsed() {
+    turnaround = null;
+    sendNext();
+  }
 
-    timeouts.put(promise, timeout);
+  /**
+   * Handle the timeout of a request or broadcast, whether it's queued or in flight.
+   *
+   * <p>Must be called from a task on {@link #requestQueue}.
+   */
+  private void onTimeout(Pending<?> pending) {
+    var ex =
+        new TimeoutException(
+            "request timed out after %sms".formatted(config.requestTimeout().toMillis()));
 
-    transport
-        .send(new ModbusRtuFrame(unitId, pdu, crc))
-        .whenComplete(
-            (v, ex) -> {
-              if (ex != null) {
-                boolean removed;
-                synchronized (promises) {
-                  removed = promises.remove(promise);
-                }
-                if (removed) {
-                  promise.future.completeExceptionally(ex);
-                }
-                TimeoutHandle t = timeouts.remove(promise);
-                if (t != null) {
-                  t.cancel();
-                }
-              }
-            });
+    if (pending == inFlight) {
+      // The frame parser needs to be reset!
+      // It could be "stuck" in Accumulating or ParseError states if the timeout was
+      // caused by an incomplete or invalid response rather than no response.
+      resetFrameParser();
 
-    return promise.future;
+      // Cancel the send so a transport that queues writes doesn't write this request
+      // after it timed out. Responses aren't matched to requests by any ID, so the
+      // late request's response would be taken as the response to another request.
+      // This happens before failRequest, so callers' callbacks see the send cancelled.
+      boolean writing = false;
+      try {
+        CompletableFuture<Void> sendFuture = pending.sendFuture.toCompletableFuture();
+        sendFuture.cancel(false);
+
+        // A transport can refuse to cancel a write that has already started, e.g.
+        // SerialPortClientTransport. Then the send completes when the write does.
+        writing = !sendFuture.isDone();
+      } catch (UnsupportedOperationException ignored) {
+        // This CompletionStage implementation can't be cancelled.
+      }
+
+      failRequest(pending, ex);
+
+      if (pending instanceof PendingBroadcast) {
+        if (writing) {
+          // Slaves will receive the broadcast, so the turnaround delay has to start when the
+          // write finishes. Keep the broadcast in flight until then; onBroadcastSent starts the
+          // delay, or onSendFailure sends the next request if the write fails.
+          pending.timedOut = true;
+          return;
+        }
+
+        // A transport may not stop a write it reported cancelled, so slaves may yet receive it.
+        startTurnaround();
+      }
+
+      inFlight = null;
+      sendNext();
+    } else if (queued.remove(pending)) {
+      // Timed out while waiting behind other requests; it was never sent.
+      failRequest(pending, ex);
+    }
+  }
+
+  /**
+   * Handle a failure to send a request.
+   *
+   * <p>Must be called from a task on {@link #requestQueue}.
+   */
+  private void onSendFailure(Pending<?> pending, Throwable failure) {
+    // Ignore the failure if the request already completed, e.g. it timed out and the timeout
+    // cancelled the send.
+    if (pending == inFlight) {
+      inFlight = null;
+
+      // A broadcast kept in flight after it timed out has already failed with the timeout.
+      if (!pending.timedOut) {
+        failRequest(pending, failure);
+      }
+
+      // No turnaround delay after a broadcast: a write that fails doesn't send the whole frame,
+      // and slaves discard a partial frame.
+      sendNext();
+    }
+  }
+
+  private <T> void completeRequest(Pending<T> pending, T result) {
+    cancelTimeout(pending);
+
+    // Complete off the request queue so caller callbacks, which may block on another request
+    // from this client, don't hold up the queue.
+    executor.execute(() -> pending.future.complete(result));
+  }
+
+  private void failRequest(Pending<?> pending, Throwable failure) {
+    cancelTimeout(pending);
+
+    // Complete off the request queue so caller callbacks, which may block on another request
+    // from this client, don't hold up the queue.
+    executor.execute(() -> pending.future.completeExceptionally(failure));
+  }
+
+  private void cancelTimeout(Pending<?> pending) {
+    TimeoutHandle t = timeouts.remove(pending);
+    if (t != null) {
+      t.cancel();
+    }
+  }
+
+  /**
+   * Send {@code frame} using the transport, converting an exception thrown by the transport into a
+   * failed {@link CompletionStage}.
+   */
+  private CompletionStage<Void> send(ModbusRtuFrame frame) {
+    try {
+      return transport.send(frame);
+    } catch (Exception e) {
+      return CompletableFuture.failedFuture(e);
+    }
   }
 
   /**
@@ -143,8 +370,12 @@ public class ModbusRtuClient extends ModbusClient {
    *
    * <p>Broadcast requests are necessarily write commands.
    *
+   * <p>The broadcast is sent in submission order with other requests; see {@link
+   * #broadcastAsync(ModbusRequestPdu)}.
+   *
    * @param request the request to broadcast. Must be a write command.
-   * @throws ModbusExecutionException if an error occurs while sending the request.
+   * @throws ModbusExecutionException if an error occurs while sending the request. If the request
+   *     timeout elapses before the write completes, the cause is a {@link TimeoutException}.
    */
   public void broadcast(ModbusRequestPdu request) throws ModbusExecutionException {
     try {
@@ -164,13 +395,23 @@ public class ModbusRtuClient extends ModbusClient {
    *
    * <p>Broadcast requests are necessarily write commands.
    *
+   * <p>The broadcast is sent in submission order with other requests, after the request before it
+   * gets a response, times out, or fails to send. After the broadcast is written, the next request
+   * waits for {@link ModbusClientConfig#broadcastTurnaroundDelay()}. That includes a broadcast that
+   * times out while it's being written, if the transport can't cancel the write.
+   *
+   * <p>Cancelling the returned future attempts to cancel the transport send. A queued broadcast
+   * whose write has not started is skipped.
+   *
    * @param request the request to broadcast. Must be a write command.
-   * @return a {@link CompletionStage} that completes when the request has been sent.
+   * @return a {@link CompletionStage} that completes when the request has been sent, or completes
+   *     exceptionally with a {@link TimeoutException} if the request timeout elapses first.
    */
   public CompletionStage<Void> broadcastAsync(ModbusRequestPdu request) {
     ByteBuffer pdu = ByteBuffer.allocate(256);
 
     try {
+      request.validate();
       config.requestSerializer().encode(request, pdu);
       pdu.flip();
     } catch (Exception e) {
@@ -179,74 +420,87 @@ public class ModbusRtuClient extends ModbusClient {
 
     ByteBuffer crc = calculateCrc16(BROADCAST_ID, pdu);
 
-    return transport.send(new ModbusRtuFrame(BROADCAST_ID, pdu, crc));
+    var pending = new PendingBroadcast(new ModbusRtuFrame(BROADCAST_ID, pdu, crc));
+
+    enqueue(pending);
+
+    return pending.future;
   }
 
   private void onFrameReceived(ModbusRtuFrame frame) {
-    ResponsePromise promise;
-    synchronized (promises) {
-      promise = promises.poll();
+    requestQueue.submit(
+        () -> {
+          // A broadcast gets no response, so a frame received while one is in flight is unexpected.
+          if (inFlight instanceof PendingRequest pending) {
+            inFlight = null;
+
+            handleResponse(pending, frame);
+            sendNext();
+          } else {
+            logger.warn("No pending request for response frame: {}", frame);
+          }
+        });
+  }
+
+  /**
+   * Complete {@code pending} using the response {@code frame}.
+   *
+   * <p>Must be called from a task on {@link #requestQueue}.
+   */
+  private void handleResponse(PendingRequest pending, ModbusRtuFrame frame) {
+    if (!verifyCrc16(frame)) {
+      resetFrameParser();
+
+      failRequest(pending, new ModbusCrcException(frame));
+      return;
     }
 
-    if (promise != null) {
-      TimeoutHandle t = timeouts.remove(promise);
-      if (t != null) {
-        t.cancel();
+    int slaveId = frame.unitId();
+
+    if (pending.slaveId != slaveId) {
+      failRequest(
+          pending,
+          new ModbusException("slave id mismatch: %s != %s".formatted(pending.slaveId, slaveId)));
+      return;
+    }
+
+    ByteBuffer buffer = frame.pdu();
+
+    if (buffer.remaining() == 0) {
+      failRequest(pending, new ModbusException("empty response PDU"));
+      return;
+    }
+
+    int functionCode = buffer.get(buffer.position()) & 0xFF;
+
+    if (functionCode == pending.functionCode) {
+      try {
+        ModbusPdu modbusPdu = config.responseSerializer().decode(functionCode, buffer);
+        var response = (ModbusResponsePdu) modbusPdu;
+        config.responseValidator().validate(pending.request, response);
+        completeRequest(pending, response);
+      } catch (Exception e) {
+        failRequest(pending, e);
       }
+    } else if (functionCode == pending.functionCode + 0x80) {
+      if (buffer.remaining() >= 2) {
+        buffer.get(); // skip FC byte
+        int exceptionCode = buffer.get() & 0xFF;
 
-      if (!verifyCrc16(frame)) {
-        resetFrameParser();
-
-        promise.future.completeExceptionally(new ModbusCrcException(frame));
-        return;
-      }
-
-      int slaveId = frame.unitId();
-
-      if (promise.slaveId != slaveId) {
-        promise.future.completeExceptionally(
-            new ModbusException("slave id mismatch: %s != %s".formatted(promise.slaveId, slaveId)));
-        return;
-      }
-
-      ByteBuffer buffer = frame.pdu();
-      int functionCode = buffer.get(buffer.position()) & 0xFF;
-
-      if (functionCode < 0x80) {
-        if (functionCode != promise.functionCode) {
-          // Response might be out of sync, e.g. the timeout elapsed in request A,
-          // we sent request B, and now we're receiving response A.
-
-          promise.future.completeExceptionally(
-              new ModbusException(
-                  "function code mismatch: %s != %s"
-                      .formatted(promise.functionCode, functionCode)));
-
-          // Clear out any pending promises.
-          var pending = new ArrayList<ResponsePromise>();
-          synchronized (promises) {
-            while (!promises.isEmpty()) {
-              pending.add(promises.poll());
-            }
-          }
-          pending.forEach(
-              p -> p.future.completeExceptionally(new ModbusException("synchronization error")));
-        } else {
-          try {
-            ModbusPdu modbusPdu = config.responseSerializer().decode(functionCode, buffer);
-            promise.future.complete((ModbusResponsePdu) modbusPdu);
-          } catch (Exception e) {
-            promise.future.completeExceptionally(e);
-          }
-        }
+        failRequest(pending, new ModbusResponseException(pending.functionCode, exceptionCode));
       } else {
-        int exceptionCode = buffer.get();
-
-        promise.future.completeExceptionally(
-            new ModbusResponseException(promise.functionCode, exceptionCode));
+        failRequest(
+            pending,
+            new ModbusException(
+                "malformed exception response PDU: %s".formatted(Hex.format(buffer))));
       }
     } else {
-      logger.warn("No pending request for response frame: {}", frame);
+      // Response might be out of sync, e.g. the timeout elapsed in request A,
+      // we sent request B, and now we're receiving response A.
+      failRequest(
+          pending,
+          new ModbusException(
+              "function code mismatch: %s != %s".formatted(pending.functionCode, functionCode)));
     }
   }
 
@@ -322,6 +576,92 @@ public class ModbusRtuClient extends ModbusClient {
     return new ModbusRtuClient(builder.build(), transport);
   }
 
-  private record ResponsePromise(
-      int slaveId, int functionCode, CompletableFuture<ModbusResponsePdu> future) {}
+  /**
+   * A request or broadcast waiting to be sent or completed.
+   *
+   * <p>Not a record: requests are compared by identity, and sendFuture is assigned when it's sent.
+   *
+   * @param <T> the type {@link #future} completes with.
+   */
+  private abstract static sealed class Pending<T> permits PendingRequest, PendingBroadcast {
+
+    final ModbusRtuFrame frame;
+    final CompletableFuture<T> future;
+
+    /** Assigned on the request queue when the request is sent. */
+    CompletionStage<Void> sendFuture;
+
+    /**
+     * Set on the request queue when a broadcast times out while it's still being written. Its
+     * future has already failed, but it stays in flight until the write finishes.
+     */
+    boolean timedOut;
+
+    Pending(ModbusRtuFrame frame) {
+      this(frame, new CompletableFuture<>());
+    }
+
+    Pending(ModbusRtuFrame frame, CompletableFuture<T> future) {
+      this.frame = frame;
+      this.future = future;
+    }
+  }
+
+  /** A request that completes when it gets a response. */
+  private static final class PendingRequest extends Pending<ModbusResponsePdu> {
+
+    final int slaveId;
+    final int functionCode;
+    final ModbusRequestPdu request;
+
+    PendingRequest(int slaveId, ModbusRequestPdu request, ModbusRtuFrame frame) {
+      super(frame);
+
+      this.slaveId = slaveId;
+      this.functionCode = request.getFunctionCode();
+      this.request = request;
+    }
+  }
+
+  /** A broadcast, which gets no response and completes when it's written. */
+  private static final class PendingBroadcast extends Pending<Void> {
+
+    PendingBroadcast(ModbusRtuFrame frame) {
+      super(frame, new BroadcastFuture());
+    }
+  }
+
+  /** Cancels a broadcast's transport send before notifying its caller. */
+  private static final class BroadcastFuture extends CompletableFuture<Void> {
+
+    private volatile CompletionStage<Void> sendFuture;
+    private volatile boolean cancellationRequested;
+
+    @Override
+    public boolean cancel(boolean mayInterruptIfRunning) {
+      cancellationRequested = true;
+      cancelSend();
+      return super.cancel(mayInterruptIfRunning);
+    }
+
+    void setSendFuture(CompletionStage<Void> sendFuture) {
+      this.sendFuture = sendFuture;
+      // Cancellation marks its intent before reading sendFuture, so either cancel sees the
+      // published send or publication sees the cancellation, even if send() was still returning.
+      if (cancellationRequested) {
+        cancelSend();
+      }
+    }
+
+    private void cancelSend() {
+      CompletionStage<Void> send = sendFuture;
+      if (send != null) {
+        try {
+          send.toCompletableFuture().cancel(false);
+        } catch (UnsupportedOperationException ignored) {
+          // This CompletionStage implementation can't be cancelled.
+        }
+      }
+    }
+  }
 }

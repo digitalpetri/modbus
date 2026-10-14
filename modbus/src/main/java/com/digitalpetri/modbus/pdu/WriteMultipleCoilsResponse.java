@@ -38,15 +38,19 @@ public record WriteMultipleCoilsResponse(int address, int quantity) implements M
     /**
      * Decode a {@link WriteMultipleCoilsResponse} from a {@link ByteBuffer}.
      *
-     * @param buffer the buffer to decode from.
+     * @param buffer the buffer containing the complete response PDU.
      * @return the decoded response.
+     * @throws IllegalArgumentException if the response PDU format is invalid.
      */
     public static WriteMultipleCoilsResponse decode(ByteBuffer buffer) {
-      int functionCode = buffer.get() & 0xFF;
-      assert functionCode == FunctionCode.WRITE_MULTIPLE_COILS.getCode();
+      ResponsePduChecks.checkLength(buffer, FunctionCode.WRITE_MULTIPLE_COILS, 5);
+      buffer.get(); // function code
 
       int address = buffer.getShort() & 0xFFFF;
       int quantity = buffer.getShort() & 0xFFFF;
+
+      ResponsePduChecks.checkRange(
+          FunctionCode.WRITE_MULTIPLE_COILS, "quantity", quantity, 1, 1968);
 
       return new WriteMultipleCoilsResponse(address, quantity);
     }

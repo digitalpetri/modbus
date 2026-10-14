@@ -34,6 +34,14 @@ public record WriteSingleRegisterRequest(int address, byte[] value) implements M
   }
 
   @Override
+  public void validate() {
+    RequestValidation.checkRange("address", address, 0, 65535);
+    if (value == null) {
+      throw new IllegalArgumentException("value must not be null");
+    }
+  }
+
+  @Override
   public int getFunctionCode() {
     return FunctionCode.WRITE_SINGLE_REGISTER.getCode();
   }
@@ -78,6 +86,8 @@ public record WriteSingleRegisterRequest(int address, byte[] value) implements M
      * @param buffer the buffer to encode into.
      */
     public static void encode(WriteSingleRegisterRequest request, ByteBuffer buffer) {
+      request.validate();
+
       buffer.put((byte) request.getFunctionCode());
       buffer.putShort((short) request.address);
       buffer.put(request.value);

@@ -43,8 +43,8 @@ unit ID (1 byte) | PDU | CRC-16 (2 bytes, low byte first)
 
 The CRC detects corrupted frames. There is no transaction ID, so response unit and function must
 match the outstanding request. The RTU client resets its frame parser after a timeout or CRC error
-to recover from an incomplete or invalid response. Keeping one request in flight preserves the
-serial request/response order that this matching depends on.
+to recover from an incomplete or invalid response. The client sends one request at a time, which
+preserves the serial request/response order that this matching depends on.
 
 RTU has no length field, so the built-in frame parsers derive each frame's length from its function
 code and, where present, its byte count. The parsers assume Write Single Register (`0x06`) frames

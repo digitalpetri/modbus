@@ -39,12 +39,13 @@ public record MaskWriteRegisterResponse(int address, int andMask, int orMask)
     /**
      * Decode a {@link MaskWriteRegisterResponse} from a {@link ByteBuffer}.
      *
-     * @param buffer the buffer to decode from.
+     * @param buffer the buffer containing the complete response PDU.
      * @return the decoded response.
+     * @throws IllegalArgumentException if the response PDU format is invalid.
      */
     public static MaskWriteRegisterResponse decode(ByteBuffer buffer) {
-      int functionCode = buffer.get() & 0xFF;
-      assert functionCode == FunctionCode.MASK_WRITE_REGISTER.getCode();
+      ResponsePduChecks.checkLength(buffer, FunctionCode.MASK_WRITE_REGISTER, 7);
+      buffer.get(); // function code
 
       int address = buffer.getShort() & 0xFFFF;
       int andMask = buffer.getShort() & 0xFFFF;

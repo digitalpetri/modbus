@@ -39,7 +39,7 @@ synchronous calls wrap failures and how request timeouts interact with in-progre
 | Client | In-flight behavior | Application rule |
 | --- | --- | --- |
 | `ModbusTcpClient` | Concurrent pending map and thread-safe transaction sequence; responses correlate by MBAP transaction ID | Concurrent calls are supported by the correlation design; bound concurrency below transaction-ID reuse and endpoint capacity |
-| `ModbusRtuClient` | Responses have no transaction ID; correlation is described in [RTU client behavior](client-and-server-behavior.md#rtu-client-behavior) | Keep one request in flight for serial RTU and RTU over TCP |
+| `ModbusRtuClient` | Responses have no transaction ID, so the client sends one request at a time in submission order; see [RTU client behavior](client-and-server-behavior.md#rtu-client-behavior) | Concurrent calls are safe but not pipelined; size request timeouts to include time spent waiting behind other requests |
 
 The typed default request and response serializer singletons are stateless and documented as safe
 for concurrent use. A custom serializer must define and enforce its own thread-safety policy.
@@ -116,6 +116,18 @@ Use this shutdown order:
 
 The library does not shut down an `ExecutorService` or `EventLoopGroup` supplied through a
 configuration setter. Supplying one transfers use, not ownership, to the transport.
+
+## TLS context ownership
+
+Each Netty TLS connection uses a context constructed and owned by its transport. The TLS builder
+customizer runs before context construction and receives a builder for that connection only.
+Configure it without retaining it or building additional contexts. The transport releases its
+native context reference after creating the TLS handler; the engine keeps its own reference until
+Netty removes the handler and releases the engine. Disconnect clients and stop servers to close
+their TLS channels. Applications do not release the transport's TLS contexts or engines.
+
+See [TLS context customization](transport-configuration.md#tls-context-customization) for callback
+frequency, concurrency, and client/server configuration examples.
 
 ## Buffer and array ownership
 

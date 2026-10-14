@@ -90,12 +90,17 @@ public record WriteSingleRegisterResponse(int address, byte[] value) implements 
      * <p>The buffer must contain exactly one framed PDU. All bytes remaining after the address are
      * decoded as the value.
      *
-     * @param buffer the buffer to decode from.
+     * @param buffer the buffer containing the complete response PDU.
      * @return the decoded response.
+     * @throws IllegalArgumentException if the response PDU format is invalid.
      */
     public static WriteSingleRegisterResponse decode(ByteBuffer buffer) {
-      int functionCode = buffer.get() & 0xFF;
-      assert functionCode == FunctionCode.WRITE_SINGLE_REGISTER.getCode();
+      if (buffer.remaining() < 3) {
+        throw new IllegalArgumentException(
+            "truncated WRITE_SINGLE_REGISTER response PDU: expected function code and address");
+      }
+      ResponsePduChecks.checkFunctionCode(buffer, FunctionCode.WRITE_SINGLE_REGISTER);
+      buffer.get(); // function code
 
       int address = buffer.getShort() & 0xFFFF;
 

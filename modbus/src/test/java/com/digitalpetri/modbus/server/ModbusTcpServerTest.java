@@ -142,6 +142,29 @@ class ModbusTcpServerTest {
     assertTypedReadHoldingRegistersResponse(response);
   }
 
+  @Test
+  void invalidReadRequestsStillProduceModbusExceptionResponses() throws Exception {
+    var server =
+        new TestServer(
+            new ReadOnlyModbusServices() {
+              @Override
+              protected Optional<ProcessImage> getProcessImage(int unitId) {
+                throw new AssertionError(
+                    "invalid range must fail before accessing the process image");
+              }
+            });
+
+    ModbusTcpFrame invalidQuantity =
+        server.handle(requestFrame(7, 3, new byte[] {0x03, 0, 0, 0, 0}), new TestContext());
+    assertArrayEquals(new byte[] {(byte) 0x83, 0x03}, bytes(invalidQuantity.pdu()));
+
+    ModbusTcpFrame invalidRange =
+        server.handle(
+            requestFrame(7, 3, new byte[] {0x03, (byte) 0xFF, (byte) 0xFF, 0, 2}),
+            new TestContext());
+    assertArrayEquals(new byte[] {(byte) 0x83, 0x02}, bytes(invalidRange.pdu()));
+  }
+
   private static ModbusTcpFrame requestFrame(int transactionId, int unitId, byte[] pdu) {
     return new ModbusTcpFrame(
         new MbapHeader(transactionId, 0, pdu.length + 1, unitId), ByteBuffer.wrap(pdu));

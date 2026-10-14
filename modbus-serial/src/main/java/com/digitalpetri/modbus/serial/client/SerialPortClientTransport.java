@@ -15,6 +15,7 @@ import com.fazecast.jSerialComm.SerialPortEvent;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -28,6 +29,7 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
   private final AtomicReference<Consumer<ModbusRtuFrame>> frameReceiver = new AtomicReference<>();
 
   private final ExecutionQueue executionQueue;
+  private final ExecutionQueue writeQueue;
 
   private volatile SerialPort serialPort;
 
@@ -37,12 +39,15 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
     this.config = config;
 
     executionQueue = new ExecutionQueue(config.executor());
+    writeQueue = new ExecutionQueue(config.executor());
   }
 
   /**
    * Return the underlying {@link SerialPort} used by this transport.
    *
-   * <p>The serial port is lazily instantiated on first access.
+   * <p>The serial port is lazily instantiated on first access. After {@link #disconnect()} closes
+   * the port, the next access creates a new instance, so changes made to the previous instance are
+   * not carried over.
    *
    * @return the configured {@link SerialPort} instance.
    * @throws ModbusException if the serial port could not be created.
@@ -125,6 +130,10 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
       if (sp.closePort()) {
         frameParser.reset();
 
+        // Create a new SerialPort on the next connect(). Writes still queued for this one then
+        // fail instead of being sent on the reopened port.
+        this.serialPort = null;
+
         return CompletableFuture.completedFuture(null);
       } else {
         return CompletableFuture.failedFuture(
@@ -146,6 +155,14 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
   /**
    * {@inheritDoc}
    *
+   * <p>The frame is written to the serial port on the configured executor, so this method does not
+   * block the caller if the write stalls. Writes are performed serially, in the order submitted.
+   *
+   * <p>If the returned {@link CompletionStage} is cancelled before its write starts, the frame is
+   * not written. A write that has started can't be stopped, so cancelling it fails, and the {@link
+   * CompletionStage} completes when the write does. A write that stalls indefinitely is released by
+   * {@link #disconnect()}.
+   *
    * <p>The returned {@link CompletionStage} may complete exceptionally with a {@link
    * ModbusException} if the transport is not connected or if writing to the serial port fails.
    */
@@ -162,26 +179,49 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
       buffer.put((byte) frame.unitId());
       buffer.put(frame.pdu());
       buffer.put(frame.crc());
-
-      byte[] data = new byte[buffer.position()];
-      buffer.flip();
-      buffer.get(data);
-
-      int totalWritten = 0;
-      while (totalWritten < data.length) {
-        int written = sp.writeBytes(data, data.length - totalWritten, totalWritten);
-        if (written == -1) {
-          int errorCode = sp.getLastErrorCode();
-          throw new ModbusException(
-              "failed to write to port '%s', lastErrorCode=%d"
-                  .formatted(config.serialPort(), errorCode));
-        }
-        totalWritten += written;
-      }
-
-      return CompletableFuture.completedFuture(null);
     } catch (Exception e) {
       return CompletableFuture.failedFuture(e);
+    }
+
+    byte[] data = new byte[buffer.position()];
+    buffer.flip();
+    buffer.get(data);
+
+    var future = new WriteFuture();
+
+    try {
+      writeQueue.submit(
+          () -> {
+            if (!future.startWrite()) {
+              // Cancelled, e.g. the request timed out while this write was queued.
+              return;
+            }
+            try {
+              writeFully(sp, data);
+              future.complete(null);
+            } catch (Exception e) {
+              future.completeExceptionally(e);
+            }
+          });
+    } catch (Exception e) {
+      // e.g. RejectedExecutionException if the executor has been shut down
+      future.completeExceptionally(e);
+    }
+
+    return future;
+  }
+
+  private void writeFully(SerialPort sp, byte[] data) throws ModbusException {
+    int totalWritten = 0;
+    while (totalWritten < data.length) {
+      int written = sp.writeBytes(data, data.length - totalWritten, totalWritten);
+      if (written <= 0) {
+        int errorCode = sp.getLastErrorCode();
+        throw new ModbusException(
+            "failed to write to port '%s', written=%d, lastErrorCode=%d"
+                .formatted(config.serialPort(), written, errorCode));
+      }
+      totalWritten += written;
     }
   }
 
@@ -230,6 +270,40 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
       Consumer<ModbusRtuFrame> frameReceiver = SerialPortClientTransport.this.frameReceiver.get();
       if (frameReceiver != null) {
         executionQueue.submit(() -> frameReceiver.accept(frame));
+      }
+    }
+  }
+
+  /**
+   * A send future that can only be cancelled before its write starts.
+   *
+   * <p>A write in progress can't be stopped. If cancelling it succeeded, the frame would still be
+   * written after the future reported it cancelled, and the caller couldn't tell when the write
+   * finished. Instead, cancelling fails, and the future completes when the write does. Unlike
+   * {@link CompletableFuture#cancel(boolean)}, a cancel that fails leaves this future incomplete.
+   */
+  private static final class WriteFuture extends CompletableFuture<Void> {
+
+    /** Set by whichever comes first: the write starting, or this future being cancelled. */
+    private final AtomicBoolean claimed = new AtomicBoolean(false);
+
+    /**
+     * Claim this future for its write.
+     *
+     * @return {@code true} if the write may start, or {@code false} if this future was cancelled or
+     *     otherwise completed first.
+     */
+    boolean startWrite() {
+      return claimed.compareAndSet(false, true) && !isDone();
+    }
+
+    @Override
+    public boolean cancel(boolean mayInterruptIfRunning) {
+      if (claimed.compareAndSet(false, true)) {
+        return super.cancel(mayInterruptIfRunning);
+      } else {
+        // The write has started, or this future was already cancelled.
+        return isCancelled();
       }
     }
   }
