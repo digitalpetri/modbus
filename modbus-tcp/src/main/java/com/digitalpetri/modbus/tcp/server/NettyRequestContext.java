@@ -7,6 +7,9 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import java.net.SocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.StandardCharsets;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 import java.util.Arrays;
@@ -16,6 +19,9 @@ import javax.net.ssl.SSLPeerUnverifiedException;
 /**
  * Combined {@link ModbusTcpTlsRequestContext} and {@link ModbusRtuTlsRequestContext} implementation
  * for Netty-based transports.
+ *
+ * <p>Missing, empty, or malformed certificate role extensions yield {@link Optional#empty()}. The
+ * application's authorization handler decides whether to authorize a client without a role.
  */
 class NettyRequestContext implements ModbusTcpTlsRequestContext, ModbusRtuTlsRequestContext {
 
@@ -51,12 +57,7 @@ class NettyRequestContext implements ModbusTcpTlsRequestContext, ModbusRtuTlsReq
 
       byte[] bs = x509Certificate.getExtensionValue("1.3.6.1.4.1.50316.802.1");
 
-      if (bs != null && bs.length >= 4) {
-        // Strip the leading tag and length bytes.
-        clientRole = new String(bs, 4, bs.length - 4);
-      } else {
-        clientRole = "";
-      }
+      clientRole = decodeClientRole(bs);
 
       attr.set(clientRole);
     }
@@ -66,6 +67,59 @@ class NettyRequestContext implements ModbusTcpTlsRequestContext, ModbusRtuTlsReq
     } else {
       return Optional.of(clientRole);
     }
+  }
+
+  static String decodeClientRole(byte[] extensionValue) {
+    if (extensionValue == null) {
+      return "";
+    }
+
+    try {
+      // X509Certificate.getExtensionValue() wraps the encoded UTF8String in an OCTET STRING.
+      ByteBuffer octets = readDerValue(ByteBuffer.wrap(extensionValue), 0x04);
+      ByteBuffer utf8 = readDerValue(octets, 0x0c);
+
+      // The decoder reports invalid UTF-8 instead of inserting replacement characters.
+      return StandardCharsets.UTF_8.newDecoder().decode(utf8).toString();
+    } catch (IllegalArgumentException | CharacterCodingException e) {
+      return "";
+    }
+  }
+
+  private static ByteBuffer readDerValue(ByteBuffer data, int expectedTag) {
+    if (data.remaining() < 2 || Byte.toUnsignedInt(data.get()) != expectedTag) {
+      throw new IllegalArgumentException("Invalid DER tag or missing length");
+    }
+
+    int firstLengthByte = Byte.toUnsignedInt(data.get());
+    long length = firstLengthByte;
+
+    if ((firstLengthByte & 0x80) != 0) {
+      int lengthBytes = firstLengthByte & 0x7f;
+
+      if (lengthBytes == 0 || lengthBytes > 4 || lengthBytes > data.remaining()) {
+        throw new IllegalArgumentException("Invalid DER length");
+      }
+      if (data.get(data.position()) == 0) {
+        throw new IllegalArgumentException("Non-minimal DER length");
+      }
+
+      length = 0;
+      for (int i = 0; i < lengthBytes; i++) {
+        length = (length << 8) | Byte.toUnsignedInt(data.get());
+      }
+
+      if (length < 128) {
+        throw new IllegalArgumentException("Non-minimal DER length");
+      }
+    }
+
+    // Each layer must contain exactly one value, with no truncation or trailing data.
+    if (length != data.remaining()) {
+      throw new IllegalArgumentException("DER length does not match the available data");
+    }
+
+    return data.slice();
   }
 
   @Override
