@@ -24,8 +24,29 @@ import com.digitalpetri.modbus.pdu.WriteSingleCoilRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleCoilResponse;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterResponse;
+import com.digitalpetri.modbus.server.ModbusRequestContext.ModbusRtuRequestContext;
+import java.util.List;
 
 public interface ModbusServices {
+
+  /**
+   * Select the unit IDs that receive an RTU broadcast write.
+   *
+   * <p>The default is {@code List.of(0)}, preserving dispatch to services that accept unit ID 0.
+   * Services hosting multiple units should override this method to return their recipients. An
+   * empty iterable ignores the write.
+   *
+   * <p>The server invokes the existing write handler for each recipient and discards its response.
+   * A {@link ModbusResponseException} or {@link UnknownUnitIdException} from one recipient does not
+   * prevent delivery to the remaining recipients. Read broadcasts, including Read/Write Multiple
+   * Registers, are ignored without calling this method. This method does not affect Modbus/TCP.
+   *
+   * @param context the context of the RTU broadcast request.
+   * @return the unit IDs that should receive the broadcast write, in dispatch order.
+   */
+  default Iterable<Integer> getBroadcastUnitIds(ModbusRtuRequestContext context) {
+    return List.of(0);
+  }
 
   /**
    * Handle an incoming {@link ReadCoilsRequest} targeting {@code unitId}.

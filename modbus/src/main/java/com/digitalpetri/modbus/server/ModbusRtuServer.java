@@ -5,6 +5,7 @@ import com.digitalpetri.modbus.ExceptionCode;
 import com.digitalpetri.modbus.FunctionCode;
 import com.digitalpetri.modbus.ModbusRtuFrame;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
+import com.digitalpetri.modbus.exceptions.UnknownUnitIdException;
 import com.digitalpetri.modbus.pdu.MaskWriteRegisterRequest;
 import com.digitalpetri.modbus.pdu.ModbusRequestPdu;
 import com.digitalpetri.modbus.pdu.ModbusResponsePdu;
@@ -64,6 +65,9 @@ public class ModbusRtuServer implements ModbusServer {
           int unitId = frame.unitId();
           ByteBuffer pdu = frame.pdu();
           int fcb = pdu.get(pdu.position()) & 0xFF;
+          if (unitId == 0 && !isBroadcastWrite(fcb)) {
+            return null;
+          }
           ModbusRequestPdu requestPdu =
               (ModbusRequestPdu) config.requestSerializer().decode(fcb, pdu);
 
@@ -86,96 +90,38 @@ public class ModbusRtuServer implements ModbusServer {
     this.services.set(services);
   }
 
+  /**
+   * Dispatch a decoded RTU request to the current services.
+   *
+   * @param context the context of the RTU request.
+   * @param unitId the unit ID from the request frame.
+   * @param fcb the function code from the request PDU.
+   * @param requestPdu the decoded request PDU.
+   * @return a response frame for unicast requests, or {@code null} for broadcasts.
+   * @throws Exception if the request cannot be processed.
+   */
   protected ModbusRtuFrame handleModbusRtuFrame(
       ModbusRtuRequestContext context, int unitId, int fcb, ModbusRequestPdu requestPdu)
       throws Exception {
 
-    try {
-      FunctionCode functionCode = FunctionCode.from(fcb).orElse(null);
+    ModbusServices services = this.services.get();
+    assert services != null;
 
-      if (functionCode == null) {
-        throw new ModbusResponseException(fcb, ExceptionCode.ILLEGAL_FUNCTION.getCode());
+    if (unitId == 0) {
+      if (isBroadcastWrite(fcb)) {
+        for (int recipient : services.getBroadcastUnitIds(context)) {
+          try {
+            handleRequest(context, recipient, fcb, requestPdu, services);
+          } catch (ModbusResponseException | UnknownUnitIdException ignored) {
+            // A rejected write must not prevent delivery to the remaining recipients.
+          }
+        }
       }
+      return null;
+    }
 
-      ModbusServices services = this.services.get();
-      assert services != null;
-
-      ModbusResponsePdu response =
-          switch (functionCode) {
-            case READ_COILS -> {
-              if (requestPdu instanceof ReadCoilsRequest request) {
-                yield services.readCoils(context, unitId, request);
-              } else {
-                throw new IllegalArgumentException("expected ReadCoilsRequest");
-              }
-            }
-            case READ_DISCRETE_INPUTS -> {
-              if (requestPdu instanceof ReadDiscreteInputsRequest request) {
-                yield services.readDiscreteInputs(context, unitId, request);
-              } else {
-                throw new IllegalArgumentException("expected ReadDiscreteInputsRequest");
-              }
-            }
-            case READ_HOLDING_REGISTERS -> {
-              if (requestPdu instanceof ReadHoldingRegistersRequest request) {
-                yield services.readHoldingRegisters(context, unitId, request);
-              } else {
-                throw new IllegalArgumentException("expected ReadHoldingRegistersRequest");
-              }
-            }
-            case READ_INPUT_REGISTERS -> {
-              if (requestPdu instanceof ReadInputRegistersRequest request) {
-                yield services.readInputRegisters(context, unitId, request);
-              } else {
-                throw new IllegalArgumentException("expected ReadInputRegistersRequest");
-              }
-            }
-            case WRITE_SINGLE_COIL -> {
-              if (requestPdu instanceof WriteSingleCoilRequest request) {
-                yield services.writeSingleCoil(context, unitId, request);
-              } else {
-                throw new IllegalArgumentException("expected WriteSingleCoilRequest");
-              }
-            }
-            case WRITE_SINGLE_REGISTER -> {
-              if (requestPdu instanceof WriteSingleRegisterRequest request) {
-                yield services.writeSingleRegister(context, unitId, request);
-              } else {
-                throw new IllegalArgumentException("expected WriteSingleRegisterRequest");
-              }
-            }
-            case WRITE_MULTIPLE_COILS -> {
-              if (requestPdu instanceof WriteMultipleCoilsRequest request) {
-                yield services.writeMultipleCoils(context, unitId, request);
-              } else {
-                throw new IllegalArgumentException("expected WriteMultipleCoilsRequest");
-              }
-            }
-            case WRITE_MULTIPLE_REGISTERS -> {
-              if (requestPdu instanceof WriteMultipleRegistersRequest request) {
-                yield services.writeMultipleRegisters(context, unitId, request);
-              } else {
-                throw new IllegalArgumentException("expected WriteMultipleRegistersRequest");
-              }
-            }
-            case MASK_WRITE_REGISTER -> {
-              if (requestPdu instanceof MaskWriteRegisterRequest request) {
-                yield services.maskWriteRegister(context, unitId, request);
-              } else {
-                throw new IllegalArgumentException("expected MaskWriteRegisterRequest");
-              }
-            }
-            case READ_WRITE_MULTIPLE_REGISTERS -> {
-              if (requestPdu instanceof ReadWriteMultipleRegistersRequest request) {
-                yield services.readWriteMultipleRegisters(context, unitId, request);
-              } else {
-                throw new IllegalArgumentException("expected ReadWriteMultipleRegistersRequest");
-              }
-            }
-            default ->
-                throw new ModbusResponseException(
-                    requestPdu.getFunctionCode(), ExceptionCode.ILLEGAL_FUNCTION.getCode());
-          };
+    try {
+      ModbusResponsePdu response = handleRequest(context, unitId, fcb, requestPdu, services);
 
       ByteBuffer pdu = ByteBuffer.allocate(256);
       config.responseSerializer().encode(response, pdu);
@@ -195,6 +141,103 @@ public class ModbusRtuServer implements ModbusServer {
 
       return new ModbusRtuFrame(unitId, pdu.flip(), crc.flip());
     }
+  }
+
+  private static boolean isBroadcastWrite(int fcb) {
+    return switch (fcb) {
+      case 0x05, 0x06, 0x0F, 0x10, 0x16 -> true;
+      default -> false;
+    };
+  }
+
+  private ModbusResponsePdu handleRequest(
+      ModbusRtuRequestContext context,
+      int unitId,
+      int fcb,
+      ModbusRequestPdu requestPdu,
+      ModbusServices services)
+      throws ModbusResponseException, UnknownUnitIdException {
+
+    FunctionCode functionCode = FunctionCode.from(fcb).orElse(null);
+    if (functionCode == null) {
+      throw new ModbusResponseException(fcb, ExceptionCode.ILLEGAL_FUNCTION.getCode());
+    }
+
+    return switch (functionCode) {
+      case READ_COILS -> {
+        if (requestPdu instanceof ReadCoilsRequest request) {
+          yield services.readCoils(context, unitId, request);
+        } else {
+          throw new IllegalArgumentException("expected ReadCoilsRequest");
+        }
+      }
+      case READ_DISCRETE_INPUTS -> {
+        if (requestPdu instanceof ReadDiscreteInputsRequest request) {
+          yield services.readDiscreteInputs(context, unitId, request);
+        } else {
+          throw new IllegalArgumentException("expected ReadDiscreteInputsRequest");
+        }
+      }
+      case READ_HOLDING_REGISTERS -> {
+        if (requestPdu instanceof ReadHoldingRegistersRequest request) {
+          yield services.readHoldingRegisters(context, unitId, request);
+        } else {
+          throw new IllegalArgumentException("expected ReadHoldingRegistersRequest");
+        }
+      }
+      case READ_INPUT_REGISTERS -> {
+        if (requestPdu instanceof ReadInputRegistersRequest request) {
+          yield services.readInputRegisters(context, unitId, request);
+        } else {
+          throw new IllegalArgumentException("expected ReadInputRegistersRequest");
+        }
+      }
+      case WRITE_SINGLE_COIL -> {
+        if (requestPdu instanceof WriteSingleCoilRequest request) {
+          yield services.writeSingleCoil(context, unitId, request);
+        } else {
+          throw new IllegalArgumentException("expected WriteSingleCoilRequest");
+        }
+      }
+      case WRITE_SINGLE_REGISTER -> {
+        if (requestPdu instanceof WriteSingleRegisterRequest request) {
+          yield services.writeSingleRegister(context, unitId, request);
+        } else {
+          throw new IllegalArgumentException("expected WriteSingleRegisterRequest");
+        }
+      }
+      case WRITE_MULTIPLE_COILS -> {
+        if (requestPdu instanceof WriteMultipleCoilsRequest request) {
+          yield services.writeMultipleCoils(context, unitId, request);
+        } else {
+          throw new IllegalArgumentException("expected WriteMultipleCoilsRequest");
+        }
+      }
+      case WRITE_MULTIPLE_REGISTERS -> {
+        if (requestPdu instanceof WriteMultipleRegistersRequest request) {
+          yield services.writeMultipleRegisters(context, unitId, request);
+        } else {
+          throw new IllegalArgumentException("expected WriteMultipleRegistersRequest");
+        }
+      }
+      case MASK_WRITE_REGISTER -> {
+        if (requestPdu instanceof MaskWriteRegisterRequest request) {
+          yield services.maskWriteRegister(context, unitId, request);
+        } else {
+          throw new IllegalArgumentException("expected MaskWriteRegisterRequest");
+        }
+      }
+      case READ_WRITE_MULTIPLE_REGISTERS -> {
+        if (requestPdu instanceof ReadWriteMultipleRegistersRequest request) {
+          yield services.readWriteMultipleRegisters(context, unitId, request);
+        } else {
+          throw new IllegalArgumentException("expected ReadWriteMultipleRegistersRequest");
+        }
+      }
+      default ->
+          throw new ModbusResponseException(
+              requestPdu.getFunctionCode(), ExceptionCode.ILLEGAL_FUNCTION.getCode());
+    };
   }
 
   private ByteBuffer calculateCrc16(int unitId, ByteBuffer pdu) {

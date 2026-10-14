@@ -190,6 +190,10 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
                 ModbusRtuFrame responseFrame =
                     frameReceiver.receive(new NettyRequestContext(ctx), requestFrame);
 
+                if (requestFrame.unitId() == 0 || responseFrame == null) {
+                  return;
+                }
+
                 ByteBuf buffer = Unpooled.buffer();
                 buffer.writeByte(responseFrame.unitId());
                 buffer.writeBytes(responseFrame.pdu());

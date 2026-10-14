@@ -191,6 +191,10 @@ public class SerialPortServerTransport implements ModbusRtuServerTransport {
                 ModbusRtuFrame responseFrame =
                     frameReceiver.receive(new ModbusRtuRequestContext() {}, requestFrame);
 
+                if (requestFrame.unitId() == 0 || responseFrame == null) {
+                  return;
+                }
+
                 int unitId = responseFrame.unitId();
                 ByteBuffer pdu = responseFrame.pdu();
                 ByteBuffer crc = responseFrame.crc();
