@@ -37,15 +37,19 @@ public record WriteMultipleRegistersResponse(int address, int quantity)
     /**
      * Decode a {@link WriteMultipleRegistersResponse} from a {@link ByteBuffer}.
      *
-     * @param buffer the buffer to decode from.
+     * @param buffer the buffer containing the complete response PDU.
      * @return the decoded response.
+     * @throws IllegalArgumentException if the response PDU format is invalid.
      */
     public static WriteMultipleRegistersResponse decode(ByteBuffer buffer) {
-      int functionCode = buffer.get() & 0xFF;
-      assert functionCode == FunctionCode.WRITE_MULTIPLE_REGISTERS.getCode();
+      ResponsePduChecks.checkLength(buffer, FunctionCode.WRITE_MULTIPLE_REGISTERS, 5);
+      buffer.get(); // function code
 
       int address = buffer.getShort() & 0xFFFF;
       int quantity = buffer.getShort() & 0xFFFF;
+
+      ResponsePduChecks.checkRange(
+          FunctionCode.WRITE_MULTIPLE_REGISTERS, "quantity", quantity, 1, 123);
 
       return new WriteMultipleRegistersResponse(address, quantity);
     }

@@ -1,14 +1,54 @@
 package com.digitalpetri.modbus.client;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.digitalpetri.modbus.ModbusPduSerializer.DefaultRequestSerializer;
 import com.digitalpetri.modbus.ModbusPduSerializer.DefaultResponseSerializer;
+import com.digitalpetri.modbus.ModbusResponseValidator;
+import com.digitalpetri.modbus.ModbusResponseValidator.DefaultResponseValidator;
 import java.time.Duration;
 import org.junit.jupiter.api.Test;
 
 class ModbusClientConfigTest {
+
+  @Test
+  void responseValidatorDefaultsToStandardChecksInBothConstructors() {
+    assertSame(
+        DefaultResponseValidator.INSTANCE,
+        ModbusClientConfig.create(cfg -> {}).responseValidator());
+    assertSame(
+        DefaultResponseValidator.INSTANCE,
+        new ModbusClientConfig(
+                Duration.ofSeconds(5),
+                (task, delay, unit) -> null,
+                DefaultRequestSerializer.INSTANCE,
+                DefaultResponseSerializer.INSTANCE,
+                Duration.ZERO)
+            .responseValidator());
+  }
+
+  @Test
+  void responseValidatorCanBeReplacedAndMustNotBeNull() {
+    ModbusResponseValidator validator = (request, response) -> {};
+    assertSame(
+        validator,
+        ModbusClientConfig.create(cfg -> cfg.setResponseValidator(validator)).responseValidator());
+    assertThrows(
+        NullPointerException.class,
+        () -> ModbusClientConfig.create(cfg -> cfg.responseValidator = null));
+    assertThrows(
+        NullPointerException.class,
+        () ->
+            new ModbusClientConfig(
+                Duration.ofSeconds(5),
+                (task, delay, unit) -> null,
+                DefaultRequestSerializer.INSTANCE,
+                DefaultResponseSerializer.INSTANCE,
+                Duration.ZERO,
+                null));
+  }
 
   @Test
   void broadcastTurnaroundDelayDefaultsToZero() {

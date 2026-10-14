@@ -1,11 +1,21 @@
 package com.digitalpetri.modbus.pdu;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.nio.ByteBuffer;
 import org.junit.jupiter.api.Test;
 
 class ReadHoldingRegistersResponseTest {
+
+  @Test
+  void decoderRejectsTrailingBytes() {
+    ByteBuffer buffer = ByteBuffer.wrap(new byte[] {0x03, 0x02, 0x12, 0x34, 0x56});
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ReadHoldingRegistersResponse.Serializer.decode(buffer));
+  }
 
   @Test
   void serializer() {

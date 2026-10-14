@@ -36,12 +36,13 @@ public record WriteSingleRegisterResponse(int address, int value) implements Mod
     /**
      * Decode a {@link WriteSingleRegisterResponse} from a {@link ByteBuffer}.
      *
-     * @param buffer the buffer to decode from.
+     * @param buffer the buffer containing the complete response PDU.
      * @return the decoded response.
+     * @throws IllegalArgumentException if the response PDU format is invalid.
      */
     public static WriteSingleRegisterResponse decode(ByteBuffer buffer) {
-      int functionCode = buffer.get();
-      assert functionCode == FunctionCode.WRITE_SINGLE_REGISTER.getCode();
+      ResponsePduChecks.checkLength(buffer, FunctionCode.WRITE_SINGLE_REGISTER, 5);
+      buffer.get(); // function code
 
       int address = buffer.getShort() & 0xFFFF;
       int value = buffer.getShort() & 0xFFFF;
