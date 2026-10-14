@@ -15,6 +15,7 @@ import org.bouncycastle.asn1.DERUTF8String;
 import org.bouncycastle.cert.X509CertificateHolder;
 import org.bouncycastle.cert.X509v3CertificateBuilder;
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter;
+import org.bouncycastle.operator.ContentSigner;
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder;
 import org.junit.jupiter.api.Test;
 
@@ -79,7 +80,7 @@ class NettyRequestContextCertificateTest {
             new X509CertificateHolder(AUTHORITY_KEYS.certificate().getEncoded()));
     builder.addExtension(new ASN1ObjectIdentifier("1.3.6.1.4.1.50316.802.1"), false, encodedRole);
 
-    var signer =
+    ContentSigner signer =
         new JcaContentSignerBuilder("SHA256withRSA").build(AUTHORITY_KEYS.keyPair().getPrivate());
 
     return new JcaX509CertificateConverter().getCertificate(builder.build(signer));
