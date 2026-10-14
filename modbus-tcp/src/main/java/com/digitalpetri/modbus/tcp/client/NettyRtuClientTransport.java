@@ -26,6 +26,7 @@ import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
 import io.netty.handler.ssl.SslProtocols;
+import io.netty.util.ReferenceCountUtil;
 import java.net.InetSocketAddress;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -223,19 +224,27 @@ public class NettyRtuClientTransport implements ModbusRtuClientTransport {
                     @Override
                     protected void initChannel(SocketChannel channel) throws Exception {
                       if (config.tlsEnabled()) {
-                        SslContext sslContext =
+                        SslContextBuilder sslContextBuilder =
                             SslContextBuilder.forClient()
                                 .clientAuth(ClientAuth.REQUIRE)
                                 .keyManager(config.keyManagerFactory().orElseThrow())
                                 .trustManager(config.trustManagerFactory().orElseThrow())
-                                .protocols(SslProtocols.TLS_v1_2, SslProtocols.TLS_v1_3)
-                                .build();
+                                .protocols(SslProtocols.TLS_v1_2, SslProtocols.TLS_v1_3);
 
-                        channel
-                            .pipeline()
-                            .addLast(
-                                sslContext.newHandler(
-                                    channel.alloc(), config.hostname(), config.port()));
+                        config.sslContextCustomizer().accept(sslContextBuilder);
+                        SslContext sslContext = sslContextBuilder.build();
+
+                        try {
+                          channel
+                              .pipeline()
+                              .addLast(
+                                  sslContext.newHandler(
+                                      channel.alloc(), config.hostname(), config.port()));
+                        } finally {
+                          // Native TLS engines retain their context until the handler releases the
+                          // engine.
+                          ReferenceCountUtil.release(sslContext);
+                        }
                       }
 
                       channel.pipeline().addLast(new ModbusRtuClientFrameReceiver());

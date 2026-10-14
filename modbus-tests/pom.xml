@@ -66,6 +66,41 @@
     <plugins>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>3.5.4</version>
+        <executions>
+          <execution>
+            <id>default-test</id>
+            <configuration>
+              <excludedGroups>native-tls</excludedGroups>
+            </configuration>
+          </execution>
+          <execution>
+            <id>native-tls-test</id>
+            <goals>
+              <goal>test</goal>
+            </goals>
+            <configuration>
+              <groups>native-tls</groups>
+              <includes>
+                <include>**/NettyTlsConfigurationTest.java</include>
+              </includes>
+              <reportNameSuffix>native-tls</reportNameSuffix>
+              <!-- Keep native TLS off the ordinary/default-provider test classpath. -->
+              <additionalClasspathDependencies>
+                <additionalClasspathDependency>
+                  <groupId>io.netty</groupId>
+                  <artifactId>netty-tcnative-boringssl-static</artifactId>
+                  <!-- Matches the tcnative version used by Netty 4.1.139.Final. -->
+                  <version>2.0.84.Final</version>
+                </additionalClasspathDependency>
+              </additionalClasspathDependencies>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
         <version>${maven-compiler-plugin.version}</version>
       </plugin>

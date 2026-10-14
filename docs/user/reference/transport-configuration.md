@@ -23,16 +23,18 @@ the stable, readable form used in examples.
 | `setTlsEnabled` | `boolean` | `false` | Adds TLS before TCP or RTU framing |
 | `setKeyManagerFactory` | `KeyManagerFactory` | None | Required when TLS is enabled |
 | `setTrustManagerFactory` | `TrustManagerFactory` | None | Required when TLS is enabled |
+| `setSslContextCustomizer` | `Consumer<SslContextBuilder>` | No-op | Configures TLS context construction after transport defaults; see [TLS context customization](#tls-context-customization) |
 
 When TLS is enabled, the client builder validates that both manager factories are present. Both
-Netty client transports enable TLS 1.2 and 1.3. `NettyTcpClientTransport` waits for the handshake
-before reporting connection success; the RTU-over-TCP transport reports the socket connection and
-can surface a handshake failure on subsequent TLS I/O. Neither enables endpoint/hostname
-identification automatically. Use the pipeline customizer to configure the `SslHandler` engine's
-`SSLParameters`, as shown in [Secure a Modbus TCP client with TLS](../how-to/clients/secure-a-modbus-tcp-client-with-tls.md),
-or enforce an equivalent endpoint-identity policy. Netty's current `SslHandler` handshake timeout
-defaults to 10 seconds and is separate from `connectTimeout`; call
-`SslHandler.setHandshakeTimeoutMillis(...)` from that same customizer to change it.
+Netty client transports enable TLS 1.2 and 1.3 by default. `NettyTcpClientTransport` waits for the
+handshake before reporting connection success; the RTU-over-TCP transport reports the socket
+connection and can surface a handshake failure on subsequent TLS I/O. Neither enables
+endpoint/hostname identification automatically. Use the pipeline customizer to configure the
+`SslHandler` engine's `SSLParameters`, as shown in [Secure a Modbus TCP client with
+TLS](../how-to/clients/secure-a-modbus-tcp-client-with-tls.md), or enforce an equivalent
+endpoint-identity policy. Netty's current `SslHandler` handshake timeout defaults to 10 seconds and
+is separate from `connectTimeout`; call `SslHandler.setHandshakeTimeoutMillis(...)` from that same
+customizer to change it.
 
 The current channel-FSM dependency defaults to a 32-second maximum exponential reconnect delay.
 `setChannelFsmCustomizer(fsm -> fsm.setMaxReconnectDelaySeconds(n))` changes that ceiling; values
@@ -60,6 +62,7 @@ same customizer; see [Shared resources](lifecycle-concurrency-and-resources.md#s
 | `setTlsEnabled` | `boolean` | `false` | Adds TLS and requires client authentication |
 | `setKeyManagerFactory` | `KeyManagerFactory` | None | Required when the first TLS client channel initializes |
 | `setTrustManagerFactory` | `TrustManagerFactory` | None | Required when the first TLS client channel initializes |
+| `setSslContextCustomizer` | `Consumer<SslContextBuilder>` | No-op | Configures TLS context construction after transport defaults; see [TLS context customization](#tls-context-customization) |
 
 Unlike the client config builder, the server config builder stores missing TLS manager factories
 as empty optionals. A TLS-enabled server can bind without both because accepted-channel pipeline
@@ -68,6 +71,69 @@ Treat both factories as required before `start()` even though the builder does n
 
 `NettyTcpServerTransport` accepts multiple client channels. `NettyRtuServerTransport` accepts one
 active client channel and closes additional channels until that client disconnects.
+
+## TLS context customization
+
+All four Netty transports support `setSslContextCustomizer(Consumer<SslContextBuilder>)`.
+The transport applies its key and trust manager factories, `ClientAuth.REQUIRE`, and TLS 1.2/1.3
+protocols before invoking the callback. The callback can then configure protocols, ciphers, the
+Netty TLS provider, or other context settings before the handler and handshake are created.
+Existing applications need no configuration changes. The original configuration record
+constructors remain available and use the default context settings.
+
+For a client, with key and trust manager factories already loaded:
+
+```java
+var clientTransport = NettyTcpClientTransport.create(cfg -> {
+  cfg.setHostname("localhost");
+  cfg.setTlsEnabled(true);
+  cfg.setKeyManagerFactory(clientKeyManagerFactory);
+  cfg.setTrustManagerFactory(trustManagerFactory);
+  cfg.setSslContextCustomizer(ssl -> ssl
+      .sslProvider(SslProvider.JDK)
+      .protocols(SslProtocols.TLS_v1_2)
+      .ciphers(List.of("TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256")));
+});
+```
+
+For the corresponding server:
+
+```java
+var serverTransport = NettyTcpServerTransport.create(cfg -> {
+  cfg.setBindAddress("localhost");
+  cfg.setTlsEnabled(true);
+  cfg.setKeyManagerFactory(serverKeyManagerFactory);
+  cfg.setTrustManagerFactory(trustManagerFactory);
+  cfg.setSslContextCustomizer(ssl -> ssl
+      .sslProvider(SslProvider.JDK)
+      .protocols(SslProtocols.TLS_v1_2)
+      .ciphers(List.of("TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256")));
+});
+```
+
+These snippets use `java.util.List` and Netty's `io.netty.handler.ssl.SslProvider` and
+`SslProtocols`. The cipher shown requires RSA identities. Choose a protocol and cipher policy
+supported by both peers and the selected provider. To use RTU over TCP, substitute
+`NettyRtuClientTransport` and `NettyRtuServerTransport`; their configuration is the same.
+
+The default path retains mutual authentication. An override is responsible for preserving it:
+clients must present an identity and verify the server certificate; servers must verify the client
+certificate and keep `ClientAuth.REQUIRE`. Both manager factories remain required even if the
+callback replaces them. Use the pipeline customizer for handler settings such as the handshake
+timeout; use the context callback for context construction.
+
+The callback runs on the channel's event loop once per TLS connection attempt, including client
+reconnects, and once per admitted server connection. The RTU server rejects additional concurrent
+clients before invoking it. The callback is not invoked when TLS is disabled. Server callbacks
+can run concurrently on different event loops, so shared mutable callback state must be safe for
+concurrent use. An exception fails that channel's initialization; later connections invoke the
+callback again.
+
+Only configure the supplied builder. Do not retain it or call `build()` from the callback.
+The transport builds and owns a new context for each connection. It releases its native context
+reference after creating the handler; Netty's TLS engine retains the context until the handler
+releases the engine. Applications do not release these contexts or engines. Protocol and cipher
+configuration does not introduce context sharing or session-cache reuse across connections.
 
 ## Serial transport
 

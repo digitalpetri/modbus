@@ -106,17 +106,25 @@ public final class TlsModbusTcpExample {
 }
 ```
 
-The transport negotiates TLS 1.2 or TLS 1.3, completes the TLS handshake as part of `connect()`,
-and then exchanges ordinary Modbus TCP frames inside the encrypted connection. The built-in
-transport supplies the host to the TLS engine but does not enable endpoint identification by
-default. The pipeline customizer above enables Java's `HTTPS` hostname check so `HOST` must match
+By default, the transport negotiates TLS 1.2 or TLS 1.3, completes the TLS handshake as part of
+`connect()`, and then exchanges ordinary Modbus TCP frames inside the encrypted connection. The
+built-in transport supplies the host to the TLS engine but does not enable endpoint identification
+by default. The pipeline customizer above enables Java's `HTTPS` hostname check so `HOST` must match
 the server certificate's identity. It also changes Netty's TLS handshake timeout from its current
-10-second default to 5 seconds. Retain the identity check and choose a handshake bound that
-matches the deployment.
+10-second default to 5 seconds. Retain the identity check and choose a handshake bound that matches
+the deployment.
 
 The example also disables persistent initial retries. If connection, trust, or hostname validation
 fails before `open()` returns, the client will not keep reconnecting after control enters the
 process-level cleanup block.
+
+## Configure the TLS context
+
+Use `cfg.setSslContextCustomizer(...)` to select protocol versions, cipher suites, or the TLS
+provider before the handshake. The transport applies its existing defaults before invoking the
+callback and owns context construction and cleanup. See
+[TLS context customization](../../reference/transport-configuration.md#tls-context-customization)
+for client and server examples, callback timing, and mutual authentication requirements.
 
 ## Clean up securely
 

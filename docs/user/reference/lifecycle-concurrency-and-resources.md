@@ -117,6 +117,18 @@ Use this shutdown order:
 The library does not shut down an `ExecutorService` or `EventLoopGroup` supplied through a
 configuration setter. Supplying one transfers use, not ownership, to the transport.
 
+## TLS context ownership
+
+Each Netty TLS connection uses a context constructed and owned by its transport. The TLS builder
+customizer runs before context construction and receives a builder for that connection only.
+Configure it without retaining it or building additional contexts. The transport releases its
+native context reference after creating the TLS handler; the engine keeps its own reference until
+Netty removes the handler and releases the engine. Disconnect clients and stop servers to close
+their TLS channels. Applications do not release the transport's TLS contexts or engines.
+
+See [TLS context customization](transport-configuration.md#tls-context-customization) for callback
+frequency, concurrency, and client/server configuration examples.
+
 ## Buffer and array ownership
 
 Typed PDU records containing `byte[]` values and raw TCP request/response records do not clone
