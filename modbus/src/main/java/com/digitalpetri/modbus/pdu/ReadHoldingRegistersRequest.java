@@ -15,6 +15,12 @@ import java.nio.ByteBuffer;
 public record ReadHoldingRegistersRequest(int address, int quantity) implements ModbusRequestPdu {
 
   @Override
+  public void validate() {
+    RequestValidation.checkRange("quantity", quantity, 1, 125);
+    RequestValidation.checkAddressRange("address", address, quantity);
+  }
+
+  @Override
   public int getFunctionCode() {
     return FunctionCode.READ_HOLDING_REGISTERS.getCode();
   }
@@ -31,6 +37,8 @@ public record ReadHoldingRegistersRequest(int address, int quantity) implements 
      * @param buffer the buffer to encode into.
      */
     public static void encode(ReadHoldingRegistersRequest request, ByteBuffer buffer) {
+      request.validate();
+
       buffer.put((byte) request.getFunctionCode());
       buffer.putShort((short) request.address);
       buffer.putShort((short) request.quantity);

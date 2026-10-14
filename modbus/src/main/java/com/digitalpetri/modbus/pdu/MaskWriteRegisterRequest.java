@@ -14,6 +14,13 @@ public record MaskWriteRegisterRequest(int address, int andMask, int orMask)
     implements ModbusRequestPdu {
 
   @Override
+  public void validate() {
+    RequestValidation.checkRange("address", address, 0, 65535);
+    RequestValidation.checkRange("andMask", andMask, 0, 65535);
+    RequestValidation.checkRange("orMask", orMask, 0, 65535);
+  }
+
+  @Override
   public int getFunctionCode() {
     return FunctionCode.MASK_WRITE_REGISTER.getCode();
   }
@@ -30,6 +37,8 @@ public record MaskWriteRegisterRequest(int address, int andMask, int orMask)
      * @param buffer the buffer to encode into.
      */
     public static void encode(MaskWriteRegisterRequest request, ByteBuffer buffer) {
+      request.validate();
+
       buffer.put((byte) request.getFunctionCode());
       buffer.putShort((short) request.address);
       buffer.putShort((short) request.andMask);

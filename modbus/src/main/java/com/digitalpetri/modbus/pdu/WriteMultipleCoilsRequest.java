@@ -12,10 +12,23 @@ import java.util.StringJoiner;
  *
  * @param address the starting address. 2 bytes, range [0x0000, 0xFFFF].
  * @param quantity the quantity of coils to write. 2 bytes, range [0x0001, 0x7B0].
- * @param values a buffer of at least N bytes, where N = (quantity + 7) / 8.
+ * @param values a buffer of exactly N bytes, where N = (quantity + 7) / 8. Unused bits in the last
+ *     byte must be zero.
  */
 public record WriteMultipleCoilsRequest(int address, int quantity, byte[] values)
     implements ModbusRequestPdu {
+
+  @Override
+  public void validate() {
+    RequestValidation.checkRange("quantity", quantity, 1, 1968);
+    RequestValidation.checkAddressRange("address", address, quantity);
+    RequestValidation.checkPayloadLength(values, (quantity + 7) / 8);
+
+    int remainder = quantity % 8;
+    if (remainder != 0 && (values[values.length - 1] & (0xFF << remainder)) != 0) {
+      throw new IllegalArgumentException("unused bits in the last values byte must be zero");
+    }
+  }
 
   @Override
   public int getFunctionCode() {
@@ -65,6 +78,8 @@ public record WriteMultipleCoilsRequest(int address, int quantity, byte[] values
      * @param buffer the buffer to encode into.
      */
     public static void encode(WriteMultipleCoilsRequest request, ByteBuffer buffer) {
+      request.validate();
+
       buffer.put((byte) request.getFunctionCode());
       buffer.putShort((short) request.address);
       buffer.putShort((short) request.quantity);

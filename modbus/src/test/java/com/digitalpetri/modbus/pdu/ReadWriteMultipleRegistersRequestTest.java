@@ -11,10 +11,10 @@ class ReadWriteMultipleRegistersRequestTest {
   @Test
   void serializer() {
     var random = new Random();
-    int address = random.nextInt(0xFFFF + 1);
     int quantity = random.nextInt(125) + 1;
-    int writeAddress = random.nextInt(0xFFFF + 1);
+    int address = random.nextInt(65537 - quantity);
     int writeQuantity = random.nextInt(121) + 1;
+    int writeAddress = random.nextInt(65537 - writeQuantity);
     byte[] writeValues = new byte[writeQuantity * 2];
     random.nextBytes(writeValues);
 
@@ -45,7 +45,11 @@ class ReadWriteMultipleRegistersRequestTest {
 
         var request =
             new ReadWriteMultipleRegistersRequest(
-                0xFFFF, readQuantity, 0xFFFF, writeQuantity, writeValues);
+                65536 - readQuantity,
+                readQuantity,
+                65536 - writeQuantity,
+                writeQuantity,
+                writeValues);
         ByteBuffer buffer = ByteBuffer.allocate(253);
 
         ReadWriteMultipleRegistersRequest.Serializer.encode(request, buffer);

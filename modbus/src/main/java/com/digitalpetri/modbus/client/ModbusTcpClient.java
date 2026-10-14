@@ -146,6 +146,7 @@ public class ModbusTcpClient extends ModbusClient {
     ByteBuffer pduBytes = ByteBuffer.allocate(256);
 
     try {
+      request.validate();
       config.requestSerializer().encode(request, pduBytes);
     } catch (Exception e) {
       return CompletableFuture.failedFuture(e);
