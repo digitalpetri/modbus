@@ -25,6 +25,7 @@ import com.digitalpetri.modbus.pdu.WriteSingleCoilResponse;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterResponse;
 import com.digitalpetri.modbus.server.ModbusRequestContext;
+import com.digitalpetri.modbus.server.ModbusRequestContext.ModbusRtuRequestContext;
 import com.digitalpetri.modbus.server.ModbusServices;
 import com.digitalpetri.modbus.server.authz.AuthzHandler.AuthzResult;
 
@@ -46,6 +47,11 @@ public class AuthzModbusServices implements ModbusServices {
   public AuthzModbusServices(AuthzHandler authzHandler, ModbusServices modbusServices) {
     this.authzHandler = authzHandler;
     this.modbusServices = modbusServices;
+  }
+
+  @Override
+  public Iterable<Integer> getBroadcastUnitIds(ModbusRtuRequestContext context) {
+    return modbusServices.getBroadcastUnitIds(context);
   }
 
   @Override

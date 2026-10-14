@@ -28,10 +28,11 @@ public interface ModbusServerTransport<C extends ModbusRequestContext, T> {
   interface FrameReceiver<C, T> {
 
     /**
-     * Receive a request frame from the transport and respond to it.
+     * Receive a request frame from the transport and process it.
      *
      * @param frame the request frame.
-     * @return a corresponding response frame.
+     * @return a corresponding response frame, or {@code null} for an RTU request that requires no
+     *     response.
      * @throws Exception if there is an unrecoverable error and the channel should be closed.
      */
     T receive(C context, T frame) throws Exception;
