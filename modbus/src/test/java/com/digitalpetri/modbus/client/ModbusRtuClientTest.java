@@ -686,11 +686,18 @@ public class ModbusRtuClientTest {
     // Callbacks run when the broadcast is cancelled must already see the send cancelled, or a
     // queued write could still go out while they run.
     var cancelledWhenCompleted = new AtomicBoolean(false);
-    broadcast.whenComplete((v, ex) -> cancelledWhenCompleted.set(sendFuture.isCancelled()));
+    var callbackCompleted = new CountDownLatch(1);
+    broadcast.whenComplete(
+        (v, ex) -> {
+          cancelledWhenCompleted.set(sendFuture.isCancelled());
+          callbackCompleted.countDown();
+        });
 
     assertTrue(broadcast.cancel(false));
     assertTrue(broadcast.isCancelled());
     assertTrue(sendFuture.isCancelled());
+    // Another thread may run the completion callback while cancel() returns.
+    assertTrue(callbackCompleted.await(1, TimeUnit.SECONDS));
     assertTrue(cancelledWhenCompleted.get());
   }
 
