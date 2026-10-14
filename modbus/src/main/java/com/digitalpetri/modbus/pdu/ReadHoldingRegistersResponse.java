@@ -65,14 +65,13 @@ public record ReadHoldingRegistersResponse(byte[] registers) implements ModbusRe
     /**
      * Decode a {@link ReadHoldingRegistersResponse} from a {@link ByteBuffer}.
      *
-     * @param buffer the buffer to decode from.
+     * @param buffer the buffer containing the complete response PDU.
      * @return the decoded response.
+     * @throws IllegalArgumentException if the response PDU format is invalid.
      */
     public static ReadHoldingRegistersResponse decode(ByteBuffer buffer) {
-      int functionCode = buffer.get() & 0xFF;
-      assert functionCode == FunctionCode.READ_HOLDING_REGISTERS.getCode();
-
-      int byteCount = buffer.get() & 0xFF;
+      int byteCount =
+          ResponsePduChecks.readRegisterByteCount(buffer, FunctionCode.READ_HOLDING_REGISTERS);
       var registers = new byte[byteCount];
       buffer.get(registers);
 

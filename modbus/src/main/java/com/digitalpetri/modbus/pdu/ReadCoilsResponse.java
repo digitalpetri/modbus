@@ -73,14 +73,12 @@ public record ReadCoilsResponse(byte[] coils) implements ModbusResponsePdu {
     /**
      * Decode a {@link ReadCoilsResponse} from a {@link ByteBuffer}.
      *
-     * @param buffer the buffer to decode from.
+     * @param buffer the buffer containing the complete response PDU.
      * @return the decoded response.
+     * @throws IllegalArgumentException if the response PDU format is invalid.
      */
     public static ReadCoilsResponse decode(ByteBuffer buffer) {
-      int functionCode = buffer.get() & 0xFF;
-      assert functionCode == FunctionCode.READ_COILS.getCode();
-
-      int byteCount = buffer.get() & 0xFF;
+      int byteCount = ResponsePduChecks.readByteCount(buffer, FunctionCode.READ_COILS);
       var coils = new byte[byteCount];
       buffer.get(coils);
 

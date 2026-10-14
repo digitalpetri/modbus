@@ -16,6 +16,41 @@ send or channel wait already in progress. A request can still reach the server a
 timeout. Applications must resolve the outcome of timed-out writes or use idempotent application
 semantics before retrying.
 
+## Typed response validation
+
+TCP and RTU clients decode normal responses with `responseSerializer`, then call
+`responseValidator.validate(request, response)` before completing the request successfully.
+This applies to `send` / `sendAsync` and all synchronous and asynchronous typed operations.
+Raw TCP calls bypass both the codec and the validator. Modbus exception responses keep their
+existing exception handling and do not invoke the validator.
+
+The default `ModbusResponseValidator.DefaultResponseValidator` checks matching built-in request
+and response record pairs. Register reads must contain two bytes per requested register. Coil and
+discrete-input reads must contain the requested packed byte count, rounded up to a whole byte.
+Writes must echo the request's address, quantity, value, or masks. Other PDU types are ignored by
+the standard validator, including custom PDUs that use a standard function code.
+
+Replace the validator independently of the codec with
+`ModbusClientConfig.Builder.setResponseValidator(...)` or the builder's `responseValidator` field.
+Applications using built-in records with a different register width or echo semantics must replace
+both the codec and the validator. Replacing only the codec retains standard semantic validation.
+Validators must support concurrent use by the clients that share them.
+
+Format checks belong to the selected codec. Built-in response decoders require the buffer's
+remaining bytes to contain exactly one complete PDU. They reject truncation, unexpected trailing
+bytes, invalid byte counts, and invalid standard response fields with an `IllegalArgumentException`
+that describes the protocol error. Custom codecs determine their own format and consumption rules;
+the generic client path does not require their buffers to be fully consumed.
+
+Validation failures complete asynchronous operations exceptionally. Synchronous calls wrap them in
+`ModbusExecutionException`. A rejected complete response fails that request only. TCP correlation
+continues normally, and RTU sends the next queued request without resetting the frame parser when
+the frame has a valid CRC. Existing timeout and CRC recovery still apply when needed.
+
+`ModbusClientConfig` has six record components. The five-argument constructor selects the default
+validator. Record reflection and generated `equals`, `hashCode`, and `toString` include the
+validator.
+
 ## TCP client behavior
 
 | Behavior | Detail |
@@ -23,7 +58,7 @@ semantics before retrying.
 | Transaction ID | Allocated in the range 0 through 65535 and wraps to 0 |
 | Correlation | Pending responses are selected by MBAP transaction ID |
 | Request timeout | One timeout per in-flight request; default 5 seconds |
-| Typed response validation | Empty PDUs, malformed exception PDUs, and unexpected function codes fail the request |
+| Typed response validation | Empty PDUs, malformed exception PDUs, unexpected function codes, codec failures, and request-relative validation failures fail the request |
 | Standard exception response | Function code `request + 0x80` and an exception byte become `ModbusResponseException` |
 | Late/unmatched response | Logged when its transaction ID has no promise; after ID wrap/reuse, a sufficiently late response can match the newer promise |
 | Raw request | `sendRaw` accepts PDU bytes only, adds MBAP, and returns response PDU bytes only |

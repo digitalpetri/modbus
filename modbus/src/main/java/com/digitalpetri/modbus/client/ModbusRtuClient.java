@@ -124,8 +124,7 @@ public class ModbusRtuClient extends ModbusClient {
 
     ByteBuffer crc = calculateCrc16(unitId, pdu);
 
-    var pending =
-        new PendingRequest(unitId, request.getFunctionCode(), new ModbusRtuFrame(unitId, pdu, crc));
+    var pending = new PendingRequest(unitId, request, new ModbusRtuFrame(unitId, pdu, crc));
 
     enqueue(pending);
 
@@ -477,7 +476,9 @@ public class ModbusRtuClient extends ModbusClient {
     if (functionCode == pending.functionCode) {
       try {
         ModbusPdu modbusPdu = config.responseSerializer().decode(functionCode, buffer);
-        completeRequest(pending, (ModbusResponsePdu) modbusPdu);
+        var response = (ModbusResponsePdu) modbusPdu;
+        config.responseValidator().validate(pending.request, response);
+        completeRequest(pending, response);
       } catch (Exception e) {
         failRequest(pending, e);
       }
@@ -611,12 +612,14 @@ public class ModbusRtuClient extends ModbusClient {
 
     final int slaveId;
     final int functionCode;
+    final ModbusRequestPdu request;
 
-    PendingRequest(int slaveId, int functionCode, ModbusRtuFrame frame) {
+    PendingRequest(int slaveId, ModbusRequestPdu request, ModbusRtuFrame frame) {
       super(frame);
 
       this.slaveId = slaveId;
-      this.functionCode = functionCode;
+      this.functionCode = request.getFunctionCode();
+      this.request = request;
     }
   }
 

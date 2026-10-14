@@ -42,6 +42,30 @@ import org.junit.jupiter.api.Test;
 public class ModbusRtuClientTest {
 
   @Test
+  void invalidResponseFailsOnlyInFlightRequestAndReleasesQueuedRequest() throws Exception {
+    for (byte[] invalid : new byte[][] {{3, 2, 0, 1}, {3, 4, 0, 1, 0, 2, 0}}) {
+      var transport = new RecordingRtuTransport();
+      var client = ModbusRtuClient.create(transport);
+      try (var ignored = client.open()) {
+        CompletableFuture<ReadHoldingRegistersResponse> first =
+            client
+                .readHoldingRegistersAsync(1, new ReadHoldingRegistersRequest(0, 2))
+                .toCompletableFuture();
+        CompletableFuture<ReadHoldingRegistersResponse> next = readAsync(client, 100);
+
+        assertEquals(0, startAddress(transport.nextSentFrame()));
+        transport.respondRaw(client, invalid);
+        assertThrows(ExecutionException.class, () -> first.get(1, TimeUnit.SECONDS));
+
+        assertEquals(100, startAddress(transport.nextSentFrame()));
+        transport.respond(client, registers(0x0B));
+        assertArrayEquals(registers(0x0B), next.get(1, TimeUnit.SECONDS).registers());
+        assertEquals(0, client.timeouts.size());
+      }
+    }
+  }
+
+  @Test
   void responsesAreMatchedToRequestsInOrder() throws Exception {
     var transport = new RecordingRtuTransport();
     var client = ModbusRtuClient.create(transport);

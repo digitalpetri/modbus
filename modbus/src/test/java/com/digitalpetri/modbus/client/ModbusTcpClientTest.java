@@ -5,20 +5,85 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.digitalpetri.modbus.MbapHeader;
 import com.digitalpetri.modbus.ModbusTcpFrame;
 import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersRequest;
+import com.digitalpetri.modbus.pdu.WriteMultipleRegistersRequest;
 import java.nio.ByteBuffer;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
 
 public class ModbusTcpClientTest {
+
+  @Test
+  void registerReadRejectsResponseWithFewerRegistersThanRequested() {
+    var transport = new TestTransport();
+    var client = ModbusTcpClient.create(transport);
+
+    var response = client.readHoldingRegistersAsync(1, new ReadHoldingRegistersRequest(0, 2));
+
+    transport.frameReceiver.accept(
+        new ModbusTcpFrame(
+            transport.lastFrameSent.header(),
+            ByteBuffer.wrap(new byte[] {0x03, 0x02, 0x12, 0x34})));
+
+    ExecutionException failure =
+        assertThrows(
+            ExecutionException.class,
+            () -> response.toCompletableFuture().get(1, TimeUnit.SECONDS));
+    ModbusException cause = assertInstanceOf(ModbusException.class, failure.getCause());
+    assertTrue(cause.getMessage().contains("register byte count"));
+  }
+
+  @Test
+  void writeRejectsResponseWithDifferentAddressAndQuantity() {
+    var transport = new TestTransport();
+    var client = ModbusTcpClient.create(transport);
+
+    var response =
+        client.writeMultipleRegistersAsync(
+            1, new WriteMultipleRegistersRequest(10, 2, new byte[] {0, 1, 0, 2}));
+
+    transport.frameReceiver.accept(
+        new ModbusTcpFrame(
+            transport.lastFrameSent.header(), ByteBuffer.wrap(new byte[] {0x10, 0, 11, 0, 1})));
+
+    ExecutionException failure =
+        assertThrows(
+            ExecutionException.class,
+            () -> response.toCompletableFuture().get(1, TimeUnit.SECONDS));
+    ModbusException cause = assertInstanceOf(ModbusException.class, failure.getCause());
+    assertTrue(cause.getMessage().contains("address"));
+  }
+
+  @Test
+  void concurrentReadsValidateAgainstTheirOwnRequestWhenResponsesArriveOutOfOrder()
+      throws Exception {
+    var transport = new TestTransport();
+    var client = ModbusTcpClient.create(transport);
+    var first = client.readHoldingRegistersAsync(1, new ReadHoldingRegistersRequest(0, 2));
+    MbapHeader firstHeader = transport.lastFrameSent.header();
+    var second = client.readHoldingRegistersAsync(1, new ReadHoldingRegistersRequest(100, 1));
+    MbapHeader secondHeader = transport.lastFrameSent.header();
+
+    byte[] oneRegister = {3, 2, 0x12, 0x34};
+    transport.frameReceiver.accept(new ModbusTcpFrame(secondHeader, ByteBuffer.wrap(oneRegister)));
+    transport.frameReceiver.accept(new ModbusTcpFrame(firstHeader, ByteBuffer.wrap(oneRegister)));
+
+    assertEquals(2, second.toCompletableFuture().get(1, TimeUnit.SECONDS).registers().length);
+    ExecutionException failure =
+        assertThrows(
+            ExecutionException.class, () -> first.toCompletableFuture().get(1, TimeUnit.SECONDS));
+    assertInstanceOf(ModbusException.class, failure.getCause());
+  }
 
   @Test
   void sendRawAcceptsVendorResponseFunctionCode() throws Exception {

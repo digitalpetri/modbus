@@ -165,7 +165,9 @@ public class ModbusTcpClient extends ModbusClient {
           try {
             ModbusPdu decoded =
                 config.responseSerializer().decode(request.getFunctionCode(), responseBuffer);
-            return (ModbusResponsePdu) decoded;
+            var response = (ModbusResponsePdu) decoded;
+            config.responseValidator().validate(request, response);
+            return response;
           } catch (Exception e) {
             throw new CompletionException(e);
           }

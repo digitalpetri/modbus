@@ -43,12 +43,18 @@ message.
 
 | Response condition | Result |
 | --- | --- |
-| Matching function code | Decode with configured response serializer |
+| Matching function code | Decode with configured response serializer, then apply the configured response validator |
 | Request function code plus `0x80` and exception byte | `ModbusResponseException` |
 | Exception function code without an exception byte | `ModbusException` for malformed exception PDU |
 | Empty typed response PDU | `ModbusException` for empty response PDU |
 | Any other function code | `ModbusException` for unexpected function code |
 | No response before deadline | Timeout; synchronous API exposes `ModbusTimeoutException` |
+
+Built-in codec format failures produce an `IllegalArgumentException` with a protocol diagnostic.
+Standard request-relative mismatches produce a `ModbusException`. Asynchronous operations expose
+the cause directly; synchronous calls wrap these failures in `ModbusExecutionException`. See
+[Typed response validation](client-and-server-behavior.md#typed-response-validation) for replacement
+rules and recovery behavior.
 
 Raw TCP calls return the response PDU bytes without these typed checks.
 
@@ -58,7 +64,7 @@ Raw TCP calls return the response PDU bytes without these typed checks.
 | --- | --- |
 | CRC differs | `ModbusCrcException`; the frame parser is reset |
 | Unit ID differs from the request | `ModbusException` for slave id mismatch |
-| Matching function code | Decode with configured response serializer |
+| Matching function code | Decode with configured response serializer, then apply the configured response validator |
 | Request function code plus `0x80` and exception byte | `ModbusResponseException` |
 | Exception function code without an exception byte | `ModbusException` for malformed exception PDU |
 | Empty response PDU | `ModbusException` for empty response PDU |

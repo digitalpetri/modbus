@@ -2,9 +2,12 @@ package com.digitalpetri.modbus.test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.digitalpetri.modbus.client.ModbusClient;
+import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
 import com.digitalpetri.modbus.pdu.MaskWriteRegisterRequest;
 import com.digitalpetri.modbus.pdu.MaskWriteRegisterResponse;
@@ -26,7 +29,10 @@ import com.digitalpetri.modbus.pdu.WriteSingleCoilRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleCoilResponse;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterResponse;
+import com.digitalpetri.modbus.server.ModbusRequestContext;
 import com.digitalpetri.modbus.server.ModbusServer;
+import com.digitalpetri.modbus.server.ModbusServices;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 
 public abstract class ClientServerIT {
@@ -56,6 +62,55 @@ public abstract class ClientServerIT {
         getClient().readHoldingRegisters(1, new ReadHoldingRegistersRequest(0, 125));
 
     assertEquals(250, response.registers().length);
+  }
+
+  @Test
+  void shortRegisterResponseFailsAndNextReadSucceeds() throws Exception {
+    var calls = new AtomicInteger();
+    getServer()
+        .setModbusServices(
+            new ModbusServices() {
+              @Override
+              public ReadHoldingRegistersResponse readHoldingRegisters(
+                  ModbusRequestContext context, int unitId, ReadHoldingRegistersRequest request) {
+                int quantity =
+                    calls.getAndIncrement() == 0 ? request.quantity() - 1 : request.quantity();
+                return new ReadHoldingRegistersResponse(new byte[2 * quantity]);
+              }
+            });
+
+    var request = new ReadHoldingRegistersRequest(0, 2);
+    ModbusExecutionException failure =
+        assertThrows(
+            ModbusExecutionException.class, () -> getClient().readHoldingRegisters(1, request));
+    assertInstanceOf(ModbusException.class, failure.getCause());
+    assertEquals(4, getClient().readHoldingRegisters(1, request).registers().length);
+    assertTrue(getClient().isConnected());
+  }
+
+  @Test
+  void wrongWriteEchoFailsAndNextWriteSucceeds() throws Exception {
+    var calls = new AtomicInteger();
+    getServer()
+        .setModbusServices(
+            new ModbusServices() {
+              @Override
+              public WriteMultipleRegistersResponse writeMultipleRegisters(
+                  ModbusRequestContext context, int unitId, WriteMultipleRegistersRequest request) {
+                int address =
+                    calls.getAndIncrement() == 0 ? request.address() + 1 : request.address();
+                return new WriteMultipleRegistersResponse(address, request.quantity());
+              }
+            });
+
+    var request = new WriteMultipleRegistersRequest(10, 2, new byte[4]);
+    ModbusExecutionException failure =
+        assertThrows(
+            ModbusExecutionException.class, () -> getClient().writeMultipleRegisters(1, request));
+    assertInstanceOf(ModbusException.class, failure.getCause());
+    assertEquals(
+        new WriteMultipleRegistersResponse(10, 2), getClient().writeMultipleRegisters(1, request));
+    assertTrue(getClient().isConnected());
   }
 
   @Test

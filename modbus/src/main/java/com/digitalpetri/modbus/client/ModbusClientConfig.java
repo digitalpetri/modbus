@@ -5,6 +5,8 @@ import static com.digitalpetri.modbus.ModbusPduSerializer.DefaultResponseSeriali
 
 import com.digitalpetri.modbus.Modbus;
 import com.digitalpetri.modbus.ModbusPduSerializer;
+import com.digitalpetri.modbus.ModbusResponseValidator;
+import com.digitalpetri.modbus.ModbusResponseValidator.DefaultResponseValidator;
 import com.digitalpetri.modbus.TimeoutScheduler;
 import java.time.Duration;
 import java.util.Objects;
@@ -21,23 +23,27 @@ import java.util.function.Consumer;
  * @param broadcastTurnaroundDelay how long {@link ModbusRtuClient} waits after writing a broadcast
  *     before it sends the next request. Other clients ignore it. Must not be negative or longer
  *     than {@link Long#MAX_VALUE} nanoseconds.
+ * @param responseValidator the validator applied after decoding normal responses.
  */
 public record ModbusClientConfig(
     Duration requestTimeout,
     TimeoutScheduler timeoutScheduler,
     ModbusPduSerializer requestSerializer,
     ModbusPduSerializer responseSerializer,
-    Duration broadcastTurnaroundDelay) {
+    Duration broadcastTurnaroundDelay,
+    ModbusResponseValidator responseValidator) {
 
   /**
    * Create a new {@link ModbusClientConfig} instance.
    *
-   * @throws NullPointerException if {@code broadcastTurnaroundDelay} is {@code null}.
+   * @throws NullPointerException if {@code broadcastTurnaroundDelay} or {@code responseValidator}
+   *     is {@code null}.
    * @throws IllegalArgumentException if {@code broadcastTurnaroundDelay} is negative or longer than
    *     {@link Long#MAX_VALUE} nanoseconds.
    */
   public ModbusClientConfig {
     Objects.requireNonNull(broadcastTurnaroundDelay, "broadcastTurnaroundDelay");
+    Objects.requireNonNull(responseValidator, "responseValidator");
 
     // ModbusRtuClient schedules the delay in nanoseconds.
     if (broadcastTurnaroundDelay.isNegative()
@@ -45,6 +51,32 @@ public record ModbusClientConfig(
       throw new IllegalArgumentException(
           "broadcastTurnaroundDelay out of range: " + broadcastTurnaroundDelay);
     }
+  }
+
+  /**
+   * Create a configuration using standard request-relative response validation.
+   *
+   * <p>This overload preserves the constructor used before the response validator was configurable.
+   *
+   * @param requestTimeout the timeout duration for requests.
+   * @param timeoutScheduler the request timeout and broadcast delay scheduler.
+   * @param requestSerializer the request serializer.
+   * @param responseSerializer the response serializer.
+   * @param broadcastTurnaroundDelay the RTU broadcast turnaround delay.
+   */
+  public ModbusClientConfig(
+      Duration requestTimeout,
+      TimeoutScheduler timeoutScheduler,
+      ModbusPduSerializer requestSerializer,
+      ModbusPduSerializer responseSerializer,
+      Duration broadcastTurnaroundDelay) {
+    this(
+        requestTimeout,
+        timeoutScheduler,
+        requestSerializer,
+        responseSerializer,
+        broadcastTurnaroundDelay,
+        DefaultResponseValidator.INSTANCE);
   }
 
   /**
@@ -75,6 +107,9 @@ public record ModbusClientConfig(
 
     /** The {@link ModbusPduSerializer} used to decode incoming responses. */
     public ModbusPduSerializer responseSerializer = DefaultResponseSerializer.INSTANCE;
+
+    /** The request-relative validator applied after decoding normal responses. */
+    public ModbusResponseValidator responseValidator = DefaultResponseValidator.INSTANCE;
 
     /**
      * How long {@link ModbusRtuClient} waits after writing a broadcast before it sends the next
@@ -128,6 +163,22 @@ public record ModbusClientConfig(
     }
 
     /**
+     * Set the request-relative validator applied after decoding normal responses.
+     *
+     * <p>Replace this independently of the response serializer to customize semantic checks. Custom
+     * protocols using built-in records with different register widths must replace both the codec
+     * and the validator. Codecs own format checks and complete-PDU consumption. Raw requests bypass
+     * the validator.
+     *
+     * @param responseValidator the response validator, which must not be {@code null}.
+     * @return this {@link Builder}.
+     */
+    public Builder setResponseValidator(ModbusResponseValidator responseValidator) {
+      this.responseValidator = responseValidator;
+      return this;
+    }
+
+    /**
      * Set how long {@link ModbusRtuClient} waits after writing a broadcast before it sends the next
      * request.
      *
@@ -161,7 +212,8 @@ public record ModbusClientConfig(
           timeoutScheduler,
           requestSerializer,
           responseSerializer,
-          broadcastTurnaroundDelay);
+          broadcastTurnaroundDelay,
+          responseValidator);
     }
   }
 }
