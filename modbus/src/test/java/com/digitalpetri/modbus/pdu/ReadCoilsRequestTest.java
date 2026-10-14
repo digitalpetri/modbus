@@ -10,7 +10,7 @@ class ReadCoilsRequestTest {
   @Test
   void serializer() {
     for (int address = 0; address < 0xFFFF; address++) {
-      for (short quantity = 1; quantity <= 2000; quantity++) {
+      for (short quantity = 1; quantity <= 2000 && address + quantity <= 65536; quantity++) {
         ByteBuffer buffer = ByteBuffer.allocate(256);
 
         var request = new ReadCoilsRequest(address, quantity);

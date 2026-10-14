@@ -12,6 +12,12 @@ import java.nio.ByteBuffer;
 public record WriteSingleRegisterRequest(int address, int value) implements ModbusRequestPdu {
 
   @Override
+  public void validate() {
+    RequestValidation.checkRange("address", address, 0, 65535);
+    RequestValidation.checkRange("value", value, 0, 65535);
+  }
+
+  @Override
   public int getFunctionCode() {
     return FunctionCode.WRITE_SINGLE_REGISTER.getCode();
   }
@@ -28,6 +34,8 @@ public record WriteSingleRegisterRequest(int address, int value) implements Modb
      * @param buffer the buffer to encode into.
      */
     public static void encode(WriteSingleRegisterRequest request, ByteBuffer buffer) {
+      request.validate();
+
       buffer.put((byte) request.getFunctionCode());
       buffer.putShort((short) request.address);
       buffer.putShort((short) request.value);

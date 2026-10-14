@@ -115,6 +115,7 @@ public class ModbusRtuClient extends ModbusClient {
     ByteBuffer pdu = ByteBuffer.allocate(256);
 
     try {
+      request.validate();
       config.requestSerializer().encode(request, pdu);
       pdu.flip();
     } catch (Exception e) {
@@ -411,6 +412,7 @@ public class ModbusRtuClient extends ModbusClient {
     ByteBuffer pdu = ByteBuffer.allocate(256);
 
     try {
+      request.validate();
       config.requestSerializer().encode(request, pdu);
       pdu.flip();
     } catch (Exception e) {

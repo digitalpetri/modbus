@@ -14,11 +14,20 @@ import java.util.StringJoiner;
  * @param readQuantity the quantity of registers to read. 2 bytes, range [0x01, 0x7D].
  * @param writeAddress the starting address to write to. 2 bytes, range [0x0000, 0xFFFF].
  * @param writeQuantity the quantity of registers to write. 2 bytes, range [0x01, 0x79].
- * @param values the register values to write. 2 bytes per register.
+ * @param values the register values to write. Must be exactly {@code 2 * writeQuantity} bytes.
  */
 public record ReadWriteMultipleRegistersRequest(
     int readAddress, int readQuantity, int writeAddress, int writeQuantity, byte[] values)
     implements ModbusRequestPdu {
+
+  @Override
+  public void validate() {
+    RequestValidation.checkRange("readQuantity", readQuantity, 1, 125);
+    RequestValidation.checkAddressRange("readAddress", readAddress, readQuantity);
+    RequestValidation.checkRange("writeQuantity", writeQuantity, 1, 121);
+    RequestValidation.checkAddressRange("writeAddress", writeAddress, writeQuantity);
+    RequestValidation.checkPayloadLength(values, 2 * writeQuantity);
+  }
 
   @Override
   public int getFunctionCode() {
@@ -72,6 +81,8 @@ public record ReadWriteMultipleRegistersRequest(
      * @param buffer the buffer to encode into.
      */
     public static void encode(ReadWriteMultipleRegistersRequest request, ByteBuffer buffer) {
+      request.validate();
+
       buffer.put((byte) request.getFunctionCode());
       buffer.putShort((short) request.readAddress);
       buffer.putShort((short) request.readQuantity);
