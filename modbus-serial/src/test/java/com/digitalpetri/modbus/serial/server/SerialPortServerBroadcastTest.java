@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.digitalpetri.modbus.ModbusRtuFrame;
+import com.digitalpetri.modbus.exceptions.ModbusResponseException;
 import com.digitalpetri.modbus.exceptions.UnknownUnitIdException;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterResponse;
@@ -128,7 +129,7 @@ class SerialPortServerBroadcastTest {
           @Override
           public WriteSingleRegisterResponse writeSingleRegister(
               ModbusRequestContext context, int unitId, WriteSingleRegisterRequest request)
-              throws UnknownUnitIdException {
+              throws ModbusResponseException, UnknownUnitIdException {
             if (request.address() == 11) {
               throw new UnknownUnitIdException(unitId);
             }

@@ -28,12 +28,37 @@ import com.digitalpetri.modbus.pdu.WriteSingleCoilRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleCoilResponse;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterResponse;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class ModbusResponseValidatorTest {
 
   private final ModbusResponseValidator validator = DefaultResponseValidator.INSTANCE;
+
+  @Test
+  void singleRegisterWritesRequireEveryValueByte() throws Exception {
+    for (byte[] value :
+        List.of(new byte[0], new byte[] {1}, new byte[] {1, 2, 3}, new byte[] {1, 2, 3, 4})) {
+      byte[] differentLength = Arrays.copyOf(value, value.length + 1);
+      checkWrite(
+          new WriteSingleRegisterRequest(10, value),
+          new WriteSingleRegisterResponse(10, value.clone()),
+          List.of(
+              new WriteSingleRegisterResponse(11, value.clone()),
+              new WriteSingleRegisterResponse(10, differentLength)));
+      if (value.length > 0) {
+        byte[] differentValue = value.clone();
+        differentValue[value.length - 1]++;
+        assertThrows(
+            ModbusException.class,
+            () ->
+                validator.validate(
+                    new WriteSingleRegisterRequest(10, value),
+                    new WriteSingleRegisterResponse(10, differentValue)));
+      }
+    }
+  }
 
   @Test
   void readsRequireTheRequestedByteCount() throws Exception {

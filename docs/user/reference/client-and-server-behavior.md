@@ -27,13 +27,15 @@ existing exception handling and do not invoke the validator.
 The default `ModbusResponseValidator.DefaultResponseValidator` checks matching built-in request
 and response record pairs. Register reads must contain two bytes per requested register. Coil and
 discrete-input reads must contain the requested packed byte count, rounded up to a whole byte.
-Writes must echo the request's address, quantity, value, or masks. Other PDU types are ignored by
+Writes must echo the request's address, quantity, value, or masks. Write Single Register (`0x06`)
+values may have any length, but every value byte must be echoed exactly. Other PDU types are ignored by
 the standard validator, including custom PDUs that use a standard function code.
 
 Replace the validator independently of the codec with
 `ModbusClientConfig.Builder.setResponseValidator(...)` or the builder's `responseValidator` field.
 Applications using built-in records with a different register width or echo semantics must replace
 both the codec and the validator. Replacing only the codec retains standard semantic validation.
+Write Single Register already supports arbitrary value lengths with the built-in codec and validator.
 Validators must support concurrent use by the clients that share them.
 
 Format checks belong to the selected codec. Built-in response decoders require the buffer's
@@ -41,6 +43,8 @@ remaining bytes to contain exactly one complete PDU. They reject truncation, une
 bytes, invalid byte counts, and invalid standard response fields with an `IllegalArgumentException`
 that describes the protocol error. Custom codecs determine their own format and consumption rules;
 the generic client path does not require their buffers to be fully consumed.
+For Write Single Register, every byte after the address is part of the value, so the decoder only
+requires a complete function code and address and consumes all remaining value bytes.
 
 Validation failures complete asynchronous operations exceptionally. Synchronous calls wrap them in
 `ModbusExecutionException`. A rejected complete response fails that request only. TCP correlation

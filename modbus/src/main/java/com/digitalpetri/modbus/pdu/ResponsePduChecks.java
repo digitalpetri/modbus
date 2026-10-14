@@ -51,7 +51,7 @@ final class ResponsePduChecks {
     }
   }
 
-  private static void checkFunctionCode(ByteBuffer buffer, FunctionCode expected) {
+  static void checkFunctionCode(ByteBuffer buffer, FunctionCode expected) {
     int actual = buffer.get(buffer.position()) & 0xFF;
     if (actual != expected.getCode()) {
       throw new IllegalArgumentException(

@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import com.digitalpetri.modbus.ModbusRtuFrame;
+import com.digitalpetri.modbus.exceptions.ModbusResponseException;
 import com.digitalpetri.modbus.exceptions.UnknownUnitIdException;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterResponse;
@@ -97,7 +98,7 @@ class NettyRtuServerBroadcastTest {
           @Override
           public WriteSingleRegisterResponse writeSingleRegister(
               ModbusRequestContext context, int unitId, WriteSingleRegisterRequest request)
-              throws UnknownUnitIdException {
+              throws ModbusResponseException, UnknownUnitIdException {
             if (request.address() == 11) {
               throw new UnknownUnitIdException(unitId);
             }

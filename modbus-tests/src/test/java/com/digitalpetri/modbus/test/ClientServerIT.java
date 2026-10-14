@@ -1,5 +1,6 @@
 package com.digitalpetri.modbus.test;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -136,7 +137,7 @@ public abstract class ClientServerIT {
         getClient().writeSingleRegister(1, new WriteSingleRegisterRequest(0, 0x1234));
 
     assertEquals(0, response.address());
-    assertEquals(0x1234, response.value());
+    assertArrayEquals(new byte[] {0x12, 0x34}, response.value());
   }
 
   @Test

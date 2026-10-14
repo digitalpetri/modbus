@@ -1,6 +1,7 @@
 package com.digitalpetri.modbus;
 
 import com.digitalpetri.modbus.exceptions.ModbusException;
+import com.digitalpetri.modbus.internal.util.Hex;
 import com.digitalpetri.modbus.pdu.MaskWriteRegisterRequest;
 import com.digitalpetri.modbus.pdu.MaskWriteRegisterResponse;
 import com.digitalpetri.modbus.pdu.ModbusRequestPdu;
@@ -23,6 +24,7 @@ import com.digitalpetri.modbus.pdu.WriteSingleCoilRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleCoilResponse;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleRegisterResponse;
+import java.util.Arrays;
 
 /**
  * Validates a decoded response against its request.
@@ -50,7 +52,8 @@ public interface ModbusResponseValidator {
    *
    * <p>Other PDU types are ignored, even when they use a standard function code. Applications using
    * built-in records with different register widths or echo rules must replace this validator along
-   * with their codecs.
+   * with their codecs. Write Single Register values may have any length, but must be echoed
+   * exactly.
    */
   class DefaultResponseValidator implements ModbusResponseValidator {
 
@@ -81,7 +84,12 @@ public interface ModbusResponseValidator {
       } else if (request instanceof WriteSingleRegisterRequest q
           && response instanceof WriteSingleRegisterResponse r) {
         check(request, "address", q.address(), r.address());
-        check(request, "value", q.value(), r.value());
+        if (!Arrays.equals(q.value(), r.value())) {
+          throw new ModbusException(
+              "response for FC 0x%02X has unexpected value: expected %s, received %s"
+                  .formatted(
+                      request.getFunctionCode(), Hex.format(q.value()), Hex.format(r.value())));
+        }
       } else if (request instanceof WriteMultipleCoilsRequest q
           && response instanceof WriteMultipleCoilsResponse r) {
         check(request, "address", q.address(), r.address());

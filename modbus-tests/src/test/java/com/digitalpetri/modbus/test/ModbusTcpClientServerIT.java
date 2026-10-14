@@ -1,13 +1,22 @@
 package com.digitalpetri.modbus.test;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.digitalpetri.modbus.ExceptionCode;
 import com.digitalpetri.modbus.ModbusPduSerializer.DefaultRequestSerializer;
 import com.digitalpetri.modbus.client.ModbusClient;
 import com.digitalpetri.modbus.client.ModbusTcpClient;
+import com.digitalpetri.modbus.exceptions.ModbusResponseException;
 import com.digitalpetri.modbus.internal.util.Hex;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersRequest;
+import com.digitalpetri.modbus.pdu.WriteSingleRegisterRequest;
+import com.digitalpetri.modbus.pdu.WriteSingleRegisterResponse;
+import com.digitalpetri.modbus.server.ModbusRequestContext;
 import com.digitalpetri.modbus.server.ModbusServer;
+import com.digitalpetri.modbus.server.ModbusServices;
 import com.digitalpetri.modbus.server.ModbusTcpServer;
 import com.digitalpetri.modbus.server.ProcessImage;
 import com.digitalpetri.modbus.server.ReadWriteModbusServices;
@@ -119,6 +128,37 @@ public class ModbusTcpClientServerIT extends ClientServerIT {
     byte[] responsePduBytes = client.sendRaw(0, requestedPduBytes);
 
     System.out.println("responsePduBytes: " + Hex.format(responsePduBytes));
+  }
+
+  @Test
+  void writeSingleRegisterFourByteValue() throws Exception {
+    server.setModbusServices(
+        new ModbusServices() {
+          @Override
+          public WriteSingleRegisterResponse writeSingleRegister(
+              ModbusRequestContext context, int unitId, WriteSingleRegisterRequest request) {
+
+            return new WriteSingleRegisterResponse(request.address(), request.value());
+          }
+        });
+
+    byte[] value = {0x3F, (byte) 0x80, 0x00, 0x00};
+
+    WriteSingleRegisterResponse response =
+        client.writeSingleRegister(1, new WriteSingleRegisterRequest(7001, value));
+
+    assertEquals(7001, response.address());
+    assertArrayEquals(new byte[] {0x3F, (byte) 0x80, 0x00, 0x00}, response.value());
+  }
+
+  @Test
+  void writeSingleRegisterFourByteValueRejectedByReadWriteModbusServices() {
+    var request = new WriteSingleRegisterRequest(0, new byte[] {0x3F, (byte) 0x80, 0x00, 0x00});
+
+    ModbusResponseException e =
+        assertThrows(ModbusResponseException.class, () -> client.writeSingleRegister(1, request));
+
+    assertEquals(ExceptionCode.ILLEGAL_DATA_VALUE.getCode(), e.getExceptionCode());
   }
 
   @Test

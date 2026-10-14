@@ -31,7 +31,6 @@ class RequestValidationTest {
       assertInvalid(new WriteSingleCoilRequest(value, true));
       assertInvalid(new WriteSingleRegisterRequest(value, 0));
       assertInvalid(new MaskWriteRegisterRequest(value, 0, 0));
-      assertInvalid(new WriteSingleRegisterRequest(0, value));
       assertInvalid(new MaskWriteRegisterRequest(0, value, 0));
       assertInvalid(new MaskWriteRegisterRequest(0, 0, value));
       assertInvalid(new ReadHoldingRegistersRequest(value, 1));
@@ -52,6 +51,17 @@ class RequestValidationTest {
       assertRoundTrip(new WriteSingleCoilRequest(address, false));
       assertRoundTrip(new WriteSingleCoilRequest(address, true));
     }
+  }
+
+  @Test
+  void singleRegisterValuesPreserveAnyLengthAndLow16Bits() throws Exception {
+    for (int value : new int[] {-1, 65536, Integer.MIN_VALUE, Integer.MAX_VALUE}) {
+      assertRoundTrip(new WriteSingleRegisterRequest(0, value));
+    }
+    for (int length : new int[] {0, 1, 2, 3, 4, 8}) {
+      assertRoundTrip(new WriteSingleRegisterRequest(0, new byte[length]));
+    }
+    assertInvalid(new WriteSingleRegisterRequest(0, null));
   }
 
   @Test
