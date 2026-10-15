@@ -226,19 +226,23 @@ public class ModbusTcpClient extends ModbusClient {
     return pending.future();
   }
 
-  private void onConnectionLost() {
-    // Snapshot before completing futures so requests submitted by callbacks aren't failed too.
-    for (var entry : new ArrayList<>(promises.entrySet())) {
-      ResponsePromise promise = entry.getValue();
-      if (promises.remove(entry.getKey(), promise)) {
-        promise.timeout().cancel();
+  private Runnable onConnectionLost() {
+    // Capture before reconnection, then let earlier queued responses complete their requests.
+    var affected = new ArrayList<>(promises.entrySet());
+    return () -> {
+      for (var entry : affected) {
+        ResponsePromise promise = entry.getValue();
+        if (promises.remove(entry.getKey(), promise)) {
+          promise.timeout().cancel();
 
-        // A caller's callback may block on another request. Don't hold up loss notification.
-        Modbus.sharedExecutor()
-            .execute(
-                () -> promise.future().completeExceptionally(new ModbusConnectionLostException()));
+          // A caller's callback may block on another request. Don't hold up loss notification.
+          Modbus.sharedExecutor()
+              .execute(
+                  () ->
+                      promise.future().completeExceptionally(new ModbusConnectionLostException()));
+        }
       }
-    }
+    };
   }
 
   private void onFrameReceived(ModbusTcpFrame frame) {

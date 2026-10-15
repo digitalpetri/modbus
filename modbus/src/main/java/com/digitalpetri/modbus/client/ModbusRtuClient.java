@@ -332,25 +332,26 @@ public class ModbusRtuClient extends ModbusClient {
     }
   }
 
-  private void onConnectionLost() {
-    // Capture the affected request before a response task can promote a queued request.
+  private Runnable onConnectionLost() {
+    // Capture before reconnection, then let earlier queued responses complete their requests.
     Pending<?> pending = inFlight;
-    requestQueue.submit(
-        () -> {
-          if (pending != null && pending == inFlight) {
-            resetFrameParser();
-            inFlight = null;
-            try {
-              pending.sendFuture.toCompletableFuture().cancel(false);
-            } catch (UnsupportedOperationException ignored) {
-              // This CompletionStage implementation can't be cancelled.
-            }
-            if (!pending.timedOut) {
-              failRequest(pending, new ModbusConnectionLostException());
-            }
-            sendNext();
-          }
-        });
+    return () ->
+        requestQueue.submit(
+            () -> {
+              if (pending != null && pending == inFlight) {
+                resetFrameParser();
+                inFlight = null;
+                try {
+                  pending.sendFuture.toCompletableFuture().cancel(false);
+                } catch (UnsupportedOperationException ignored) {
+                  // This CompletionStage implementation can't be cancelled.
+                }
+                if (!pending.timedOut) {
+                  failRequest(pending, new ModbusConnectionLostException());
+                }
+                sendNext();
+              }
+            });
   }
 
   private <T> void completeRequest(Pending<T> pending, T result) {

@@ -24,6 +24,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 
 public class ModbusTcpClientTest {
@@ -36,7 +37,9 @@ public class ModbusTcpClientTest {
     var typed = client.readHoldingRegistersAsync(1, new ReadHoldingRegistersRequest(0, 1));
     var raw = client.sendRawAsync(1, new byte[] {3, 0, 0, 0, 1});
 
-    transport.connectionLost.run();
+    Runnable lossNotification = transport.connectionLost.get();
+    var next = client.sendRawAsync(1, new byte[] {3, 0, 0, 0, 1});
+    lossNotification.run();
 
     for (CompletionStage<?> response : List.of(typed, raw)) {
       ExecutionException failure =
@@ -45,10 +48,11 @@ public class ModbusTcpClientTest {
               () -> response.toCompletableFuture().get(1, TimeUnit.SECONDS));
       assertInstanceOf(ModbusConnectionLostException.class, failure.getCause());
     }
-    assertEquals(2, scheduler.handles.size());
-    assertTrue(scheduler.handles.stream().allMatch(TimeoutScheduler.TimeoutHandle::isCancelled));
-
-    var next = client.sendRawAsync(1, new byte[] {3, 0, 0, 0, 1});
+    assertEquals(3, scheduler.handles.size());
+    assertTrue(scheduler.handles.get(0).isCancelled());
+    assertTrue(scheduler.handles.get(1).isCancelled());
+    assertFalse(scheduler.handles.get(2).isCancelled());
+    assertFalse(next.toCompletableFuture().isDone());
     transport.frameReceiver.accept(
         new ModbusTcpFrame(
             transport.lastFrameSent.header(), ByteBuffer.wrap(new byte[] {3, 2, 0, 42})));
@@ -65,7 +69,7 @@ public class ModbusTcpClientTest {
         new ModbusTcpFrame(
             transport.lastFrameSent.header(), ByteBuffer.wrap(new byte[] {3, 2, 0, 42})));
 
-    transport.connectionLost.run();
+    transport.connectionLost.get().run();
     assertArrayEquals(
         new byte[] {3, 2, 0, 42}, response.toCompletableFuture().get(1, TimeUnit.SECONDS));
   }
@@ -92,7 +96,7 @@ public class ModbusTcpClientTest {
           }
         };
     var first = client.sendRawAsync(1, new byte[] {3, 0, 0, 0, 1});
-    transport.connectionLost.run();
+    transport.connectionLost.get().run();
     ExecutionException failure =
         assertThrows(
             ExecutionException.class, () -> first.toCompletableFuture().get(1, TimeUnit.SECONDS));
@@ -342,10 +346,10 @@ public class ModbusTcpClientTest {
     boolean connected = false;
     ModbusTcpFrame lastFrameSent;
     Consumer<ModbusTcpFrame> frameReceiver;
-    Runnable connectionLost;
+    Supplier<Runnable> connectionLost;
 
     @Override
-    public void onConnectionLost(Runnable callback) {
+    public void onConnectionLost(Supplier<Runnable> callback) {
       connectionLost = callback;
     }
 

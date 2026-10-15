@@ -38,6 +38,7 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 
 public class ModbusRtuClientTest {
@@ -62,7 +63,7 @@ public class ModbusRtuClientTest {
     Runnable nextTimeout = scheduler.nextTimeout();
     assertEquals(0, startAddress(transport.nextSentFrame()));
 
-    transport.connectionLost.run();
+    transport.connectionLost.get().run();
     ExecutionException failure =
         assertThrows(ExecutionException.class, () -> first.get(1, TimeUnit.SECONDS));
     assertInstanceOf(ModbusConnectionLostException.class, failure.getCause());
@@ -114,7 +115,7 @@ public class ModbusRtuClientTest {
 
     try {
       assertTrue(validating.await(1, TimeUnit.SECONDS));
-      transport.connectionLost.run();
+      transport.connectionLost.get().run();
     } finally {
       releaseValidation.countDown();
     }
@@ -135,7 +136,7 @@ public class ModbusRtuClientTest {
     Runnable firstTimeout = scheduler.nextTimeout();
     assertEquals(0, startAddress(transport.nextSentFrame()));
 
-    transport.connectionLost.run();
+    transport.connectionLost.get().run();
     ExecutionException failure =
         assertThrows(ExecutionException.class, () -> first.get(1, TimeUnit.SECONDS));
     assertInstanceOf(ModbusConnectionLostException.class, failure.getCause());
@@ -161,7 +162,7 @@ public class ModbusRtuClientTest {
     scheduler.nextTimeout();
     scheduler.nextTimeout();
 
-    transport.connectionLost.run();
+    transport.connectionLost.get().run();
     ExecutionException failure =
         assertThrows(ExecutionException.class, () -> broadcast.get(1, TimeUnit.SECONDS));
     assertInstanceOf(ModbusConnectionLostException.class, failure.getCause());
@@ -990,11 +991,11 @@ public class ModbusRtuClientTest {
     final BlockingQueue<ModbusRtuFrame> sentFrames = new LinkedBlockingQueue<>();
 
     volatile Consumer<ModbusRtuFrame> frameReceiver;
-    Runnable connectionLost;
+    Supplier<Runnable> connectionLost;
     final AtomicInteger parserResets = new AtomicInteger();
 
     @Override
-    public void onConnectionLost(Runnable callback) {
+    public void onConnectionLost(Supplier<Runnable> callback) {
       connectionLost = callback;
     }
 

@@ -2,6 +2,7 @@ package com.digitalpetri.modbus.client;
 
 import java.util.concurrent.CompletionStage;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 public interface ModbusClientTransport<T> {
 
@@ -42,14 +43,19 @@ public interface ModbusClientTransport<T> {
   void receive(Consumer<T> frameReceiver);
 
   /**
-   * Configure a callback invoked when an established connection is lost or disconnected.
+   * Configure a callback that captures requests affected by a lost or disconnected connection.
    *
-   * <p>The callback replaces any previously configured callback. Transports that can detect
-   * connection loss should invoke it when requests already handed to the transport can no longer
-   * receive responses. It does not request reconnection or indicate whether a request reached the
-   * device. Transports without connection-loss detection may retain this default no-op.
+   * <p>The transport invokes the supplier during the connection-state transition, before another
+   * connection can be used. The supplier must return promptly and must not wait for transport
+   * operations. It captures the affected requests and returns a task that the transport runs in
+   * order with response delivery, after responses already queued before the loss. This prevents a
+   * delayed notification from failing requests sent on a replacement connection.
    *
-   * @param callback the callback to invoke when the connection is lost.
+   * <p>The callback replaces any previously configured callback. It does not request reconnection
+   * or indicate whether a request reached the device. Transports without connection-loss detection
+   * may retain this default no-op.
+   *
+   * @param callback the supplier that captures affected requests and returns their cleanup task.
    */
-  default void onConnectionLost(Runnable callback) {}
+  default void onConnectionLost(Supplier<Runnable> callback) {}
 }

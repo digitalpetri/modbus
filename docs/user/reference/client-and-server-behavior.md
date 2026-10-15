@@ -30,6 +30,11 @@ reconnection policy. Connection loss does not retry a failed request. A write ma
 reached the device, so its outcome is unknown.
 
 Custom transports can report connection loss through `ModbusClientTransport.onConnectionLost`.
+Its `Supplier<Runnable>` captures affected requests during the connection-state transition, before
+reconnection. The transport then runs the returned cleanup task in order with response delivery,
+after responses queued before the loss. This keeps a delayed notification from failing requests on
+a replacement connection. The supplier must return promptly without waiting for transport operations.
+Netty logs exceptions from either phase and still notifies its existing connection listeners.
 The default implementation does nothing, so transports without loss detection retain their timeout
 behavior. The serial transport does not currently report connection loss through this callback.
 The client installs this callback; applications observing a Netty transport should use its existing
