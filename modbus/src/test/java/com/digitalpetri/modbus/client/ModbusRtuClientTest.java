@@ -15,6 +15,7 @@ import com.digitalpetri.modbus.ModbusRtuFrame;
 import com.digitalpetri.modbus.TimeoutScheduler;
 import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
+import com.digitalpetri.modbus.exceptions.ModbusMalformedResponseException;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
 import com.digitalpetri.modbus.exceptions.ModbusTimeoutException;
 import com.digitalpetri.modbus.pdu.ModbusResponsePdu;
@@ -197,6 +198,28 @@ public class ModbusRtuClientTest {
   }
 
   @Test
+  void unitIdMismatchFailsOnlyInFlightRequest() throws Exception {
+    var transport = new RecordingRtuTransport();
+    var client = ModbusRtuClient.create(transport);
+    try (var ignored = client.open()) {
+      CompletableFuture<ReadHoldingRegistersResponse> first = readAsync(client, 0);
+      CompletableFuture<ReadHoldingRegistersResponse> next = readAsync(client, 100);
+
+      transport.nextSentFrame();
+      ByteBuffer pdu = ByteBuffer.wrap(new byte[] {3, 2, 0, 1});
+      transport.frameReceiver.accept(new ModbusRtuFrame(2, pdu, client.calculateCrc16(2, pdu)));
+      var e = assertThrows(ExecutionException.class, () -> first.get(1, TimeUnit.SECONDS));
+      assertInstanceOf(ModbusMalformedResponseException.class, e.getCause());
+      assertTrue(e.getCause().getMessage().startsWith("slave id mismatch"));
+
+      assertEquals(100, startAddress(transport.nextSentFrame()));
+      transport.respond(client, registers(0x0B));
+      assertArrayEquals(registers(0x0B), next.get(1, TimeUnit.SECONDS).registers());
+      assertEquals(0, client.timeouts.size());
+    }
+  }
+
+  @Test
   void exceptionResponseFailsWithExceptionCode() throws Exception {
     var transport = new RecordingRtuTransport();
     var client = ModbusRtuClient.create(transport);
@@ -228,7 +251,7 @@ public class ModbusRtuClientTest {
     // An exception response to READ_INPUT_REGISTERS, not READ_HOLDING_REGISTERS
     transport.respondRaw(client, (byte) 0x84, (byte) 0x02);
     var e = assertThrows(ExecutionException.class, () -> a.get(1, TimeUnit.SECONDS));
-    assertEquals(ModbusException.class, e.getCause().getClass());
+    assertInstanceOf(ModbusMalformedResponseException.class, e.getCause());
     assertTrue(e.getCause().getMessage().startsWith("function code mismatch"));
   }
 
@@ -244,7 +267,7 @@ public class ModbusRtuClientTest {
     transport.nextSentFrame();
     transport.respondRaw(client, (byte) 0x83);
     var e = assertThrows(ExecutionException.class, () -> a.get(1, TimeUnit.SECONDS));
-    assertEquals(ModbusException.class, e.getCause().getClass());
+    assertInstanceOf(ModbusMalformedResponseException.class, e.getCause());
     assertEquals("malformed exception response PDU: 83", e.getCause().getMessage());
   }
 

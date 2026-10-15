@@ -1,6 +1,7 @@
 package com.digitalpetri.modbus;
 
 import com.digitalpetri.modbus.exceptions.ModbusException;
+import com.digitalpetri.modbus.exceptions.ModbusMalformedResponseException;
 import com.digitalpetri.modbus.internal.util.Hex;
 import com.digitalpetri.modbus.pdu.MaskWriteRegisterRequest;
 import com.digitalpetri.modbus.pdu.MaskWriteRegisterResponse;
@@ -40,6 +41,9 @@ public interface ModbusResponseValidator {
 
   /**
    * Validate a decoded response against its request.
+   *
+   * <p>Clients preserve {@link ModbusMalformedResponseException} and wrap any other exception from
+   * this method in that type, retaining the original cause.
    *
    * @param request the original request.
    * @param response the decoded response.
@@ -85,7 +89,7 @@ public interface ModbusResponseValidator {
           && response instanceof WriteSingleRegisterResponse r) {
         check(request, "address", q.address(), r.address());
         if (!Arrays.equals(q.value(), r.value())) {
-          throw new ModbusException(
+          throw new ModbusMalformedResponseException(
               "response for FC 0x%02X has unexpected value: expected %s, received %s"
                   .formatted(
                       request.getFunctionCode(), Hex.format(q.value()), Hex.format(r.value())));
@@ -107,9 +111,9 @@ public interface ModbusResponseValidator {
     }
 
     private static void check(ModbusRequestPdu request, String field, long expected, long actual)
-        throws ModbusException {
+        throws ModbusMalformedResponseException {
       if (actual != expected) {
-        throw new ModbusException(
+        throw new ModbusMalformedResponseException(
             "response for FC 0x%02X has unexpected %s: expected %d, received %d"
                 .formatted(request.getFunctionCode(), field, expected, actual));
       }

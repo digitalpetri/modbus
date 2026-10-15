@@ -46,8 +46,13 @@ the generic client path does not require their buffers to be fully consumed.
 For Write Single Register, every byte after the address is part of the value, so the decoder only
 requires a complete function code and address and consumes all remaining value bytes.
 
-Validation failures complete asynchronous operations exceptionally. Synchronous calls wrap them in
-`ModbusExecutionException`. A rejected complete response fails that request only. TCP correlation
+Malformed PDUs, response mismatches, and codec or validator failures complete asynchronous
+operations with `ModbusMalformedResponseException`. The original decoder or validator exception is
+retained as the cause unless it already has this type. Synchronous calls wrap the malformed-response
+exception in `ModbusExecutionException`. CRC failures retain `ModbusCrcException`, and valid Modbus
+exception responses retain `ModbusResponseException`.
+
+A rejected complete response fails that request only. TCP correlation
 continues normally, and RTU sends the next queued request without resetting the frame parser when
 the frame has a valid CRC. Existing timeout and CRC recovery still apply when needed.
 
