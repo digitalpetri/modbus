@@ -9,7 +9,8 @@ responses, and service dispatch. For object lifecycle, threading, and shared res
 Synchronous connection/disconnection failures are wrapped in `ModbusExecutionException`.
 Synchronous request calls translate request deadline expiry to `ModbusTimeoutException`, preserve
 `ModbusResponseException`, and wrap other failures in `ModbusExecutionException`. Asynchronous
-stages expose their exceptional causes directly.
+stages report failures without the synchronous execution wrapper. See
+[Typed response validation](#typed-response-validation) for malformed-response failures.
 
 A request timeout removes and fails the pending response promise; it does not cancel a transport
 send or channel wait already in progress. A request can still reach the server after the caller's
@@ -41,7 +42,8 @@ Validators must support concurrent use by the clients that share them.
 Format checks belong to the selected codec. Built-in response decoders require the buffer's
 remaining bytes to contain exactly one complete PDU. They reject truncation, unexpected trailing
 bytes, invalid byte counts, and invalid standard response fields with an `IllegalArgumentException`
-that describes the protocol error. Custom codecs determine their own format and consumption rules;
+that describes the protocol error. Typed clients retain this decoder exception as the cause of
+`ModbusMalformedResponseException`. Custom codecs determine their own format and consumption rules;
 the generic client path does not require their buffers to be fully consumed.
 For Write Single Register, every byte after the address is part of the value, so the decoder only
 requires a complete function code and address and consumes all remaining value bytes.
@@ -89,7 +91,7 @@ reused while its previous request remains in flight.
 | CRC recovery | Fails with `ModbusCrcException` and resets the frame parser |
 | Unit/function mismatch (reported as `slave id mismatch` / `function code mismatch`) | Fails the outstanding request only; requests waiting behind it are not failed. A late response with a matching unit and function code is accepted as the response to the next request |
 | Broadcast | `broadcast` sends with unit ID 0 and waits only for send completion. Broadcasts wait their turn in submission order like other requests, and the request timeout applies until the broadcast is written. A timeout is reported by `broadcast` as `ModbusExecutionException` with a `TimeoutException` cause. Cancelling the `broadcastAsync` future attempts to cancel its transport send; a queued write that has not started is skipped. After a broadcast is written, the next request waits for `broadcastTurnaroundDelay`, which defaults to zero. If a broadcast times out while the serial transport is still writing it, the caller gets the timeout, but the next request waits for the write to finish and then for the turnaround delay |
-| Exception response | Produces `ModbusResponseException` with the request's function code and the response's exception code. An exception response without an exception code fails with `malformed exception response PDU` |
+| Exception response | Produces `ModbusResponseException` with the request's function code and the response's exception code. An exception response without an exception code fails with `ModbusMalformedResponseException` and the diagnostic `malformed exception response PDU` |
 
 These behaviors apply to both serial RTU and RTU over TCP. For concurrent callers, see
 [Client concurrency](lifecycle-concurrency-and-resources.md#client-concurrency).
