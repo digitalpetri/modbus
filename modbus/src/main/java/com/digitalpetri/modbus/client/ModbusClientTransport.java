@@ -40,4 +40,16 @@ public interface ModbusClientTransport<T> {
    * @param frameReceiver the callback to response receive frames.
    */
   void receive(Consumer<T> frameReceiver);
+
+  /**
+   * Configure a callback invoked when an established connection is lost or disconnected.
+   *
+   * <p>The callback replaces any previously configured callback. Transports that can detect
+   * connection loss should invoke it when requests already handed to the transport can no longer
+   * receive responses. It does not request reconnection or indicate whether a request reached the
+   * device. Transports without connection-loss detection may retain this default no-op.
+   *
+   * @param callback the callback to invoke when the connection is lost.
+   */
+  default void onConnectionLost(Runnable callback) {}
 }

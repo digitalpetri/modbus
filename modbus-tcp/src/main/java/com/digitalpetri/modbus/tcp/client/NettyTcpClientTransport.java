@@ -44,6 +44,8 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
 
   private final List<ConnectionListener> connectionListeners = new CopyOnWriteArrayList<>();
 
+  private final AtomicReference<Runnable> connectionLostCallback = new AtomicReference<>();
+
   private final ChannelFsm channelFsm;
   private final ExecutionQueue executionQueue;
 
@@ -76,7 +78,7 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
 
   @SuppressWarnings("DuplicatedCode")
   private void maybeNotifyConnectionListeners(State from, State to) {
-    if (connectionListeners.isEmpty()) {
+    if (connectionListeners.isEmpty() && connectionLostCallback.get() == null) {
       return;
     }
 
@@ -84,7 +86,13 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
       executionQueue.submit(() -> connectionListeners.forEach(ConnectionListener::onConnection));
     } else if (from == State.Connected && to != State.Connected) {
       executionQueue.submit(
-          () -> connectionListeners.forEach(ConnectionListener::onConnectionLost));
+          () -> {
+            Runnable callback = connectionLostCallback.get();
+            if (callback != null) {
+              callback.run();
+            }
+            connectionListeners.forEach(ConnectionListener::onConnectionLost);
+          });
     }
   }
 
@@ -120,6 +128,11 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
 
               return future;
             });
+  }
+
+  @Override
+  public void onConnectionLost(Runnable callback) {
+    connectionLostCallback.set(callback);
   }
 
   @Override

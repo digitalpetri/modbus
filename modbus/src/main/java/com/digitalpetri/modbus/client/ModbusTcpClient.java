@@ -1,8 +1,10 @@
 package com.digitalpetri.modbus.client;
 
 import com.digitalpetri.modbus.MbapHeader;
+import com.digitalpetri.modbus.Modbus;
 import com.digitalpetri.modbus.ModbusTcpFrame;
 import com.digitalpetri.modbus.TimeoutScheduler.TimeoutHandle;
+import com.digitalpetri.modbus.exceptions.ModbusConnectionLostException;
 import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
@@ -12,6 +14,7 @@ import com.digitalpetri.modbus.pdu.ModbusPdu;
 import com.digitalpetri.modbus.pdu.ModbusRequestPdu;
 import com.digitalpetri.modbus.pdu.ModbusResponsePdu;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -46,6 +49,7 @@ public class ModbusTcpClient extends ModbusClient {
     this.transport = transport;
 
     transport.receive(this::onFrameReceived);
+    transport.onConnectionLost(this::onConnectionLost);
   }
 
   /**
@@ -182,14 +186,17 @@ public class ModbusTcpClient extends ModbusClient {
 
     var header = new MbapHeader(transactionId, MODBUS_PROTOCOL_ID, 1 + buffer.remaining(), unitId);
 
+    var future = new CompletableFuture<ByteBuffer>();
     long timeoutMillis = config.requestTimeout().toMillis();
     TimeoutHandle timeout =
         config
             .timeoutScheduler()
             .newTimeout(
                 t -> {
-                  ResponsePromise promise = promises.remove(header.transactionId());
-                  if (promise != null) {
+                  ResponsePromise promise = promises.get(header.transactionId());
+                  if (promise != null
+                      && promise.future() == future
+                      && promises.remove(header.transactionId(), promise)) {
                     promise
                         .future()
                         .completeExceptionally(
@@ -200,7 +207,7 @@ public class ModbusTcpClient extends ModbusClient {
                 timeoutMillis,
                 TimeUnit.MILLISECONDS);
 
-    ResponsePromise pending = promiseFactory.create(new CompletableFuture<>(), timeout);
+    ResponsePromise pending = promiseFactory.create(future, timeout);
 
     promises.put(header.transactionId(), pending);
 
@@ -209,15 +216,29 @@ public class ModbusTcpClient extends ModbusClient {
         .whenComplete(
             (v, ex) -> {
               if (ex != null) {
-                ResponsePromise promise = promises.remove(header.transactionId());
-                if (promise != null) {
-                  promise.timeout().cancel();
-                  promise.future().completeExceptionally(ex);
+                if (promises.remove(header.transactionId(), pending)) {
+                  pending.timeout().cancel();
+                  pending.future().completeExceptionally(ex);
                 }
               }
             });
 
     return pending.future();
+  }
+
+  private void onConnectionLost() {
+    // Snapshot before completing futures so requests submitted by callbacks aren't failed too.
+    for (var entry : new ArrayList<>(promises.entrySet())) {
+      ResponsePromise promise = entry.getValue();
+      if (promises.remove(entry.getKey(), promise)) {
+        promise.timeout().cancel();
+
+        // A caller's callback may block on another request. Don't hold up loss notification.
+        Modbus.sharedExecutor()
+            .execute(
+                () -> promise.future().completeExceptionally(new ModbusConnectionLostException()));
+      }
+    }
   }
 
   private void onFrameReceived(ModbusTcpFrame frame) {
