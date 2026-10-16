@@ -159,7 +159,7 @@ public class ModbusRtuClient extends ModbusClient {
           long now = System.nanoTime();
           long delay = config.requestTimeout().toNanos();
           if (turnaround != null) {
-            delay += Math.max(0, turnaroundEnd - now);
+            delay = saturatedAdd(delay, Math.max(0, turnaroundEnd - now));
           }
 
           // The timeout is scheduled on the queue so the timeout task can't run before the
@@ -299,21 +299,35 @@ public class ModbusRtuClient extends ModbusClient {
    * <p>Must be called from a task on {@link #requestQueue}.
    */
   private void extendTimeout(Pending<?> pending, long extension) {
-    long deadline = pending.deadline + extension;
+    long now = System.nanoTime();
+    long remaining = saturatedAdd(pending.deadline - now, extension);
 
     TimeoutHandle timeout;
     try {
-      timeout = scheduleTimeout(pending, deadline - System.nanoTime());
+      timeout = scheduleTimeout(pending, remaining);
     } catch (Exception e) {
       logger.warn("Failed to extend request timeout for broadcast turnaround delay", e);
       return;
     }
 
-    pending.deadline = deadline;
+    pending.deadline = now + remaining;
     TimeoutHandle previous = timeouts.put(pending, timeout);
     if (previous != null) {
       previous.cancel();
     }
+  }
+
+  /**
+   * Add a non-negative duration in nanoseconds to another, saturating at {@link Long#MAX_VALUE}
+   * instead of overflowing. {@code requestTimeout} may be as long as {@link Long#MAX_VALUE}
+   * nanoseconds.
+   *
+   * <p>Deadlines themselves are {@link System#nanoTime()} values and may wrap; only their
+   * differences and sums of durations are compared.
+   */
+  private static long saturatedAdd(long duration, long addend) {
+    long sum = duration + addend;
+    return ((duration ^ sum) & (addend ^ sum)) < 0 ? Long.MAX_VALUE : sum;
   }
 
   /**

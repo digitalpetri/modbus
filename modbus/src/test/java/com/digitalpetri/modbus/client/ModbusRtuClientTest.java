@@ -907,6 +907,52 @@ public class ModbusRtuClientTest {
   }
 
   @Test
+  void pushedBackTimeoutSaturatesAtLongMaxValueNanoseconds() throws Exception {
+    var scheduler = new ManualTimeoutScheduler();
+    var broadcastWrite = new CompletableFuture<Void>();
+    var transport = new BroadcastRtuTransport(broadcastWrite);
+    var client =
+        ModbusRtuClient.create(
+            transport,
+            cfg -> {
+              cfg.timeoutScheduler = scheduler;
+              cfg.requestTimeout = Duration.ofNanos(Long.MAX_VALUE);
+              cfg.broadcastTurnaroundDelay = Duration.ofMillis(300);
+            });
+
+    client.connect();
+
+    CompletableFuture<Void> x = broadcastAsync(client, 50);
+    CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
+    scheduler.nextTimeout(); // X's request timeout
+    ScheduledTimeout timeoutA = scheduler.nextScheduledTimeout();
+    assertEquals(Long.MAX_VALUE, timeoutA.delayNanos());
+
+    assertEquals(50, startAddress(transport.nextSentFrame()));
+    broadcastWrite.complete(null);
+    x.get(1, TimeUnit.SECONDS);
+
+    // Pushing A's deadline back must not wrap around into an immediate timeout.
+    Runnable turnaroundElapsed = scheduler.nextTimeout();
+    ScheduledTimeout extendedA = scheduler.nextScheduledTimeout();
+    assertEquals(Long.MAX_VALUE, extendedA.delayNanos());
+
+    // Nor may the timeout of a request submitted during the delay.
+    CompletableFuture<ReadHoldingRegistersResponse> b = readAsync(client, 100);
+    ScheduledTimeout timeoutB = scheduler.nextScheduledTimeout();
+    assertEquals(Long.MAX_VALUE, timeoutB.delayNanos());
+
+    turnaroundElapsed.run();
+    assertEquals(0, startAddress(transport.nextSentFrame()));
+    transport.respond(client, registers(0x0A));
+    assertArrayEquals(registers(0x0A), a.get(1, TimeUnit.SECONDS).registers());
+    assertEquals(100, startAddress(transport.nextSentFrame()));
+    transport.respond(client, registers(0x0B));
+    assertArrayEquals(registers(0x0B), b.get(1, TimeUnit.SECONDS).registers());
+    assertEquals(0, client.timeouts.size());
+  }
+
+  @Test
   void queuedRequestKeepsTimeoutWhenPushedBackTimeoutCannotBeScheduled() throws Exception {
     var calls = new AtomicInteger();
     var scheduler =
