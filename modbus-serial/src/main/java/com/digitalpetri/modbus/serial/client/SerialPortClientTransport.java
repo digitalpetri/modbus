@@ -7,6 +7,7 @@ import com.digitalpetri.modbus.ModbusRtuResponseFrameParser.ParserState;
 import com.digitalpetri.modbus.client.ModbusRtuClientTransport;
 import com.digitalpetri.modbus.exceptions.ModbusConnectException;
 import com.digitalpetri.modbus.exceptions.ModbusException;
+import com.digitalpetri.modbus.exceptions.ModbusNotConnectedException;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
 import com.digitalpetri.modbus.serial.SerialPortTransportConfig;
 import com.fazecast.jSerialComm.SerialPort;
@@ -18,20 +19,42 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Modbus RTU/Serial client transport; a {@link ModbusRtuClientTransport} that sends and receives
  * {@link ModbusRtuFrame}s over a serial port.
+ *
+ * <p>The transport reports connection loss through {@link #onConnectionLost(Supplier)} when the
+ * open port goes away, e.g. a USB serial adapter is unplugged, and when {@link #disconnect()}
+ * closes it.
  */
 public class SerialPortClientTransport implements ModbusRtuClientTransport {
 
+  private final Logger logger = LoggerFactory.getLogger(getClass());
+
   private final ModbusRtuResponseFrameParser frameParser = new ModbusRtuResponseFrameParser();
   private final AtomicReference<Consumer<ModbusRtuFrame>> frameReceiver = new AtomicReference<>();
+
+  private final AtomicReference<Supplier<Runnable>> connectionLostCallback =
+      new AtomicReference<>();
 
   private final ExecutionQueue executionQueue;
   private final ExecutionQueue writeQueue;
 
   private volatile SerialPort serialPort;
+
+  /**
+   * The port jSerialComm reported disconnected, until it's closed and detached from this transport.
+   *
+   * <p>jSerialComm keeps reporting a port open until it's closed, so a port that went away still
+   * answers {@code isOpen()} with {@code true}. This transport treats it as not connected as soon
+   * as the loss is reported, and closes it on the executor rather than on jSerialComm's event
+   * thread.
+   */
+  private volatile SerialPort lostPort;
 
   private final SerialPortTransportConfig config;
 
@@ -91,6 +114,12 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
 
   @Override
   public synchronized CompletableFuture<Void> connect() {
+    SerialPort lost = this.lostPort;
+    if (lost != null) {
+      // The port went away and hasn't been closed yet. Close it now so a new one is opened.
+      closeLostPort(lost);
+    }
+
     SerialPort sp;
     try {
       sp = getSerialPort();
@@ -120,19 +149,34 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
   /**
    * {@inheritDoc}
    *
+   * <p>Closing an open port reports connection loss through the {@link #onConnectionLost(Supplier)}
+   * callback, so requests waiting for a response are failed rather than left to time out.
+   *
    * <p>The returned {@link CompletionStage} may complete exceptionally with a {@link
    * ModbusException} if the serial port could not be closed.
    */
   @Override
   public synchronized CompletableFuture<Void> disconnect() {
     SerialPort sp = this.serialPort;
-    if (sp != null && sp.isOpen()) {
+    if (sp == null) {
+      return CompletableFuture.completedFuture(null);
+    }
+
+    if (sp == lostPort) {
+      // Loss was already reported when the port went away; just make sure it's closed.
+      closeLostPort(sp);
+      return CompletableFuture.completedFuture(null);
+    }
+
+    if (sp.isOpen()) {
       if (sp.closePort()) {
         frameParser.reset();
 
         // Create a new SerialPort on the next connect(). Writes still queued for this one then
         // fail instead of being sent on the reopened port.
         this.serialPort = null;
+
+        notifyConnectionLost();
 
         return CompletableFuture.completedFuture(null);
       } else {
@@ -148,8 +192,91 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
 
   @Override
   public boolean isConnected() {
-    SerialPort sp = this.serialPort;
-    return sp != null && sp.isOpen();
+    return isConnected(this.serialPort);
+  }
+
+  @Override
+  public void onConnectionLost(Supplier<Runnable> callback) {
+    connectionLostCallback.set(callback);
+  }
+
+  /**
+   * Handle jSerialComm reporting that {@code port} went away.
+   *
+   * <p>Called on jSerialComm's event thread. It must not close the port or synchronize on this
+   * transport: {@link SerialPort#closePort()} waits for the event thread to return, so doing either
+   * here while another thread is in {@link #disconnect()} would deadlock. Instead the port is
+   * marked lost, so sends fail at once, and closed on the executor.
+   */
+  private void onPortDisconnected(SerialPort port) {
+    if (port != this.serialPort) {
+      return;
+    }
+
+    lostPort = port;
+
+    notifyConnectionLost();
+
+    try {
+      config.executor().execute(() -> closeLostPort(port));
+    } catch (Exception e) {
+      // e.g. RejectedExecutionException if the executor has been shut down
+      logger.warn("Failed to schedule closing disconnected port '{}'", config.serialPort(), e);
+    }
+  }
+
+  /**
+   * Close {@code lost} and detach it from this transport, if it's still this transport's port.
+   *
+   * <p>A write stalled on the port is released by closing it.
+   */
+  private synchronized void closeLostPort(SerialPort lost) {
+    if (this.serialPort == lost) {
+      if (!lost.closePort()) {
+        logger.warn(
+            "Failed to close disconnected port '{}', lastErrorCode={}",
+            config.serialPort(),
+            lost.getLastErrorCode());
+      }
+      frameParser.reset();
+      this.serialPort = null;
+    }
+    if (this.lostPort == lost) {
+      this.lostPort = null;
+    }
+  }
+
+  /**
+   * Capture the requests affected by the loss of the current connection and queue their cleanup to
+   * run in order with frame delivery.
+   */
+  private void notifyConnectionLost() {
+    Runnable notification = captureConnectionLoss();
+    try {
+      executionQueue.submit(
+          () -> {
+            try {
+              notification.run();
+            } catch (Exception e) {
+              logger.warn("Connection-loss notification failed", e);
+            }
+          });
+    } catch (Exception e) {
+      // e.g. RejectedExecutionException if the executor has been shut down
+      logger.warn("Failed to queue connection-loss notification", e);
+    }
+  }
+
+  private Runnable captureConnectionLoss() {
+    Supplier<Runnable> callback = connectionLostCallback.get();
+    if (callback != null) {
+      try {
+        return callback.get();
+      } catch (Exception e) {
+        logger.warn("Connection-loss capture failed", e);
+      }
+    }
+    return () -> {};
   }
 
   /**
@@ -163,14 +290,15 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
    * CompletionStage} completes when the write does. A write that stalls indefinitely is released by
    * {@link #disconnect()}.
    *
-   * <p>The returned {@link CompletionStage} may complete exceptionally with a {@link
-   * ModbusException} if the transport is not connected or if writing to the serial port fails.
+   * <p>The returned {@link CompletionStage} completes exceptionally with a {@link
+   * ModbusNotConnectedException} if the transport is not connected when the frame is sent or when
+   * its write would start, and with a {@link ModbusException} if writing to the serial port fails.
    */
   @Override
   public CompletionStage<Void> send(ModbusRtuFrame frame) {
     SerialPort sp = this.serialPort;
-    if (sp == null || !sp.isOpen()) {
-      return CompletableFuture.failedFuture(new ModbusException("not connected"));
+    if (!isConnected(sp)) {
+      return CompletableFuture.failedFuture(new ModbusNotConnectedException());
     }
 
     ByteBuffer buffer = ByteBuffer.allocate(256);
@@ -196,6 +324,11 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
               // Cancelled, e.g. the request timed out while this write was queued.
               return;
             }
+            if (!isConnected(sp)) {
+              // The port was closed or went away while this write was queued.
+              future.completeExceptionally(new ModbusNotConnectedException());
+              return;
+            }
             try {
               writeFully(sp, data);
               future.complete(null);
@@ -209,6 +342,11 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
     }
 
     return future;
+  }
+
+  /** Whether {@code sp} is open and hasn't been reported disconnected. */
+  private boolean isConnected(SerialPort sp) {
+    return sp != null && sp != lostPort && sp.isOpen();
   }
 
   private void writeFully(SerialPort sp, byte[] data) throws ModbusException {
@@ -238,7 +376,14 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
   private class ModbusRtuDataListener implements SerialPortDataListener {
 
     /** Bit mask indicating what events we're interested in. */
-    private static final int LISTENING_EVENTS = SerialPort.LISTENING_EVENT_DATA_RECEIVED;
+    private static final int LISTENING_EVENTS =
+        SerialPort.LISTENING_EVENT_DATA_RECEIVED | SerialPort.LISTENING_EVENT_PORT_DISCONNECTED;
+
+    /**
+     * Set when the port's disconnection has been reported. jSerialComm repeats the event until the
+     * port is closed.
+     */
+    private final AtomicBoolean disconnected = new AtomicBoolean(false);
 
     @Override
     public int getListeningEvents() {
@@ -247,8 +392,15 @@ public class SerialPortClientTransport implements ModbusRtuClientTransport {
 
     @Override
     public void serialEvent(SerialPortEvent event) {
-      if ((event.getEventType() & LISTENING_EVENTS) == LISTENING_EVENTS) {
+      int eventType = event.getEventType();
+
+      if ((eventType & SerialPort.LISTENING_EVENT_DATA_RECEIVED) != 0) {
         onDataReceived(event);
+      }
+
+      if ((eventType & SerialPort.LISTENING_EVENT_PORT_DISCONNECTED) != 0
+          && disconnected.compareAndSet(false, true)) {
+        onPortDisconnected(event.getSerialPort());
       }
     }
 
