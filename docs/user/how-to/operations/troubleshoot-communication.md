@@ -58,7 +58,7 @@ multi-register value conversion. Once one register succeeds, expand one variable
 | Observation | Meaning and next check |
 | --- | --- |
 | `ModbusConnectException` or a cause wrapped by `ModbusExecutionException` | The transport could not connect/open; inspect the root cause, endpoint, permissions, and TLS handshake |
-| `ModbusTimeoutException` | No matching response arrived before the request deadline; check unit, framing, server load, and timeout budget |
+| `ModbusTimeoutException` | No matching response arrived before the request deadline; check unit, framing, server load, and timeout budget. If the cause is `QueuedRequestTimeoutException`, the request was never sent: an RTU request waited out its whole timeout behind other requests, or the timeout scheduler was shut down |
 | `ModbusResponseException` | The server returned a Modbus exception; `getFunctionCode()` and `getExceptionCode()` identify the request function and the reason |
 | `ModbusExecutionException` caused by `ModbusCrcException` | A synchronous RTU call received a frame with the wrong CRC; inspect physical/link settings and interference |
 | Unit/function mismatch (reported as `slave id mismatch` / `function code mismatch`) | An RTU response did not match the outstanding request, often a late response to an earlier request that timed out, or another master on the bus |

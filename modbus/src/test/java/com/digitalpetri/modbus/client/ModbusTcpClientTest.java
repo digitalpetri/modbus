@@ -5,6 +5,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -14,6 +16,8 @@ import com.digitalpetri.modbus.TimeoutScheduler;
 import com.digitalpetri.modbus.exceptions.ModbusConnectionLostException;
 import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
+import com.digitalpetri.modbus.exceptions.ModbusTimeoutException;
+import com.digitalpetri.modbus.exceptions.QueuedRequestTimeoutException;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersRequest;
 import com.digitalpetri.modbus.pdu.WriteMultipleRegistersRequest;
 import java.nio.ByteBuffer;
@@ -22,6 +26,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -312,6 +317,41 @@ public class ModbusTcpClientTest {
 
     ModbusException cause = assertInstanceOf(ModbusException.class, ex.getCause());
     assertEquals("unexpected function code: 0x22", cause.getMessage());
+  }
+
+  @Test
+  void requestFailsWhenTimeoutCannotBeScheduled() throws Exception {
+    var failure = new RejectedExecutionException("scheduler shut down");
+    var transport = new TestTransport();
+    var client =
+        ModbusTcpClient.create(
+            transport,
+            cfg ->
+                cfg.timeoutScheduler =
+                    (task, delay, unit) -> {
+                      throw failure;
+                    });
+
+    // Neither call throws; the stage fails, and the request is never handed to the transport.
+    var typed = client.readHoldingRegistersAsync(1, new ReadHoldingRegistersRequest(0, 1));
+    var raw = client.sendRawAsync(1, new byte[] {3, 0, 0, 0, 1});
+
+    for (CompletionStage<?> response : List.of(typed, raw)) {
+      ExecutionException e =
+          assertThrows(
+              ExecutionException.class,
+              () -> response.toCompletableFuture().get(1, TimeUnit.SECONDS));
+      var cause = assertInstanceOf(QueuedRequestTimeoutException.class, e.getCause());
+      assertSame(failure, cause.getCause());
+    }
+
+    var sync =
+        assertThrows(
+            ModbusTimeoutException.class,
+            () -> client.readHoldingRegisters(1, new ReadHoldingRegistersRequest(0, 1)));
+    assertInstanceOf(QueuedRequestTimeoutException.class, sync.getCause());
+
+    assertNull(transport.lastFrameSent);
   }
 
   private static class RecordingTimeoutScheduler implements TimeoutScheduler {

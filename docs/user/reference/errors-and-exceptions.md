@@ -2,7 +2,9 @@
 
 ## Exception hierarchy
 
-All library exceptions below extend the checked `ModbusException`.
+All library exceptions below extend the checked `ModbusException`, except
+`QueuedRequestTimeoutException`, which extends `java.util.concurrent.TimeoutException` so that
+existing timeout handling keeps working.
 
 | Exception | Produced by | Information |
 | --- | --- | --- |
@@ -11,7 +13,8 @@ All library exceptions below extend the checked `ModbusException`.
 | `ModbusExecutionException` | Synchronous client wrapper for unexpected connection, transport, serialization, correlation, or interruption failures | Inspect `getCause()`; interruption also restores the thread interrupt flag |
 | `ModbusMalformedResponseException` | Typed TCP or RTU client when a received PDU cannot be decoded or validated, or does not match its request | Diagnostic message; decoder and custom-validator failures retain their original cause; synchronous typed calls wrap it in `ModbusExecutionException` |
 | `ModbusResponseException` | Typed client for a Modbus exception response; server services to request a Modbus exception response | `getFunctionCode()` and `getExceptionCode()` |
-| `ModbusTimeoutException` | Synchronous request when the configured request deadline expires; `ModbusRtuClient.broadcast` instead throws `ModbusExecutionException` with a `TimeoutException` cause | Cause is the internal `TimeoutException` |
+| `ModbusTimeoutException` | Synchronous request when the configured request deadline expires; `ModbusRtuClient.broadcast` instead throws `ModbusExecutionException` with a `TimeoutException` cause | Cause is the internal `TimeoutException`, or a `QueuedRequestTimeoutException` if the request was never sent |
+| `QueuedRequestTimeoutException` | RTU client when a request or broadcast times out while still waiting in its queue; either client when the `TimeoutScheduler` refuses to schedule a request's timeout | The request was never sent, so a write can be retried safely. Asynchronous stages fail with it directly; synchronous request methods wrap it in `ModbusTimeoutException`, and `ModbusRtuClient.broadcast` in `ModbusExecutionException`. A scheduler refusal keeps the scheduler's exception as the cause |
 | `UnknownUnitIdException` | Server service cannot route the requested unit | Unit ID appears in the message; supplied transports ignore the request |
 
 Synchronous `connect()` wraps a transport connection failure in `ModbusExecutionException`. For a
@@ -73,7 +76,8 @@ Raw TCP calls return the response PDU bytes without these typed checks.
 | Exception function code without an exception byte | `ModbusMalformedResponseException` for malformed exception PDU |
 | Empty response PDU | `ModbusMalformedResponseException` for empty response PDU |
 | Any other function code | `ModbusMalformedResponseException` for function code mismatch |
-| No response before deadline | Timeout; synchronous API exposes `ModbusTimeoutException` |
+| No response before deadline | `TimeoutException`; synchronous API exposes `ModbusTimeoutException` |
+| Deadline expires while the request is still queued | `QueuedRequestTimeoutException`; the request was never sent. Synchronous API exposes `ModbusTimeoutException` with it as the cause |
 
 ## Server error behavior
 
@@ -91,7 +95,7 @@ Raw TCP calls return the response PDU bytes without these typed checks.
 | Failure category | Application action |
 | --- | --- |
 | Connection/open failure | Inspect nested cause and endpoint/port/serial/TLS configuration before retrying |
-| Timeout | Verify unit, framing, address, server load, and timeout budget; do not retry writes blindly |
+| Timeout | Verify unit, framing, address, server load, and timeout budget; do not retry writes blindly unless the cause is `QueuedRequestTimeoutException`, which means the request never left the client |
 | Malformed response | Inspect the diagnostic and original cause for an invalid PDU or a mismatch with the request |
 | Modbus response exception | Branch on numeric exception code and function |
 | CRC failure | Inspect the link, then allow parser reset/reconnect before retrying |
