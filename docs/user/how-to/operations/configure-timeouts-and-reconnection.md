@@ -33,7 +33,9 @@ the client creates an in-flight request and bounds how long its response promise
 while transport acquisition, send, and response are in progress. Its default is 5 seconds. The
 TCP connect timeout also defaults to 5 seconds. `ModbusRtuClient` sends one request at a time, so
 its request timeout also includes time spent waiting behind earlier requests. A request that times
-out while waiting there is never sent.
+out while waiting there is never sent, and fails with `QueuedRequestTimeoutException` so the caller
+can tell. Time the request spends waiting out a `broadcastTurnaroundDelay` after a broadcast does
+not count against its timeout.
 
 Expiring the promise does not cancel `transport.send(...)` or an underlying `getChannel()` wait.
 A request queued during reconnection can therefore be written after the caller has already
@@ -64,8 +66,12 @@ try {
       client.readHoldingRegisters(unitId, new ReadHoldingRegistersRequest(address, 1));
   process(response.registers());
 } catch (ModbusTimeoutException e) {
-  // No response before the deadline. The request may still have reached the server;
-  // never blindly retry a timed-out write.
+  if (e.getCause() instanceof QueuedRequestTimeoutException) {
+    // The request timed out before it was sent. The server never saw it; retrying is safe.
+  } else {
+    // No response before the deadline. The request may still have reached the server;
+    // never blindly retry a timed-out write.
+  }
 } catch (ModbusResponseException e) {
   // The server answered with a Modbus exception response.
   System.err.printf(

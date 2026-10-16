@@ -9,6 +9,7 @@ import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
 import com.digitalpetri.modbus.exceptions.ModbusMalformedResponseException;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
 import com.digitalpetri.modbus.exceptions.ModbusTimeoutException;
+import com.digitalpetri.modbus.exceptions.QueuedRequestTimeoutException;
 import com.digitalpetri.modbus.internal.util.Hex;
 import com.digitalpetri.modbus.pdu.ModbusPdu;
 import com.digitalpetri.modbus.pdu.ModbusRequestPdu;
@@ -190,24 +191,33 @@ public class ModbusTcpClient extends ModbusClient {
 
     var future = new CompletableFuture<ByteBuffer>();
     long timeoutMillis = config.requestTimeout().toMillis();
-    TimeoutHandle timeout =
-        config
-            .timeoutScheduler()
-            .newTimeout(
-                t -> {
-                  ResponsePromise promise = promises.get(header.transactionId());
-                  if (promise != null
-                      && promise.future() == future
-                      && promises.remove(header.transactionId(), promise)) {
-                    promise
-                        .future()
-                        .completeExceptionally(
-                            new TimeoutException(
-                                "request timed out after %sms".formatted(timeoutMillis)));
-                  }
-                },
-                timeoutMillis,
-                TimeUnit.MILLISECONDS);
+    TimeoutHandle timeout;
+    try {
+      timeout =
+          config
+              .timeoutScheduler()
+              .newTimeout(
+                  t -> {
+                    ResponsePromise promise = promises.get(header.transactionId());
+                    if (promise != null
+                        && promise.future() == future
+                        && promises.remove(header.transactionId(), promise)) {
+                      promise
+                          .future()
+                          .completeExceptionally(
+                              new TimeoutException(
+                                  "request timed out after %sms".formatted(timeoutMillis)));
+                    }
+                  },
+                  timeoutMillis,
+                  TimeUnit.MILLISECONDS);
+    } catch (Exception e) {
+      // e.g. RejectedExecutionException if the scheduler has been shut down. Without a timeout the
+      // request could wait forever, so fail it instead of sending it.
+      return CompletableFuture.failedFuture(
+          new QueuedRequestTimeoutException(
+              "request timeout could not be scheduled; the request was not sent", e));
+    }
 
     ResponsePromise pending = promiseFactory.create(future, timeout);
 

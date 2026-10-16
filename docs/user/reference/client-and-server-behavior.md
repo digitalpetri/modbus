@@ -15,7 +15,12 @@ stages report failures without the synchronous execution wrapper. See
 A request timeout removes and fails the pending response promise; it does not cancel a transport
 send or channel wait already in progress. A request can still reach the server after the caller's
 timeout. Applications must resolve the outcome of timed-out writes or use idempotent application
-semantics before retrying.
+semantics before retrying. The exception is a timeout reported as `QueuedRequestTimeoutException`:
+the request was never handed to the transport, so it did not reach the server and a write can be
+retried. The RTU client reports this for a request that times out in its queue. Both clients report
+it when the configured `TimeoutScheduler` refuses to schedule a request's timeout, with the
+scheduler's exception as the cause; the asynchronous `ModbusTcpClient` send methods return a failed
+stage rather than throwing.
 
 ## Connection loss
 
@@ -109,12 +114,12 @@ reused while its previous request remains in flight.
 | --- | --- |
 | Request order | One request is outstanding at a time. Other requests wait in submission order and are sent when the current request gets a response, times out, or fails to send |
 | Correlation | A response is matched to the outstanding request. The client checks the unit ID and the function code. An exception response must carry the request's function code plus `0x80`. There is no transaction ID or ordering field |
-| Request timeout | Starts when the request is submitted, so it includes time spent waiting behind other requests. A request that times out while waiting is never sent |
+| Request timeout | Starts when the request is submitted, so it includes time spent waiting behind other requests. A request that times out while waiting is never sent and fails with `QueuedRequestTimeoutException`. Time spent waiting out a broadcast turnaround delay does not count: when the delay starts, each queued request's deadline is pushed back by the delay, and a request submitted during the delay gets its full timeout from when the delay ends |
 | CRC | Calculated on send and verified on receive |
 | Timeout recovery | Fails the outstanding request, resets the transport frame parser, and sends the next waiting request |
 | CRC recovery | Fails with `ModbusCrcException` and resets the frame parser |
 | Unit/function mismatch (reported as `slave id mismatch` / `function code mismatch`) | Fails the outstanding request only; requests waiting behind it are not failed. A late response with a matching unit and function code is accepted as the response to the next request |
-| Broadcast | `broadcast` sends with unit ID 0 and waits only for send completion. Broadcasts wait their turn in submission order like other requests, and the request timeout applies until the broadcast is written. A timeout is reported by `broadcast` as `ModbusExecutionException` with a `TimeoutException` cause. Cancelling the `broadcastAsync` future attempts to cancel its transport send; a queued write that has not started is skipped. After a broadcast is written, the next request waits for `broadcastTurnaroundDelay`, which defaults to zero. If a broadcast times out while the serial transport is still writing it, the caller gets the timeout, but the next request waits for the write to finish and then for the turnaround delay |
+| Broadcast | `broadcast` sends with unit ID 0 and waits only for send completion. Broadcasts wait their turn in submission order like other requests, and the request timeout applies until the broadcast is written. A timeout is reported by `broadcast` as `ModbusExecutionException` with a `TimeoutException` cause; the cause is `QueuedRequestTimeoutException` if the write never started. Cancelling the `broadcastAsync` future attempts to cancel its transport send; a queued write that has not started is skipped. After a broadcast is written, the next request waits for `broadcastTurnaroundDelay`, which defaults to zero. If a broadcast times out while the serial transport is still writing it, the caller gets the timeout, but the next request waits for the write to finish and then for the turnaround delay |
 | Exception response | Produces `ModbusResponseException` with the request's function code and the response's exception code. An exception response without an exception code fails with `ModbusMalformedResponseException` and the diagnostic `malformed exception response PDU` |
 
 These behaviors apply to both serial RTU and RTU over TCP. For concurrent callers, see

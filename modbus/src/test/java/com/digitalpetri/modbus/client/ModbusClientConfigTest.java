@@ -75,6 +75,32 @@ class ModbusClientConfigTest {
   }
 
   @Test
+  void requestTimeoutMustNotBeNull() {
+    assertThrows(
+        NullPointerException.class,
+        () -> ModbusClientConfig.create(cfg -> cfg.requestTimeout = null));
+  }
+
+  @Test
+  void requestTimeoutMustNotBeNegative() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ModbusClientConfig.create(cfg -> cfg.requestTimeout = Duration.ofNanos(-1)));
+  }
+
+  @Test
+  void requestTimeoutMustFitInNanoseconds() {
+    Duration max = Duration.ofNanos(Long.MAX_VALUE);
+
+    ModbusClientConfig config = ModbusClientConfig.create(cfg -> cfg.requestTimeout = max);
+    assertEquals(max, config.requestTimeout());
+
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> ModbusClientConfig.create(cfg -> cfg.requestTimeout = max.plusNanos(1)));
+  }
+
+  @Test
   void broadcastTurnaroundDelayMustNotBeNegative() {
     assertThrows(
         IllegalArgumentException.class,

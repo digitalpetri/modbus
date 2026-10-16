@@ -9,6 +9,7 @@ import com.digitalpetri.modbus.exceptions.ModbusCrcException;
 import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
 import com.digitalpetri.modbus.exceptions.ModbusMalformedResponseException;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
+import com.digitalpetri.modbus.exceptions.QueuedRequestTimeoutException;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
 import com.digitalpetri.modbus.internal.util.Hex;
 import com.digitalpetri.modbus.pdu.ModbusPdu;
@@ -37,7 +38,8 @@ import org.slf4j.LoggerFactory;
  * response, times out, or fails to send. Concurrent calls are safe, but they are not pipelined.
  *
  * <p>The request timeout starts when a request is submitted, so it includes time spent waiting
- * behind other requests. A request that times out while waiting is never sent.
+ * behind other requests. A request that times out while waiting is never sent, and fails with a
+ * {@link QueuedRequestTimeoutException} rather than a plain {@link TimeoutException}.
  *
  * <p>Broadcasts wait their turn with other requests. A broadcast gets no response, so it completes
  * when it's written, and the next request is sent after {@link
@@ -45,6 +47,10 @@ import org.slf4j.LoggerFactory;
  * from submission until the broadcast is written. If a broadcast times out after its write has
  * started, and the transport can't cancel the write, the next request waits for the write to finish
  * and then for the turnaround delay. Requests waiting behind it still time out.
+ *
+ * <p>Time spent waiting out a turnaround delay doesn't count toward a queued request's timeout.
+ * When the delay starts, the timeout of each queued request and broadcast is pushed back by the
+ * delay, and a request submitted during the delay gets its full timeout from when the delay ends.
  */
 public class ModbusRtuClient extends ModbusClient {
 
@@ -77,6 +83,11 @@ public class ModbusRtuClient extends ModbusClient {
 
   /** The turnaround delay that holds the queue after a broadcast, or {@code null}. */
   private TimeoutHandle turnaround;
+
+  /**
+   * The {@link System#nanoTime()} at which {@link #turnaround} ends; meaningless when it's null.
+   */
+  private long turnaroundEnd;
 
   // package visibility for testing
   final Map<Pending<?>, TimeoutHandle> timeouts = new ConcurrentHashMap<>();
@@ -138,34 +149,60 @@ public class ModbusRtuClient extends ModbusClient {
    * Schedule the timeout for {@code pending} and queue it to be sent.
    *
    * <p>The timeout starts when the request is submitted, so it bounds how long the caller waits,
-   * including time spent queued behind other requests.
+   * including time spent queued behind other requests. Time left in a broadcast turnaround delay
+   * doesn't count, so a request submitted during the delay gets its full timeout from when the
+   * delay ends.
    */
   private void enqueue(Pending<?> pending) {
     requestQueue.submit(
         () -> {
+          long now = System.nanoTime();
+          long delay = config.requestTimeout().toNanos();
+          if (turnaround != null) {
+            delay += Math.max(0, turnaroundEnd - now);
+          }
+
           // The timeout is scheduled on the queue so the timeout task can't run before the
           // request is queued.
           TimeoutHandle timeout;
           try {
-            timeout =
-                config
-                    .timeoutScheduler()
-                    .newTimeout(
-                        t -> requestQueue.submit(() -> onTimeout(pending)),
-                        config.requestTimeout().toMillis(),
-                        TimeUnit.MILLISECONDS);
+            timeout = scheduleTimeout(pending, delay);
           } catch (Exception e) {
             // e.g. RejectedExecutionException if the scheduler has been shut down. Without a
             // timeout the request could wait forever, so fail it instead of sending it.
-            failRequest(pending, e);
+            failRequest(
+                pending,
+                new QueuedRequestTimeoutException(
+                    "request timeout could not be scheduled; the request was not sent", e));
             return;
           }
 
+          pending.deadline = now + delay;
           timeouts.put(pending, timeout);
 
           queued.addLast(pending);
           sendNext();
         });
+  }
+
+  /**
+   * Schedule a timeout that runs {@link #onTimeout} for {@code pending} after {@code delay}
+   * nanoseconds, and make it the request's current timeout. Throws if the scheduler refuses, e.g.
+   * because it has been shut down; the request's current timeout is unchanged.
+   */
+  private TimeoutHandle scheduleTimeout(Pending<?> pending, long delay) {
+    int generation = pending.timeoutGeneration + 1;
+
+    TimeoutHandle timeout =
+        config
+            .timeoutScheduler()
+            .newTimeout(
+                t -> requestQueue.submit(() -> onTimeout(pending, generation)),
+                Math.max(0, delay),
+                TimeUnit.NANOSECONDS);
+
+    pending.timeoutGeneration = generation;
+    return timeout;
   }
 
   /**
@@ -222,26 +259,60 @@ public class ModbusRtuClient extends ModbusClient {
   }
 
   /**
-   * Hold the queue for the turnaround delay after a broadcast, if one is configured.
+   * Hold the queue for the turnaround delay after a broadcast, if one is configured, and push back
+   * the timeouts of the queued requests so the delay doesn't count against them.
    *
    * <p>Must be called from a task on {@link #requestQueue}.
    */
   private void startTurnaround() {
+    long delay = config.broadcastTurnaroundDelay().toNanos();
+    if (delay <= 0) {
+      return;
+    }
+
     try {
-      long delay = config.broadcastTurnaroundDelay().toNanos();
-      if (delay > 0) {
-        turnaround =
-            config
-                .timeoutScheduler()
-                .newTimeout(
-                    t -> requestQueue.submit(this::onTurnaroundElapsed),
-                    delay,
-                    TimeUnit.NANOSECONDS);
-      }
+      turnaround =
+          config
+              .timeoutScheduler()
+              .newTimeout(
+                  t -> requestQueue.submit(this::onTurnaroundElapsed), delay, TimeUnit.NANOSECONDS);
     } catch (Exception e) {
       // e.g. RejectedExecutionException if the scheduler has been shut down. Send the next
       // request now rather than never.
       logger.warn("Failed to schedule broadcast turnaround delay", e);
+      return;
+    }
+
+    turnaroundEnd = System.nanoTime() + delay;
+
+    for (Pending<?> pending : queued) {
+      extendTimeout(pending, delay);
+    }
+  }
+
+  /**
+   * Push back the timeout of a queued request by {@code extension}.
+   *
+   * <p>If the new timeout can't be scheduled, the request keeps its current one rather than being
+   * left with none.
+   *
+   * <p>Must be called from a task on {@link #requestQueue}.
+   */
+  private void extendTimeout(Pending<?> pending, long extension) {
+    long deadline = pending.deadline + extension;
+
+    TimeoutHandle timeout;
+    try {
+      timeout = scheduleTimeout(pending, deadline - System.nanoTime());
+    } catch (Exception e) {
+      logger.warn("Failed to extend request timeout for broadcast turnaround delay", e);
+      return;
+    }
+
+    pending.deadline = deadline;
+    TimeoutHandle previous = timeouts.put(pending, timeout);
+    if (previous != null) {
+      previous.cancel();
     }
   }
 
@@ -259,13 +330,21 @@ public class ModbusRtuClient extends ModbusClient {
    * Handle the timeout of a request or broadcast, whether it's queued or in flight.
    *
    * <p>Must be called from a task on {@link #requestQueue}.
+   *
+   * @param generation the generation of the timeout that elapsed. A timeout that was replaced when
+   *     the request's deadline was pushed back can still fire before its cancellation; it's
+   *     ignored.
    */
-  private void onTimeout(Pending<?> pending) {
-    var ex =
-        new TimeoutException(
-            "request timed out after %sms".formatted(config.requestTimeout().toMillis()));
+  private void onTimeout(Pending<?> pending, int generation) {
+    if (generation != pending.timeoutGeneration) {
+      return;
+    }
+
+    long timeoutMillis = config.requestTimeout().toMillis();
 
     if (pending == inFlight) {
+      var ex = new TimeoutException("request timed out after %sms".formatted(timeoutMillis));
+
       // The frame parser needs to be reset!
       // It could be "stuck" in Accumulating or ParseError states if the timeout was
       // caused by an incomplete or invalid response rather than no response.
@@ -306,7 +385,11 @@ public class ModbusRtuClient extends ModbusClient {
       sendNext();
     } else if (queued.remove(pending)) {
       // Timed out while waiting behind other requests; it was never sent.
-      failRequest(pending, ex);
+      failRequest(
+          pending,
+          new QueuedRequestTimeoutException(
+              "request timed out before it was sent (request timeout %sms)"
+                  .formatted(timeoutMillis)));
     }
   }
 
@@ -400,7 +483,8 @@ public class ModbusRtuClient extends ModbusClient {
    *
    * @param request the request to broadcast. Must be a write command.
    * @throws ModbusExecutionException if an error occurs while sending the request. If the request
-   *     timeout elapses before the write completes, the cause is a {@link TimeoutException}.
+   *     timeout elapses before the write completes, the cause is a {@link TimeoutException}; it's a
+   *     {@link QueuedRequestTimeoutException} if the timeout elapsed before the write started.
    */
   public void broadcast(ModbusRequestPdu request) throws ModbusExecutionException {
     try {
@@ -430,7 +514,9 @@ public class ModbusRtuClient extends ModbusClient {
    *
    * @param request the request to broadcast. Must be a write command.
    * @return a {@link CompletionStage} that completes when the request has been sent, or completes
-   *     exceptionally with a {@link TimeoutException} if the request timeout elapses first.
+   *     exceptionally with a {@link TimeoutException} if the request timeout elapses first. A
+   *     broadcast that times out before its write starts fails with a {@link
+   *     QueuedRequestTimeoutException}; it was never sent.
    */
   public CompletionStage<Void> broadcastAsync(ModbusRequestPdu request) {
     ByteBuffer pdu = ByteBuffer.allocate(256);
@@ -618,6 +704,18 @@ public class ModbusRtuClient extends ModbusClient {
 
     /** Assigned on the request queue when the request is sent. */
     CompletionStage<Void> sendFuture;
+
+    /**
+     * The {@link System#nanoTime()} at which the request times out. Set on the request queue when
+     * the request is queued, and pushed back while it waits out a broadcast turnaround delay.
+     */
+    long deadline;
+
+    /**
+     * Incremented on the request queue each time a timeout is scheduled for the request, so a
+     * replaced timeout that fires anyway can be told from the current one.
+     */
+    int timeoutGeneration;
 
     /**
      * Set on the request queue when a broadcast times out while it's still being written. Its

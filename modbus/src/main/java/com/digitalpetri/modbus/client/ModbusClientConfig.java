@@ -15,14 +15,16 @@ import java.util.function.Consumer;
 /**
  * Configuration for a {@link ModbusClient}.
  *
- * @param requestTimeout the timeout duration for requests.
+ * @param requestTimeout the timeout duration for requests. Must not be negative or longer than
+ *     {@link Long#MAX_VALUE} nanoseconds.
  * @param timeoutScheduler the {@link TimeoutScheduler} used to schedule request timeouts and the
  *     broadcast turnaround delay.
  * @param requestSerializer the {@link ModbusPduSerializer} used to encode requests.
  * @param responseSerializer the {@link ModbusPduSerializer} used to decode responses.
  * @param broadcastTurnaroundDelay how long {@link ModbusRtuClient} waits after writing a broadcast
- *     before it sends the next request. Other clients ignore it. Must not be negative or longer
- *     than {@link Long#MAX_VALUE} nanoseconds.
+ *     before it sends the next request. The wait doesn't count toward the request timeout of the
+ *     requests it holds back. Other clients ignore it. Must not be negative or longer than {@link
+ *     Long#MAX_VALUE} nanoseconds.
  * @param responseValidator the validator applied after decoding normal responses.
  */
 public record ModbusClientConfig(
@@ -36,16 +38,21 @@ public record ModbusClientConfig(
   /**
    * Create a new {@link ModbusClientConfig} instance.
    *
-   * @throws NullPointerException if {@code broadcastTurnaroundDelay} or {@code responseValidator}
-   *     is {@code null}.
-   * @throws IllegalArgumentException if {@code broadcastTurnaroundDelay} is negative or longer than
-   *     {@link Long#MAX_VALUE} nanoseconds.
+   * @throws NullPointerException if {@code requestTimeout}, {@code broadcastTurnaroundDelay}, or
+   *     {@code responseValidator} is {@code null}.
+   * @throws IllegalArgumentException if {@code requestTimeout} or {@code broadcastTurnaroundDelay}
+   *     is negative or longer than {@link Long#MAX_VALUE} nanoseconds.
    */
   public ModbusClientConfig {
+    Objects.requireNonNull(requestTimeout, "requestTimeout");
     Objects.requireNonNull(broadcastTurnaroundDelay, "broadcastTurnaroundDelay");
     Objects.requireNonNull(responseValidator, "responseValidator");
 
-    // ModbusRtuClient schedules the delay in nanoseconds.
+    // ModbusRtuClient tracks request deadlines and schedules the delay in nanoseconds.
+    if (requestTimeout.isNegative()
+        || requestTimeout.compareTo(Duration.ofNanos(Long.MAX_VALUE)) > 0) {
+      throw new IllegalArgumentException("requestTimeout out of range: " + requestTimeout);
+    }
     if (broadcastTurnaroundDelay.isNegative()
         || broadcastTurnaroundDelay.compareTo(Duration.ofNanos(Long.MAX_VALUE)) > 0) {
       throw new IllegalArgumentException(

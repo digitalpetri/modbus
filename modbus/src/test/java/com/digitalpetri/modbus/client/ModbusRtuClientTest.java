@@ -19,6 +19,7 @@ import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
 import com.digitalpetri.modbus.exceptions.ModbusMalformedResponseException;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
 import com.digitalpetri.modbus.exceptions.ModbusTimeoutException;
+import com.digitalpetri.modbus.exceptions.QueuedRequestTimeoutException;
 import com.digitalpetri.modbus.pdu.ModbusResponsePdu;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersRequest;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersResponse;
@@ -29,6 +30,7 @@ import java.time.Duration;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
@@ -237,7 +239,9 @@ public class ModbusRtuClientTest {
 
     timeoutA.run();
     var e = assertThrows(ExecutionException.class, () -> a.get(1, TimeUnit.SECONDS));
+    // A was sent and got no response, so its outcome is unknown.
     assertInstanceOf(TimeoutException.class, e.getCause());
+    assertFalse(e.getCause() instanceof QueuedRequestTimeoutException);
 
     assertEquals(100, startAddress(transport.nextSentFrame()));
     transport.respond(client, registers(0x0B));
@@ -263,7 +267,8 @@ public class ModbusRtuClientTest {
 
     timeoutB.run();
     var e = assertThrows(ExecutionException.class, () -> b.get(1, TimeUnit.SECONDS));
-    assertInstanceOf(TimeoutException.class, e.getCause());
+    // B timed out while A was still in flight, so it was never sent.
+    assertInstanceOf(QueuedRequestTimeoutException.class, e.getCause());
 
     transport.respond(client, registers(0x0A));
     assertArrayEquals(registers(0x0A), a.get(1, TimeUnit.SECONDS).registers());
@@ -272,6 +277,66 @@ public class ModbusRtuClientTest {
     assertEquals(200, startAddress(transport.nextSentFrame()));
     transport.respond(client, registers(0x0C));
     assertArrayEquals(registers(0x0C), c.get(1, TimeUnit.SECONDS).registers());
+    assertEquals(0, client.timeouts.size());
+  }
+
+  @Test
+  void queuedRequestTimeoutIsReportedAsModbusTimeoutExceptionWithNeverSentCause() throws Exception {
+    var scheduler = new ManualTimeoutScheduler();
+    var transport = new RecordingRtuTransport();
+    var client = ModbusRtuClient.create(transport, cfg -> cfg.timeoutScheduler = scheduler);
+
+    client.connect();
+
+    CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
+    CompletableFuture<ReadHoldingRegistersResponse> b =
+        CompletableFuture.supplyAsync(
+            () -> {
+              try {
+                return client.readHoldingRegisters(1, new ReadHoldingRegistersRequest(100, 1));
+              } catch (Exception e) {
+                throw new CompletionException(e);
+              }
+            });
+    scheduler.nextTimeout(); // A's request timeout
+    Runnable timeoutB = scheduler.nextTimeout();
+
+    assertEquals(0, startAddress(transport.nextSentFrame()));
+
+    timeoutB.run();
+    var e = assertThrows(ExecutionException.class, () -> b.get(1, TimeUnit.SECONDS));
+    // The synchronous call still throws ModbusTimeoutException; the cause says B was never sent.
+    var timeout = assertInstanceOf(ModbusTimeoutException.class, e.getCause());
+    assertInstanceOf(QueuedRequestTimeoutException.class, timeout.getCause());
+
+    transport.respond(client, registers(0x0A));
+    assertArrayEquals(registers(0x0A), a.get(1, TimeUnit.SECONDS).registers());
+    transport.assertNoFrameSent();
+    assertEquals(0, client.timeouts.size());
+  }
+
+  @Test
+  void queuedBroadcastThatTimesOutIsNotSent() throws Exception {
+    var scheduler = new ManualTimeoutScheduler();
+    var transport = new RecordingRtuTransport();
+    var client = ModbusRtuClient.create(transport, cfg -> cfg.timeoutScheduler = scheduler);
+
+    client.connect();
+
+    CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
+    CompletableFuture<Void> x = broadcastAsync(client, 50);
+    scheduler.nextTimeout(); // A's request timeout
+    Runnable timeoutX = scheduler.nextTimeout();
+
+    assertEquals(0, startAddress(transport.nextSentFrame()));
+
+    timeoutX.run();
+    var e = assertThrows(ExecutionException.class, () -> x.get(1, TimeUnit.SECONDS));
+    assertInstanceOf(QueuedRequestTimeoutException.class, e.getCause());
+
+    transport.respond(client, registers(0x0A));
+    assertArrayEquals(registers(0x0A), a.get(1, TimeUnit.SECONDS).registers());
+    transport.assertNoFrameSent();
     assertEquals(0, client.timeouts.size());
   }
 
@@ -447,7 +512,15 @@ public class ModbusRtuClientTest {
 
     CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
     var e = assertThrows(ExecutionException.class, () -> a.get(1, TimeUnit.SECONDS));
-    assertSame(failure, e.getCause());
+    // The request was never sent; the scheduler's exception is the cause.
+    var cause = assertInstanceOf(QueuedRequestTimeoutException.class, e.getCause());
+    assertSame(failure, cause.getCause());
+
+    var sync =
+        assertThrows(
+            ModbusTimeoutException.class,
+            () -> client.readHoldingRegisters(1, new ReadHoldingRegistersRequest(0, 1)));
+    assertInstanceOf(QueuedRequestTimeoutException.class, sync.getCause());
 
     transport.assertNoFrameSent();
   }
@@ -663,12 +736,14 @@ public class ModbusRtuClientTest {
     assertEquals(50, startAddress(transport.nextSentFrame()));
     timeoutX.run();
     var e = assertThrows(ExecutionException.class, () -> x.get(1, TimeUnit.SECONDS));
+    // X's write started, so slaves may receive it.
     assertInstanceOf(TimeoutException.class, e.getCause());
+    assertFalse(e.getCause() instanceof QueuedRequestTimeoutException);
 
     // The broadcast write is stalled, so A times out without being sent.
     timeoutA.run();
     e = assertThrows(ExecutionException.class, () -> a.get(1, TimeUnit.SECONDS));
-    assertInstanceOf(TimeoutException.class, e.getCause());
+    assertInstanceOf(QueuedRequestTimeoutException.class, e.getCause());
     transport.assertNoFrameSent();
 
     // e.g. disconnect() closes the port. Slaves discard the partial frame, so there's no
@@ -681,6 +756,203 @@ public class ModbusRtuClientTest {
     transport.respond(client, registers(0x0B));
     assertArrayEquals(registers(0x0B), b.get(1, TimeUnit.SECONDS).registers());
     scheduler.assertNoTimeoutScheduled();
+    assertEquals(0, client.timeouts.size());
+  }
+
+  @Test
+  void queuedRequestTimeoutIsPushedBackByTurnaroundDelay() throws Exception {
+    var scheduler = new ManualTimeoutScheduler();
+    var broadcastWrite = new CompletableFuture<Void>();
+    var transport = new BroadcastRtuTransport(broadcastWrite);
+    var client =
+        ModbusRtuClient.create(
+            transport,
+            cfg -> {
+              cfg.timeoutScheduler = scheduler;
+              cfg.requestTimeout = Duration.ofSeconds(1);
+              // Timeouts only fire when the test runs them, so a long delay costs nothing and
+              // keeps the lower bounds below from depending on how fast the test thread runs.
+              cfg.broadcastTurnaroundDelay = Duration.ofSeconds(10);
+            });
+
+    client.connect();
+
+    CompletableFuture<Void> x = broadcastAsync(client, 50);
+    CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
+    scheduler.nextTimeout(); // X's request timeout
+    ScheduledTimeout timeoutA = scheduler.nextScheduledTimeout();
+    assertEquals(Duration.ofSeconds(1).toNanos(), timeoutA.delayNanos());
+
+    assertEquals(50, startAddress(transport.nextSentFrame()));
+    broadcastWrite.complete(null);
+    x.get(1, TimeUnit.SECONDS);
+
+    // The turnaround delay holds the queue, so A's deadline is pushed back by the delay.
+    Runnable turnaroundElapsed = scheduler.nextTimeout();
+    ScheduledTimeout extendedA = scheduler.nextScheduledTimeout();
+    assertTrue(extendedA.delayNanos() > Duration.ofSeconds(6).toNanos());
+    assertTrue(extendedA.delayNanos() <= Duration.ofSeconds(11).toNanos());
+
+    // The original timeout can fire before it's cancelled; it no longer fails A.
+    timeoutA.fireIgnoringCancellation();
+    transport.assertNoFrameSent();
+    assertFalse(a.isDone());
+
+    turnaroundElapsed.run();
+    assertEquals(0, startAddress(transport.nextSentFrame()));
+    // The replacement timeout is scheduled before the original is cancelled, so check it here.
+    assertTrue(timeoutA.handle().isCancelled());
+    transport.respond(client, registers(0x0A));
+    assertArrayEquals(registers(0x0A), a.get(1, TimeUnit.SECONDS).registers());
+    assertEquals(0, client.timeouts.size());
+  }
+
+  @Test
+  void requestSubmittedDuringTurnaroundDelayGetsTimeoutFromEndOfDelay() throws Exception {
+    var scheduler = new ManualTimeoutScheduler();
+    var transport = new RecordingRtuTransport();
+    var client =
+        ModbusRtuClient.create(
+            transport,
+            cfg -> {
+              cfg.timeoutScheduler = scheduler;
+              cfg.requestTimeout = Duration.ofSeconds(1);
+              // Timeouts only fire when the test runs them, so a long delay costs nothing and
+              // keeps the lower bounds below from depending on how fast the test thread runs.
+              cfg.broadcastTurnaroundDelay = Duration.ofSeconds(10);
+            });
+
+    client.connect();
+
+    CompletableFuture<Void> x = broadcastAsync(client, 50);
+    assertEquals(50, startAddress(transport.nextSentFrame()));
+    x.get(1, TimeUnit.SECONDS);
+    scheduler.nextTimeout(); // X's request timeout, cancelled when it was written
+    Runnable turnaroundElapsed = scheduler.nextTimeout();
+
+    // A is submitted while the queue is held, so its timeout gets the rest of the delay added.
+    CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
+    ScheduledTimeout timeoutA = scheduler.nextScheduledTimeout();
+    assertTrue(timeoutA.delayNanos() > Duration.ofSeconds(6).toNanos());
+    assertTrue(timeoutA.delayNanos() <= Duration.ofSeconds(11).toNanos());
+    transport.assertNoFrameSent();
+
+    turnaroundElapsed.run();
+    assertEquals(0, startAddress(transport.nextSentFrame()));
+    transport.respond(client, registers(0x0A));
+    assertArrayEquals(registers(0x0A), a.get(1, TimeUnit.SECONDS).registers());
+    assertEquals(0, client.timeouts.size());
+  }
+
+  @Test
+  void queuedRequestTimeoutIsPushedBackByEachTurnaroundDelay() throws Exception {
+    var scheduler = new ManualTimeoutScheduler();
+    var transport = new QueuedWriteRtuTransport();
+    var client =
+        ModbusRtuClient.create(
+            transport,
+            cfg -> {
+              cfg.timeoutScheduler = scheduler;
+              cfg.requestTimeout = Duration.ofSeconds(1);
+              // Timeouts only fire when the test runs them, so a long delay costs nothing and
+              // keeps the lower bounds below from depending on how fast the test thread runs.
+              cfg.broadcastTurnaroundDelay = Duration.ofSeconds(10);
+            });
+
+    client.connect();
+
+    CompletableFuture<Void> x1 = broadcastAsync(client, 50);
+    CompletableFuture<Void> x2 = broadcastAsync(client, 60);
+    CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
+    scheduler.nextTimeout(); // X1's request timeout
+    ScheduledTimeout timeoutX2 = scheduler.nextScheduledTimeout();
+    ScheduledTimeout timeoutA = scheduler.nextScheduledTimeout();
+
+    assertEquals(50, startAddress(transport.nextSentFrame()));
+    transport.nextWrite().complete(null);
+    x1.get(1, TimeUnit.SECONDS);
+
+    // The first delay pushes back the queued broadcast and the queued request.
+    Runnable turnaround1 = scheduler.nextTimeout();
+    ScheduledTimeout extendedX2 = scheduler.nextScheduledTimeout();
+    ScheduledTimeout extendedA1 = scheduler.nextScheduledTimeout();
+    assertTrue(extendedX2.delayNanos() > Duration.ofSeconds(6).toNanos());
+    assertTrue(extendedA1.delayNanos() > Duration.ofSeconds(6).toNanos());
+
+    turnaround1.run();
+    assertEquals(60, startAddress(transport.nextSentFrame()));
+    assertTrue(timeoutX2.handle().isCancelled());
+    assertTrue(timeoutA.handle().isCancelled());
+    transport.nextWrite().complete(null);
+    x2.get(1, TimeUnit.SECONDS);
+
+    // The second delay pushes A back again, from its already extended deadline.
+    Runnable turnaround2 = scheduler.nextTimeout();
+    ScheduledTimeout extendedA2 = scheduler.nextScheduledTimeout();
+    assertTrue(extendedA2.delayNanos() > Duration.ofSeconds(16).toNanos());
+    assertTrue(extendedA2.delayNanos() <= Duration.ofSeconds(21).toNanos());
+
+    timeoutA.fireIgnoringCancellation();
+    extendedA1.fireIgnoringCancellation();
+    transport.assertNoFrameSent();
+    assertFalse(a.isDone());
+
+    turnaround2.run();
+    assertEquals(0, startAddress(transport.nextSentFrame()));
+    assertTrue(extendedA1.handle().isCancelled());
+    transport.respond(client, registers(0x0A));
+    assertArrayEquals(registers(0x0A), a.get(1, TimeUnit.SECONDS).registers());
+    scheduler.assertNoTimeoutScheduled();
+    assertEquals(0, client.timeouts.size());
+  }
+
+  @Test
+  void queuedRequestKeepsTimeoutWhenPushedBackTimeoutCannotBeScheduled() throws Exception {
+    var calls = new AtomicInteger();
+    var scheduler =
+        new ManualTimeoutScheduler() {
+          @Override
+          public TimeoutHandle newTimeout(Task task, long delay, TimeUnit unit) {
+            // X's and A's request timeouts, the turnaround delay, then A's pushed back timeout.
+            if (calls.incrementAndGet() == 4) {
+              throw new RejectedExecutionException("scheduler shut down");
+            }
+            return super.newTimeout(task, delay, unit);
+          }
+        };
+    var broadcastWrite = new CompletableFuture<Void>();
+    var transport = new BroadcastRtuTransport(broadcastWrite);
+    var client =
+        ModbusRtuClient.create(
+            transport,
+            cfg -> {
+              cfg.timeoutScheduler = scheduler;
+              cfg.broadcastTurnaroundDelay = Duration.ofMillis(300);
+            });
+
+    client.connect();
+
+    CompletableFuture<Void> x = broadcastAsync(client, 50);
+    CompletableFuture<ReadHoldingRegistersResponse> a = readAsync(client, 0);
+    scheduler.nextTimeout(); // X's request timeout
+    ScheduledTimeout timeoutA = scheduler.nextScheduledTimeout();
+
+    // A is queued before the broadcast is written, so the delay tries to push its timeout back.
+    assertEquals(50, startAddress(transport.nextSentFrame()));
+    broadcastWrite.complete(null);
+    x.get(1, TimeUnit.SECONDS);
+
+    Runnable turnaroundElapsed = scheduler.nextTimeout();
+    scheduler.assertNoTimeoutScheduled();
+    assertFalse(timeoutA.handle().isCancelled());
+
+    // A keeps its original timeout rather than waiting without one.
+    timeoutA.fire().run();
+    var e = assertThrows(ExecutionException.class, () -> a.get(1, TimeUnit.SECONDS));
+    assertInstanceOf(QueuedRequestTimeoutException.class, e.getCause());
+
+    turnaroundElapsed.run();
+    transport.assertNoFrameSent();
     assertEquals(0, client.timeouts.size());
   }
 
@@ -820,7 +1092,7 @@ public class ModbusRtuClientTest {
           public CompletionStage<Void> send(ModbusRtuFrame frame) {
             // Fire the timeout while send() is still running, before the client publishes the
             // send future, to exercise the re-check after publication.
-            scheduler.timeouts.remove().run();
+            scheduler.timeouts.remove().fire().run();
             return sendFuture;
           }
         };
@@ -985,7 +1257,8 @@ public class ModbusRtuClientTest {
                     .broadcastAsync(new WriteSingleRegisterRequest(0, 0x0A))
                     .toCompletableFuture()
                     .get(1, TimeUnit.SECONDS));
-    assertSame(failure, e.getCause());
+    var cause = assertInstanceOf(QueuedRequestTimeoutException.class, e.getCause());
+    assertSame(failure, cause.getCause());
 
     transport.assertNoFrameSent();
   }
@@ -1090,10 +1363,53 @@ public class ModbusRtuClientTest {
     }
   }
 
+  /** Returns a new write future for each broadcast, and a completed one for other requests. */
+  private static class QueuedWriteRtuTransport extends RecordingRtuTransport {
+
+    final BlockingQueue<CompletableFuture<Void>> writes = new LinkedBlockingQueue<>();
+
+    @Override
+    public CompletionStage<Void> send(ModbusRtuFrame frame) {
+      super.send(frame);
+      if (frame.unitId() == 0) {
+        var write = new CompletableFuture<Void>();
+        writes.add(write);
+        return write;
+      } else {
+        return CompletableFuture.completedFuture(null);
+      }
+    }
+
+    CompletableFuture<Void> nextWrite() throws InterruptedException {
+      CompletableFuture<Void> write = writes.poll(1, TimeUnit.SECONDS);
+      assertNotNull(write, "expected a broadcast to be written");
+      return write;
+    }
+  }
+
+  /** A timeout scheduled on a {@link ManualTimeoutScheduler}. */
+  private record ScheduledTimeout(
+      TimeoutScheduler.Task task, TimeoutScheduler.TimeoutHandle handle, long delayNanos) {
+
+    /** Returns a {@link Runnable} that fires the timeout unless it has been cancelled. */
+    Runnable fire() {
+      return () -> {
+        if (!handle.isCancelled()) {
+          task.run(handle);
+        }
+      };
+    }
+
+    /** Fire the timeout as a scheduler that had already started it before it was cancelled. */
+    void fireIgnoringCancellation() {
+      task.run(handle);
+    }
+  }
+
   /** A {@link TimeoutScheduler} whose timeouts only fire when the test runs them. */
   private static class ManualTimeoutScheduler implements TimeoutScheduler {
 
-    final BlockingQueue<Runnable> timeouts = new LinkedBlockingQueue<>();
+    final BlockingQueue<ScheduledTimeout> timeouts = new LinkedBlockingQueue<>();
 
     @Override
     public TimeoutHandle newTimeout(Task task, long delay, TimeUnit unit) {
@@ -1112,19 +1428,19 @@ public class ModbusRtuClientTest {
             }
           };
 
-      timeouts.add(
-          () -> {
-            if (!cancelled.get()) {
-              task.run(handle);
-            }
-          });
+      timeouts.add(new ScheduledTimeout(task, handle, unit.toNanos(delay)));
 
       return handle;
     }
 
     /** Wait for the next timeout to be scheduled and return a {@link Runnable} that fires it. */
     Runnable nextTimeout() throws InterruptedException {
-      Runnable timeout = timeouts.poll(1, TimeUnit.SECONDS);
+      return nextScheduledTimeout().fire();
+    }
+
+    /** Wait for the next timeout to be scheduled and return it. */
+    ScheduledTimeout nextScheduledTimeout() throws InterruptedException {
+      ScheduledTimeout timeout = timeouts.poll(1, TimeUnit.SECONDS);
       assertNotNull(timeout, "expected a timeout to be scheduled");
       return timeout;
     }
