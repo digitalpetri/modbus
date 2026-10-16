@@ -3,6 +3,7 @@ package com.digitalpetri.modbus.tcp.client;
 import com.digitalpetri.fsm.FsmContext;
 import com.digitalpetri.modbus.ModbusTcpFrame;
 import com.digitalpetri.modbus.client.ModbusTcpClientTransport;
+import com.digitalpetri.modbus.exceptions.ModbusNotConnectedException;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
 import com.digitalpetri.modbus.tcp.ModbusTcpCodec;
 import com.digitalpetri.netty.fsm.*;
@@ -23,8 +24,10 @@ import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslProtocols;
 import io.netty.util.ReferenceCountUtil;
 import java.net.InetSocketAddress;
+import java.nio.channels.ClosedChannelException;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
@@ -122,28 +125,57 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
     return channelFsm.disconnect();
   }
 
+  /**
+   * {@inheritDoc}
+   *
+   * <p>The returned {@link CompletionStage} completes exceptionally with a {@link
+   * ModbusNotConnectedException} if no channel is available or the channel closed before the frame
+   * was written. The frame was not written in either case.
+   */
   @Override
   public CompletionStage<Void> send(ModbusTcpFrame frame) {
-    return channelFsm
+    var future = new CompletableFuture<Void>();
+
+    channelFsm
         .getChannel()
-        .thenCompose(
-            channel -> {
-              var future = new CompletableFuture<Void>();
+        .whenComplete(
+            (channel, ex) -> {
+              if (ex != null) {
+                future.completeExceptionally(notConnected(ex));
+                return;
+              }
 
-              channel
-                  .writeAndFlush(frame)
-                  .addListener(
-                      (ChannelFutureListener)
-                          channelFuture -> {
-                            if (channelFuture.isSuccess()) {
-                              future.complete(null);
-                            } else {
-                              future.completeExceptionally(channelFuture.cause());
-                            }
-                          });
-
-              return future;
+              try {
+                channel
+                    .writeAndFlush(frame)
+                    .addListener(
+                        (ChannelFutureListener)
+                            channelFuture -> {
+                              if (channelFuture.isSuccess()) {
+                                future.complete(null);
+                              } else if (channelFuture.cause()
+                                  instanceof ClosedChannelException e) {
+                                future.completeExceptionally(new ModbusNotConnectedException(e));
+                              } else {
+                                future.completeExceptionally(channelFuture.cause());
+                              }
+                            });
+              } catch (Exception e) {
+                future.completeExceptionally(e);
+              }
             });
+
+    return future;
+  }
+
+  /**
+   * Wrap a failure to get a channel, e.g. the channel FSM's "not connected" failure or a failed
+   * connection attempt, as a {@link ModbusNotConnectedException}.
+   */
+  private static ModbusNotConnectedException notConnected(Throwable ex) {
+    Throwable cause =
+        ex instanceof CompletionException && ex.getCause() != null ? ex.getCause() : ex;
+    return new ModbusNotConnectedException(cause);
   }
 
   @Override

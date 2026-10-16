@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.digitalpetri.modbus.ModbusRtuFrame;
-import com.digitalpetri.modbus.exceptions.ModbusException;
+import com.digitalpetri.modbus.exceptions.ModbusNotConnectedException;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -138,10 +138,11 @@ class SerialPortClientTransportWriteTest {
 
     transport.disconnect().get(5, TimeUnit.SECONDS);
 
+    // None of the queued writes started, so each fails as not connected.
     for (CompletableFuture<Void> f : queued) {
       ExecutionException e =
           assertThrows(ExecutionException.class, () -> f.get(5, TimeUnit.SECONDS));
-      assertInstanceOf(ModbusException.class, e.getCause());
+      assertInstanceOf(ModbusNotConnectedException.class, e.getCause());
     }
   }
 
@@ -174,7 +175,7 @@ class SerialPortClientTransportWriteTest {
 
       ExecutionException e =
           assertThrows(ExecutionException.class, () -> queued.get(5, TimeUnit.SECONDS));
-      assertInstanceOf(ModbusException.class, e.getCause());
+      assertInstanceOf(ModbusNotConnectedException.class, e.getCause());
     } finally {
       gate.countDown();
       executor.shutdown();

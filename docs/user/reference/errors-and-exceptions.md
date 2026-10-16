@@ -7,9 +7,11 @@ All library exceptions below extend the checked `ModbusException`.
 | Exception | Produced by | Information |
 | --- | --- | --- |
 | `ModbusConnectException` | Supplied serial transports when opening the port fails | Message/cause; a failed `openPort()` includes the port and last error code |
+| `ModbusConnectionLostException` | TCP or RTU client when the transport reports that an established connection closed while the request was pending | The request may have reached the device, so a write's outcome is unknown; synchronous calls wrap it in `ModbusExecutionException` |
 | `ModbusCrcException` | RTU client when a received frame's CRC differs | `getFrame()` returns the rejected RTU frame; synchronous typed calls wrap it in `ModbusExecutionException` |
 | `ModbusExecutionException` | Synchronous client wrapper for unexpected connection, transport, serialization, correlation, or interruption failures | Inspect `getCause()`; interruption also restores the thread interrupt flag |
 | `ModbusMalformedResponseException` | Typed TCP or RTU client when a received PDU cannot be decoded or validated, or does not match its request | Diagnostic message; decoder and custom-validator failures retain their original cause; synchronous typed calls wrap it in `ModbusExecutionException` |
+| `ModbusNotConnectedException` | Supplied client transports when a request is handed to them while not connected, including a Netty write that fails because the channel closed first | The frame was not written, so the request did not reach the device; the transport's own failure, if any, is the cause; synchronous calls wrap it in `ModbusExecutionException` |
 | `ModbusResponseException` | Typed client for a Modbus exception response; server services to request a Modbus exception response | `getFunctionCode()` and `getExceptionCode()` |
 | `ModbusTimeoutException` | Synchronous request when the configured request deadline expires; `ModbusRtuClient.broadcast` instead throws `ModbusExecutionException` with a `TimeoutException` cause | Cause is the internal `TimeoutException` |
 | `UnknownUnitIdException` | Server service cannot route the requested unit | Unit ID appears in the message; supplied transports ignore the request |

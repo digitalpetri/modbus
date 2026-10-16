@@ -19,11 +19,18 @@ semantics before retrying.
 
 ## Connection loss
 
-When a Netty TCP or RTU-over-TCP transport detects that an established connection has closed,
-including an explicit disconnect, the client fails requests already handed to the transport with
+When a supplied transport detects that an established connection has closed, including an
+explicit disconnect, the client fails requests already handed to the transport with
 `ModbusConnectionLostException` and cancels their request timeouts. This includes raw TCP requests
 and RTU broadcasts whose sends have not completed. Synchronous calls wrap the exception in
 `ModbusExecutionException`.
+
+The Netty TCP and RTU-over-TCP transports detect loss when the channel closes. The serial
+transport detects loss when jSerialComm reports that the open port went away, for example when a
+USB serial adapter is unplugged, and when `disconnect()` closes the port. jSerialComm keeps
+reporting a vanished port as open until it is closed, so the serial transport treats the port as
+not connected as soon as the loss is reported, then closes it on its executor. `isConnected()`
+returns `false` from that point, and a later `connect()` opens a new port.
 
 Requests still waiting in the RTU client's queue keep their original timeouts and submission order.
 The next request is handed to the transport, where it follows the configured connection and
@@ -37,9 +44,23 @@ after responses queued before the loss. This keeps a delayed notification from f
 a replacement connection. The supplier must return promptly without waiting for transport operations.
 Netty logs exceptions from either phase and still notifies its existing connection listeners.
 The default implementation does nothing, so transports without loss detection retain their timeout
-behavior. The serial transport does not currently report connection loss through this callback.
-The client installs this callback; applications observing a Netty transport should use its existing
-`addConnectionListener` API.
+behavior. The client installs this callback; applications observing a Netty transport should use
+its existing `addConnectionListener` API.
+
+## Sends on a disconnected transport
+
+A request handed to a transport that is not connected fails with `ModbusNotConnectedException`.
+The frame was not written, so the request did not reach the device. This differs from
+`ModbusConnectionLostException`, where a write may already have been applied. Synchronous calls
+wrap the exception in `ModbusExecutionException`.
+
+| Transport | Not-connected send |
+| --- | --- |
+| Netty TCP and RTU over TCP | No channel is available, including before `connect()`, after `disconnect()`, and when the connection attempt the send waited for fails; or the write fails with `ClosedChannelException` because the channel closed first. The transport's own failure is the cause |
+| Serial | The port is not open, was closed by `disconnect()` before a queued write started, or was reported disconnected by jSerialComm |
+
+A write that starts and then fails, for example a serial write interrupted by the port going away,
+keeps its transport-specific `ModbusException`.
 
 ## Typed response validation
 
