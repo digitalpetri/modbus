@@ -168,6 +168,9 @@ public class NettyRtuClientTransport implements ModbusRtuClientTransport {
   /**
    * {@inheritDoc}
    *
+   * <p>If the returned {@link CompletionStage} is cancelled while the transport is waiting for a
+   * channel, e.g. during reconnection, the frame is not written.
+   *
    * <p>The returned {@link CompletionStage} completes exceptionally with a {@link
    * ModbusNotConnectedException} if no channel is available or the channel closed before the frame
    * was written. The frame was not written in either case.
@@ -180,6 +183,11 @@ public class NettyRtuClientTransport implements ModbusRtuClientTransport {
         .getChannel()
         .whenComplete(
             (channel, ex) -> {
+              if (future.isDone()) {
+                // Cancelled while waiting for a channel, e.g. the request timed out.
+                return;
+              }
+
               if (ex != null) {
                 future.completeExceptionally(notConnected(ex));
                 return;
