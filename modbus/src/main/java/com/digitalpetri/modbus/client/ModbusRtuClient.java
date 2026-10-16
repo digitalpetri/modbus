@@ -6,8 +6,8 @@ import com.digitalpetri.modbus.ModbusRtuFrame;
 import com.digitalpetri.modbus.TimeoutScheduler.TimeoutHandle;
 import com.digitalpetri.modbus.exceptions.ModbusConnectionLostException;
 import com.digitalpetri.modbus.exceptions.ModbusCrcException;
-import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
+import com.digitalpetri.modbus.exceptions.ModbusMalformedResponseException;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
 import com.digitalpetri.modbus.internal.util.ExecutionQueue;
 import com.digitalpetri.modbus.internal.util.Hex;
@@ -485,14 +485,15 @@ public class ModbusRtuClient extends ModbusClient {
     if (pending.slaveId != slaveId) {
       failRequest(
           pending,
-          new ModbusException("slave id mismatch: %s != %s".formatted(pending.slaveId, slaveId)));
+          new ModbusMalformedResponseException(
+              "slave id mismatch: %s != %s".formatted(pending.slaveId, slaveId)));
       return;
     }
 
     ByteBuffer buffer = frame.pdu();
 
     if (buffer.remaining() == 0) {
-      failRequest(pending, new ModbusException("empty response PDU"));
+      failRequest(pending, new ModbusMalformedResponseException("empty response PDU"));
       return;
     }
 
@@ -504,8 +505,10 @@ public class ModbusRtuClient extends ModbusClient {
         var response = (ModbusResponsePdu) modbusPdu;
         config.responseValidator().validate(pending.request, response);
         completeRequest(pending, response);
-      } catch (Exception e) {
+      } catch (ModbusMalformedResponseException e) {
         failRequest(pending, e);
+      } catch (Exception e) {
+        failRequest(pending, new ModbusMalformedResponseException(e));
       }
     } else if (functionCode == pending.functionCode + 0x80) {
       if (buffer.remaining() >= 2) {
@@ -516,7 +519,7 @@ public class ModbusRtuClient extends ModbusClient {
       } else {
         failRequest(
             pending,
-            new ModbusException(
+            new ModbusMalformedResponseException(
                 "malformed exception response PDU: %s".formatted(Hex.format(buffer))));
       }
     } else {
@@ -524,7 +527,7 @@ public class ModbusRtuClient extends ModbusClient {
       // we sent request B, and now we're receiving response A.
       failRequest(
           pending,
-          new ModbusException(
+          new ModbusMalformedResponseException(
               "function code mismatch: %s != %s".formatted(pending.functionCode, functionCode)));
     }
   }

@@ -9,6 +9,7 @@ All library exceptions below extend the checked `ModbusException`.
 | `ModbusConnectException` | Supplied serial transports when opening the port fails | Message/cause; a failed `openPort()` includes the port and last error code |
 | `ModbusCrcException` | RTU client when a received frame's CRC differs | `getFrame()` returns the rejected RTU frame; synchronous typed calls wrap it in `ModbusExecutionException` |
 | `ModbusExecutionException` | Synchronous client wrapper for unexpected connection, transport, serialization, correlation, or interruption failures | Inspect `getCause()`; interruption also restores the thread interrupt flag |
+| `ModbusMalformedResponseException` | Typed TCP or RTU client when a received PDU cannot be decoded or validated, or does not match its request | Diagnostic message; decoder and custom-validator failures retain their original cause; synchronous typed calls wrap it in `ModbusExecutionException` |
 | `ModbusResponseException` | Typed client for a Modbus exception response; server services to request a Modbus exception response | `getFunctionCode()` and `getExceptionCode()` |
 | `ModbusTimeoutException` | Synchronous request when the configured request deadline expires; `ModbusRtuClient.broadcast` instead throws `ModbusExecutionException` with a `TimeoutException` cause | Cause is the internal `TimeoutException` |
 | `UnknownUnitIdException` | Server service cannot route the requested unit | Unit ID appears in the message; supplied transports ignore the request |
@@ -45,14 +46,17 @@ message.
 | --- | --- |
 | Matching function code | Decode with configured response serializer, then apply the configured response validator |
 | Request function code plus `0x80` and exception byte | `ModbusResponseException` |
-| Exception function code without an exception byte | `ModbusException` for malformed exception PDU |
-| Empty typed response PDU | `ModbusException` for empty response PDU |
-| Any other function code | `ModbusException` for unexpected function code |
+| Exception function code without an exception byte | `ModbusMalformedResponseException` for malformed exception PDU |
+| Empty typed response PDU | `ModbusMalformedResponseException` for empty response PDU |
+| Any other function code | `ModbusMalformedResponseException` for unexpected function code |
 | No response before deadline | Timeout; synchronous API exposes `ModbusTimeoutException` |
 
-Built-in codec format failures produce an `IllegalArgumentException` with a protocol diagnostic.
-Standard request-relative mismatches produce a `ModbusException`. Asynchronous operations expose
-the cause directly; synchronous calls wrap these failures in `ModbusExecutionException`. See
+Typed clients report codec and validator failures as `ModbusMalformedResponseException`. The
+default response validator also throws this type when used directly. Clients preserve an existing
+`ModbusMalformedResponseException`; other decoder or validator exceptions become its cause.
+Asynchronous operations fail with this type; synchronous calls wrap it in
+`ModbusExecutionException`. Method signatures are unchanged. Direct calls to built-in response
+decoders still throw their original format exceptions. See
 [Typed response validation](client-and-server-behavior.md#typed-response-validation) for replacement
 rules and recovery behavior.
 
@@ -63,12 +67,12 @@ Raw TCP calls return the response PDU bytes without these typed checks.
 | Response condition | Result |
 | --- | --- |
 | CRC differs | `ModbusCrcException`; the frame parser is reset |
-| Unit ID differs from the request | `ModbusException` for slave id mismatch |
+| Unit ID differs from the request | `ModbusMalformedResponseException` for slave id mismatch |
 | Matching function code | Decode with configured response serializer, then apply the configured response validator |
 | Request function code plus `0x80` and exception byte | `ModbusResponseException` |
-| Exception function code without an exception byte | `ModbusException` for malformed exception PDU |
-| Empty response PDU | `ModbusException` for empty response PDU |
-| Any other function code | `ModbusException` for function code mismatch |
+| Exception function code without an exception byte | `ModbusMalformedResponseException` for malformed exception PDU |
+| Empty response PDU | `ModbusMalformedResponseException` for empty response PDU |
+| Any other function code | `ModbusMalformedResponseException` for function code mismatch |
 | No response before deadline | Timeout; synchronous API exposes `ModbusTimeoutException` |
 
 ## Server error behavior
@@ -88,6 +92,7 @@ Raw TCP calls return the response PDU bytes without these typed checks.
 | --- | --- |
 | Connection/open failure | Inspect nested cause and endpoint/port/serial/TLS configuration before retrying |
 | Timeout | Verify unit, framing, address, server load, and timeout budget; do not retry writes blindly |
+| Malformed response | Inspect the diagnostic and original cause for an invalid PDU or a mismatch with the request |
 | Modbus response exception | Branch on numeric exception code and function |
 | CRC failure | Inspect the link, then allow parser reset/reconnect before retrying |
 | RTU unit/function mismatch | Usually a late response to a request that timed out, or another master on the bus. For late responses, raise the request timeout or reduce the number of queued requests. Otherwise, confirm that only one master transmits on the RTU bus |

@@ -8,8 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.digitalpetri.modbus.client.ModbusClient;
-import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
+import com.digitalpetri.modbus.exceptions.ModbusMalformedResponseException;
 import com.digitalpetri.modbus.pdu.MaskWriteRegisterRequest;
 import com.digitalpetri.modbus.pdu.MaskWriteRegisterResponse;
 import com.digitalpetri.modbus.pdu.ReadCoilsRequest;
@@ -84,7 +84,7 @@ public abstract class ClientServerIT {
     ModbusExecutionException failure =
         assertThrows(
             ModbusExecutionException.class, () -> getClient().readHoldingRegisters(1, request));
-    assertInstanceOf(ModbusException.class, failure.getCause());
+    assertInstanceOf(ModbusMalformedResponseException.class, failure.getCause());
     assertEquals(4, getClient().readHoldingRegisters(1, request).registers().length);
     assertTrue(getClient().isConnected());
   }
@@ -108,7 +108,7 @@ public abstract class ClientServerIT {
     ModbusExecutionException failure =
         assertThrows(
             ModbusExecutionException.class, () -> getClient().writeMultipleRegisters(1, request));
-    assertInstanceOf(ModbusException.class, failure.getCause());
+    assertInstanceOf(ModbusMalformedResponseException.class, failure.getCause());
     assertEquals(
         new WriteMultipleRegistersResponse(10, 2), getClient().writeMultipleRegisters(1, request));
     assertTrue(getClient().isConnected());
