@@ -4,6 +4,7 @@ import com.digitalpetri.modbus.Crc16;
 import com.digitalpetri.modbus.Modbus;
 import com.digitalpetri.modbus.ModbusRtuFrame;
 import com.digitalpetri.modbus.TimeoutScheduler.TimeoutHandle;
+import com.digitalpetri.modbus.exceptions.ModbusConnectionLostException;
 import com.digitalpetri.modbus.exceptions.ModbusCrcException;
 import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
 import com.digitalpetri.modbus.exceptions.ModbusMalformedResponseException;
@@ -59,8 +60,9 @@ public class ModbusRtuClient extends ModbusClient {
    * Runs every request state change (submit, send, response, timeout, and send failure) serially.
    *
    * <p>RTU responses carry no transaction ID, so a response can only be matched to a request if at
-   * most one request is outstanding at a time. The fields below are only accessed from tasks on
-   * this queue, which lets the transport be called without holding a lock.
+   * most one request is outstanding at a time. Request state is changed only by tasks on this
+   * queue, which lets the transport be called without holding a lock. Connection-loss callbacks
+   * read the volatile in-flight reference to identify the request affected by the loss.
    */
   private final ExecutionQueue requestQueue = new ExecutionQueue(executor);
 
@@ -71,7 +73,7 @@ public class ModbusRtuClient extends ModbusClient {
    * The request that has been sent and is waiting for a response, the broadcast that is being
    * written, or {@code null}.
    */
-  private Pending<?> inFlight;
+  private volatile Pending<?> inFlight;
 
   /** The turnaround delay that holds the queue after a broadcast, or {@code null}. */
   private TimeoutHandle turnaround;
@@ -89,6 +91,7 @@ public class ModbusRtuClient extends ModbusClient {
     this.transport = transport;
 
     transport.receive(this::onFrameReceived);
+    transport.onConnectionLost(this::onConnectionLost);
   }
 
   /**
@@ -327,6 +330,28 @@ public class ModbusRtuClient extends ModbusClient {
       // and slaves discard a partial frame.
       sendNext();
     }
+  }
+
+  private Runnable onConnectionLost() {
+    // Capture before reconnection, then let earlier queued responses complete their requests.
+    Pending<?> pending = inFlight;
+    return () ->
+        requestQueue.submit(
+            () -> {
+              if (pending != null && pending == inFlight) {
+                resetFrameParser();
+                inFlight = null;
+                try {
+                  pending.sendFuture.toCompletableFuture().cancel(false);
+                } catch (UnsupportedOperationException ignored) {
+                  // This CompletionStage implementation can't be cancelled.
+                }
+                if (!pending.timedOut) {
+                  failRequest(pending, new ModbusConnectionLostException());
+                }
+                sendNext();
+              }
+            });
   }
 
   private <T> void completeRequest(Pending<T> pending, T result) {

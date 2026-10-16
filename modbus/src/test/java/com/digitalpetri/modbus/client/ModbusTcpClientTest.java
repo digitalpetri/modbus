@@ -2,6 +2,7 @@ package com.digitalpetri.modbus.client;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -9,19 +10,109 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.digitalpetri.modbus.MbapHeader;
 import com.digitalpetri.modbus.ModbusTcpFrame;
+import com.digitalpetri.modbus.TimeoutScheduler;
+import com.digitalpetri.modbus.exceptions.ModbusConnectionLostException;
 import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersRequest;
 import com.digitalpetri.modbus.pdu.WriteMultipleRegistersRequest;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 
 public class ModbusTcpClientTest {
+
+  @Test
+  void connectionLossFailsAllTypedAndRawRequestsAndCancelsTimeouts() throws Exception {
+    var transport = new TestTransport();
+    var scheduler = new RecordingTimeoutScheduler();
+    var client = ModbusTcpClient.create(transport, cfg -> cfg.timeoutScheduler = scheduler);
+    var typed = client.readHoldingRegistersAsync(1, new ReadHoldingRegistersRequest(0, 1));
+    var raw = client.sendRawAsync(1, new byte[] {3, 0, 0, 0, 1});
+
+    Runnable lossNotification = transport.connectionLost.get();
+    var next = client.sendRawAsync(1, new byte[] {3, 0, 0, 0, 1});
+    lossNotification.run();
+
+    for (CompletionStage<?> response : List.of(typed, raw)) {
+      ExecutionException failure =
+          assertThrows(
+              ExecutionException.class,
+              () -> response.toCompletableFuture().get(1, TimeUnit.SECONDS));
+      assertInstanceOf(ModbusConnectionLostException.class, failure.getCause());
+    }
+    assertEquals(3, scheduler.handles.size());
+    assertTrue(scheduler.handles.get(0).isCancelled());
+    assertTrue(scheduler.handles.get(1).isCancelled());
+    assertFalse(scheduler.handles.get(2).isCancelled());
+    assertFalse(next.toCompletableFuture().isDone());
+    transport.frameReceiver.accept(
+        new ModbusTcpFrame(
+            transport.lastFrameSent.header(), ByteBuffer.wrap(new byte[] {3, 2, 0, 42})));
+    assertArrayEquals(
+        new byte[] {3, 2, 0, 42}, next.toCompletableFuture().get(1, TimeUnit.SECONDS));
+  }
+
+  @Test
+  void completedResponseIsPreservedWhenConnectionIsLost() throws Exception {
+    var transport = new TestTransport();
+    var client = ModbusTcpClient.create(transport);
+    var response = client.sendRawAsync(1, new byte[] {3, 0, 0, 0, 1});
+    transport.frameReceiver.accept(
+        new ModbusTcpFrame(
+            transport.lastFrameSent.header(), ByteBuffer.wrap(new byte[] {3, 2, 0, 42})));
+
+    transport.connectionLost.get().run();
+    assertArrayEquals(
+        new byte[] {3, 2, 0, 42}, response.toCompletableFuture().get(1, TimeUnit.SECONDS));
+  }
+
+  @Test
+  void lateSendFailureAndTimeoutAfterConnectionLossDoNotRemoveReusedTransaction() throws Exception {
+    var send = new CompletableFuture<Void>();
+    var transport =
+        new TestTransport() {
+          @Override
+          public CompletionStage<Void> send(ModbusTcpFrame frame) {
+            boolean first = lastFrameSent == null;
+            super.send(frame);
+            return first ? send : CompletableFuture.completedFuture(null);
+          }
+        };
+    var scheduler = new RecordingTimeoutScheduler();
+    var config = ModbusClientConfig.create(cfg -> cfg.timeoutScheduler = scheduler);
+    var client =
+        new ModbusTcpClient(config, transport) {
+          @Override
+          protected TransactionSequence createTransactionSequence() {
+            return () -> 0;
+          }
+        };
+    var first = client.sendRawAsync(1, new byte[] {3, 0, 0, 0, 1});
+    transport.connectionLost.get().run();
+    ExecutionException failure =
+        assertThrows(
+            ExecutionException.class, () -> first.toCompletableFuture().get(1, TimeUnit.SECONDS));
+    assertInstanceOf(ModbusConnectionLostException.class, failure.getCause());
+
+    var next = client.sendRawAsync(1, new byte[] {3, 0, 0, 0, 1});
+    send.completeExceptionally(new ModbusException("late send failure"));
+    // A timeout task may already be queued when its handle is cancelled.
+    scheduler.tasks.get(0).run(scheduler.handles.get(0));
+    assertFalse(next.toCompletableFuture().isDone());
+    transport.frameReceiver.accept(
+        new ModbusTcpFrame(
+            transport.lastFrameSent.header(), ByteBuffer.wrap(new byte[] {3, 2, 0, 42})));
+    assertArrayEquals(
+        new byte[] {3, 2, 0, 42}, next.toCompletableFuture().get(1, TimeUnit.SECONDS));
+  }
 
   @Test
   void registerReadRejectsResponseWithFewerRegistersThanRequested() {
@@ -223,11 +314,44 @@ public class ModbusTcpClientTest {
     assertEquals("unexpected function code: 0x22", cause.getMessage());
   }
 
+  private static class RecordingTimeoutScheduler implements TimeoutScheduler {
+
+    final List<TimeoutHandle> handles = new ArrayList<>();
+    final List<Task> tasks = new ArrayList<>();
+
+    @Override
+    public TimeoutHandle newTimeout(Task task, long delay, TimeUnit unit) {
+      var handle =
+          new TimeoutHandle() {
+            boolean cancelled;
+
+            @Override
+            public void cancel() {
+              cancelled = true;
+            }
+
+            @Override
+            public boolean isCancelled() {
+              return cancelled;
+            }
+          };
+      handles.add(handle);
+      tasks.add(task);
+      return handle;
+    }
+  }
+
   private static class TestTransport implements ModbusTcpClientTransport {
 
     boolean connected = false;
     ModbusTcpFrame lastFrameSent;
     Consumer<ModbusTcpFrame> frameReceiver;
+    Supplier<Runnable> connectionLost;
+
+    @Override
+    public void onConnectionLost(Supplier<Runnable> callback) {
+      connectionLost = callback;
+    }
 
     @Override
     public CompletionStage<Void> connect() {

@@ -17,6 +17,30 @@ send or channel wait already in progress. A request can still reach the server a
 timeout. Applications must resolve the outcome of timed-out writes or use idempotent application
 semantics before retrying.
 
+## Connection loss
+
+When a Netty TCP or RTU-over-TCP transport detects that an established connection has closed,
+including an explicit disconnect, the client fails requests already handed to the transport with
+`ModbusConnectionLostException` and cancels their request timeouts. This includes raw TCP requests
+and RTU broadcasts whose sends have not completed. Synchronous calls wrap the exception in
+`ModbusExecutionException`.
+
+Requests still waiting in the RTU client's queue keep their original timeouts and submission order.
+The next request is handed to the transport, where it follows the configured connection and
+reconnection policy. Connection loss does not retry a failed request. A write may already have
+reached the device, so its outcome is unknown.
+
+Custom transports can report connection loss through `ModbusClientTransport.onConnectionLost`.
+Its `Supplier<Runnable>` captures affected requests during the connection-state transition, before
+reconnection. The transport then runs the returned cleanup task in order with response delivery,
+after responses queued before the loss. This keeps a delayed notification from failing requests on
+a replacement connection. The supplier must return promptly without waiting for transport operations.
+Netty logs exceptions from either phase and still notifies its existing connection listeners.
+The default implementation does nothing, so transports without loss detection retain their timeout
+behavior. The serial transport does not currently report connection loss through this callback.
+The client installs this callback; applications observing a Netty transport should use its existing
+`addConnectionListener` API.
+
 ## Typed response validation
 
 TCP and RTU clients decode normal responses with `responseSerializer`, then call

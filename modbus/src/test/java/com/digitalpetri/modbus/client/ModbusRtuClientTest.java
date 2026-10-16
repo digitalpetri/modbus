@@ -13,6 +13,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.digitalpetri.modbus.ModbusPduSerializer.DefaultResponseSerializer;
 import com.digitalpetri.modbus.ModbusRtuFrame;
 import com.digitalpetri.modbus.TimeoutScheduler;
+import com.digitalpetri.modbus.exceptions.ModbusConnectionLostException;
 import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
 import com.digitalpetri.modbus.exceptions.ModbusMalformedResponseException;
@@ -38,9 +39,140 @@ import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import org.junit.jupiter.api.Test;
 
 public class ModbusRtuClientTest {
+
+  @Test
+  void connectionLossFailsOnlyInFlightRequestAndPreservesQueuedDeadline() throws Exception {
+    var scheduler = new ManualTimeoutScheduler();
+    var send = new CompletableFuture<Void>();
+    var transport =
+        new RecordingRtuTransport() {
+          @Override
+          public CompletionStage<Void> send(ModbusRtuFrame frame) {
+            super.send(frame);
+            return startAddress(frame) == 0 ? send : CompletableFuture.completedFuture(null);
+          }
+        };
+    var client = ModbusRtuClient.create(transport, cfg -> cfg.timeoutScheduler = scheduler);
+
+    CompletableFuture<ReadHoldingRegistersResponse> first = readAsync(client, 0);
+    CompletableFuture<ReadHoldingRegistersResponse> next = readAsync(client, 100);
+    scheduler.nextTimeout();
+    Runnable nextTimeout = scheduler.nextTimeout();
+    assertEquals(0, startAddress(transport.nextSentFrame()));
+
+    transport.connectionLost.get().run();
+    ExecutionException failure =
+        assertThrows(ExecutionException.class, () -> first.get(1, TimeUnit.SECONDS));
+    assertInstanceOf(ModbusConnectionLostException.class, failure.getCause());
+    assertTrue(send.isCancelled());
+    assertEquals(1, transport.parserResets.get());
+    assertEquals(100, startAddress(transport.nextSentFrame()));
+    assertFalse(next.isDone());
+    assertEquals(1, client.timeouts.size());
+
+    // The queued request keeps its original deadline after being handed to the transport.
+    nextTimeout.run();
+    failure = assertThrows(ExecutionException.class, () -> next.get(1, TimeUnit.SECONDS));
+    assertInstanceOf(TimeoutException.class, failure.getCause());
+    assertEquals(0, client.timeouts.size());
+  }
+
+  @Test
+  void lossDuringResponseValidationDoesNotFailRequestStillQueuedAtNotification() throws Exception {
+    var scheduler = new ManualTimeoutScheduler();
+    var transport = new RecordingRtuTransport();
+    var validating = new CountDownLatch(1);
+    var releaseValidation = new CountDownLatch(1);
+    var client =
+        ModbusRtuClient.create(
+            transport,
+            cfg -> {
+              cfg.timeoutScheduler = scheduler;
+              cfg.responseValidator =
+                  (request, response) -> {
+                    if (((ReadHoldingRegistersRequest) request).address() == 0) {
+                      validating.countDown();
+                      try {
+                        if (!releaseValidation.await(5, TimeUnit.SECONDS)) {
+                          throw new ModbusException("test did not release validation");
+                        }
+                      } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new ModbusException(e);
+                      }
+                    }
+                  };
+            });
+    CompletableFuture<ReadHoldingRegistersResponse> first = readAsync(client, 0);
+    CompletableFuture<ReadHoldingRegistersResponse> next = readAsync(client, 100);
+    scheduler.nextTimeout();
+    scheduler.nextTimeout();
+    assertEquals(0, startAddress(transport.nextSentFrame()));
+    transport.respond(client, registers(1));
+
+    try {
+      assertTrue(validating.await(1, TimeUnit.SECONDS));
+      transport.connectionLost.get().run();
+    } finally {
+      releaseValidation.countDown();
+    }
+
+    assertArrayEquals(registers(1), first.get(1, TimeUnit.SECONDS).registers());
+    assertEquals(100, startAddress(transport.nextSentFrame()));
+    transport.respond(client, registers(42));
+    assertArrayEquals(registers(42), next.get(1, TimeUnit.SECONDS).registers());
+    assertEquals(0, client.timeouts.size());
+  }
+
+  @Test
+  void requestAfterConnectionLossCanCompleteNormally() throws Exception {
+    var scheduler = new ManualTimeoutScheduler();
+    var transport = new RecordingRtuTransport();
+    var client = ModbusRtuClient.create(transport, cfg -> cfg.timeoutScheduler = scheduler);
+    CompletableFuture<ReadHoldingRegistersResponse> first = readAsync(client, 0);
+    Runnable firstTimeout = scheduler.nextTimeout();
+    assertEquals(0, startAddress(transport.nextSentFrame()));
+
+    transport.connectionLost.get().run();
+    ExecutionException failure =
+        assertThrows(ExecutionException.class, () -> first.get(1, TimeUnit.SECONDS));
+    assertInstanceOf(ModbusConnectionLostException.class, failure.getCause());
+    assertEquals(0, client.timeouts.size());
+
+    CompletableFuture<ReadHoldingRegistersResponse> next = readAsync(client, 100);
+    assertEquals(100, startAddress(transport.nextSentFrame()));
+    firstTimeout.run();
+    transport.respond(client, registers(42));
+    assertArrayEquals(registers(42), next.get(1, TimeUnit.SECONDS).registers());
+    assertEquals(0, client.timeouts.size());
+  }
+
+  @Test
+  void connectionLossFailsBroadcastBeingWrittenAndReleasesQueuedRequest() throws Exception {
+    var scheduler = new ManualTimeoutScheduler();
+    var send = new StartedWriteFuture();
+    var transport = new BroadcastRtuTransport(send);
+    var client = ModbusRtuClient.create(transport, cfg -> cfg.timeoutScheduler = scheduler);
+    CompletableFuture<Void> broadcast = broadcastAsync(client, 0);
+    CompletableFuture<ReadHoldingRegistersResponse> next = readAsync(client, 100);
+    assertEquals(0, transport.nextSentFrame().unitId());
+    scheduler.nextTimeout();
+    scheduler.nextTimeout();
+
+    transport.connectionLost.get().run();
+    ExecutionException failure =
+        assertThrows(ExecutionException.class, () -> broadcast.get(1, TimeUnit.SECONDS));
+    assertInstanceOf(ModbusConnectionLostException.class, failure.getCause());
+    assertEquals(100, startAddress(transport.nextSentFrame()));
+    send.complete(null); // A late send completion must not complete a different request.
+    transport.respond(client, registers(42));
+    assertArrayEquals(registers(42), next.get(1, TimeUnit.SECONDS).registers());
+    assertEquals(0, client.timeouts.size());
+  }
 
   @Test
   void invalidResponseFailsOnlyInFlightRequestAndReleasesQueuedRequest() throws Exception {
@@ -882,6 +1014,18 @@ public class ModbusRtuClientTest {
     final BlockingQueue<ModbusRtuFrame> sentFrames = new LinkedBlockingQueue<>();
 
     volatile Consumer<ModbusRtuFrame> frameReceiver;
+    Supplier<Runnable> connectionLost;
+    final AtomicInteger parserResets = new AtomicInteger();
+
+    @Override
+    public void onConnectionLost(Supplier<Runnable> callback) {
+      connectionLost = callback;
+    }
+
+    @Override
+    public void resetFrameParser() {
+      parserResets.incrementAndGet();
+    }
 
     @Override
     public CompletionStage<Void> send(ModbusRtuFrame frame) {

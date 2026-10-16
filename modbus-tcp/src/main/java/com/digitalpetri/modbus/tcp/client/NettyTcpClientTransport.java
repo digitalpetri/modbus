@@ -29,6 +29,7 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,6 +44,9 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
   private final AtomicReference<Consumer<ModbusTcpFrame>> frameReceiver = new AtomicReference<>();
 
   private final List<ConnectionListener> connectionListeners = new CopyOnWriteArrayList<>();
+
+  private final AtomicReference<Supplier<Runnable>> connectionLostCallback =
+      new AtomicReference<>();
 
   private final ChannelFsm channelFsm;
   private final ExecutionQueue executionQueue;
@@ -76,16 +80,36 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
 
   @SuppressWarnings("DuplicatedCode")
   private void maybeNotifyConnectionListeners(State from, State to) {
-    if (connectionListeners.isEmpty()) {
+    if (connectionListeners.isEmpty() && connectionLostCallback.get() == null) {
       return;
     }
 
     if (from != State.Connected && to == State.Connected) {
       executionQueue.submit(() -> connectionListeners.forEach(ConnectionListener::onConnection));
     } else if (from == State.Connected && to != State.Connected) {
+      Runnable notification = captureConnectionLoss();
       executionQueue.submit(
-          () -> connectionListeners.forEach(ConnectionListener::onConnectionLost));
+          () -> {
+            try {
+              notification.run();
+            } catch (Exception e) {
+              logger.warn("Connection-loss notification failed", e);
+            }
+            connectionListeners.forEach(ConnectionListener::onConnectionLost);
+          });
     }
+  }
+
+  private Runnable captureConnectionLoss() {
+    Supplier<Runnable> callback = connectionLostCallback.get();
+    if (callback != null) {
+      try {
+        return callback.get();
+      } catch (Exception e) {
+        logger.warn("Connection-loss capture failed", e);
+      }
+    }
+    return () -> {};
   }
 
   @Override
@@ -120,6 +144,11 @@ public class NettyTcpClientTransport implements ModbusTcpClientTransport {
 
               return future;
             });
+  }
+
+  @Override
+  public void onConnectionLost(Supplier<Runnable> callback) {
+    connectionLostCallback.set(callback);
   }
 
   @Override
