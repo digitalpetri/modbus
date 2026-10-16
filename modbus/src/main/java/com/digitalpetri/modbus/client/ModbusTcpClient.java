@@ -3,8 +3,8 @@ package com.digitalpetri.modbus.client;
 import com.digitalpetri.modbus.MbapHeader;
 import com.digitalpetri.modbus.ModbusTcpFrame;
 import com.digitalpetri.modbus.TimeoutScheduler.TimeoutHandle;
-import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
+import com.digitalpetri.modbus.exceptions.ModbusMalformedResponseException;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
 import com.digitalpetri.modbus.exceptions.ModbusTimeoutException;
 import com.digitalpetri.modbus.internal.util.Hex;
@@ -168,8 +168,10 @@ public class ModbusTcpClient extends ModbusClient {
             var response = (ModbusResponsePdu) decoded;
             config.responseValidator().validate(request, response);
             return response;
-          } catch (Exception e) {
+          } catch (ModbusMalformedResponseException e) {
             throw new CompletionException(e);
+          } catch (Exception e) {
+            throw new CompletionException(new ModbusMalformedResponseException(e));
           }
         });
   }
@@ -302,7 +304,7 @@ public class ModbusTcpClient extends ModbusClient {
     @Override
     public void complete(ByteBuffer buffer) {
       if (buffer.remaining() == 0) {
-        future.completeExceptionally(new ModbusException("empty response PDU"));
+        future.completeExceptionally(new ModbusMalformedResponseException("empty response PDU"));
         return;
       }
 
@@ -318,12 +320,12 @@ public class ModbusTcpClient extends ModbusClient {
           future.completeExceptionally(new ModbusResponseException(functionCode, exceptionCode));
         } else {
           future.completeExceptionally(
-              new ModbusException(
+              new ModbusMalformedResponseException(
                   "malformed exception response PDU: %s".formatted(Hex.format(buffer))));
         }
       } else {
         future.completeExceptionally(
-            new ModbusException(
+            new ModbusMalformedResponseException(
                 "unexpected function code: 0x%02X".formatted(responseFunctionCode)));
       }
     }

@@ -15,6 +15,7 @@ import com.digitalpetri.modbus.ModbusRtuFrame;
 import com.digitalpetri.modbus.ModbusTcpFrame;
 import com.digitalpetri.modbus.exceptions.ModbusException;
 import com.digitalpetri.modbus.exceptions.ModbusExecutionException;
+import com.digitalpetri.modbus.exceptions.ModbusMalformedResponseException;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
 import com.digitalpetri.modbus.pdu.ModbusPdu;
 import com.digitalpetri.modbus.pdu.ModbusRequestPdu;
@@ -23,6 +24,7 @@ import com.digitalpetri.modbus.pdu.ReadHoldingRegistersRequest;
 import com.digitalpetri.modbus.pdu.ReadHoldingRegistersResponse;
 import com.digitalpetri.modbus.pdu.WriteMultipleRegistersRequest;
 import com.digitalpetri.modbus.pdu.WriteMultipleRegistersResponse;
+import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Queue;
@@ -40,29 +42,39 @@ class ModbusResponseValidationTest {
   private static final byte[] VALID_READ = {3, 4, 0, 1, 0, 2};
 
   @Test
-  void syncAndAsyncReadsRejectMalformedResponsesAndRecoverOverTcpAndRtu() throws Exception {
+  void syncAndAsyncReadsRejectMalformedResponsesAndRecoverOverTcp() throws Exception {
+    assertMalformedResponses(false);
+  }
+
+  @Test
+  void syncAndAsyncReadsRejectMalformedResponsesAndRecoverOverRtu() throws Exception {
+    assertMalformedResponses(true);
+  }
+
+  private void assertMalformedResponses(boolean rtu) throws Exception {
     byte[][] invalidResponses = {
       {3, 2, 0, 1}, // well-formed, but one register instead of two
       {3, 6, 0, 1, 0, 2, 0, 3}, // well-formed, but three registers instead of two
       {3, 4, 0, 1, 0, 2, 0}, // trailing byte
       {3, 4, 0, 1}, // truncated data
-      {3, 3, 0, 1, 0} // odd register byte count
+      {3, 3, 0, 1, 0}, // odd register byte count
+      {}, // empty PDU
+      {4, 4, 0, 1, 0, 2}, // wrong function code
+      {(byte) 0x83} // exception response without an exception code
     };
-    for (boolean rtu : new boolean[] {false, true}) {
-      for (boolean async : new boolean[] {false, true}) {
-        for (int i = 0; i < invalidResponses.length; i++) {
-          ModbusClient client = createClient(rtu, cfg -> {}, invalidResponses[i], VALID_READ);
-          try (var ignored = client.open()) {
-            Throwable failure = readFailure(client, async);
-            if (i < 2) {
-              assertInstanceOf(ModbusException.class, failure);
-            } else {
-              assertInstanceOf(IllegalArgumentException.class, failure);
-            }
-            assertTrue(failure.getMessage().contains(i < 2 ? "byte count" : "response"));
-            assertArrayEquals(new byte[] {0, 1, 0, 2}, read(client, async).registers());
-            assertNoRtuTimeouts(client);
+    for (boolean async : new boolean[] {false, true}) {
+      for (int i = 0; i < invalidResponses.length; i++) {
+        ModbusClient client = createClient(rtu, cfg -> {}, invalidResponses[i], VALID_READ);
+        try (var ignored = client.open()) {
+          Throwable failure = readFailure(client, async);
+          assertInstanceOf(ModbusMalformedResponseException.class, failure);
+          if (i < 2) {
+            assertTrue(failure.getMessage().contains("byte count"));
+          } else if (i < 5) {
+            assertInstanceOf(IllegalArgumentException.class, failure.getCause());
           }
+          assertArrayEquals(new byte[] {0, 1, 0, 2}, read(client, async).registers());
+          assertNoRtuTimeouts(client);
         }
       }
     }
@@ -94,7 +106,7 @@ class ModbusResponseValidationTest {
                           () -> client.writeMultipleRegisters(1, request))
                       .getCause();
             }
-            assertInstanceOf(ModbusException.class, failure);
+            assertInstanceOf(ModbusMalformedResponseException.class, failure);
             WriteMultipleRegistersResponse response =
                 async
                     ? client
@@ -104,6 +116,62 @@ class ModbusResponseValidationTest {
                     : client.writeMultipleRegisters(1, request);
             assertEquals(new WriteMultipleRegistersResponse(10, 2), response);
             assertNoRtuTimeouts(client);
+          }
+        }
+      }
+    }
+  }
+
+  @Test
+  void decoderAndValidatorFailuresPreserveTheirCauseOverTcpAndRtu() throws Exception {
+    Exception[] failures = {
+      new ModbusException("vendor response rejected"),
+      new BufferUnderflowException(),
+      new IndexOutOfBoundsException("vendor byte count"),
+      new ModbusMalformedResponseException("already classified")
+    };
+    for (boolean rtu : new boolean[] {false, true}) {
+      for (boolean async : new boolean[] {false, true}) {
+        for (boolean decoder : new boolean[] {false, true}) {
+          for (Exception original : failures) {
+            ModbusClient client =
+                createClient(
+                    rtu,
+                    cfg -> {
+                      if (decoder) {
+                        cfg.responseSerializer =
+                            new DefaultResponseSerializer() {
+                              @Override
+                              public ModbusPdu decode(int functionCode, ByteBuffer buffer)
+                                  throws ModbusException {
+                                if (original instanceof ModbusException checked) {
+                                  throw checked;
+                                }
+                                throw (RuntimeException) original;
+                              }
+                            };
+                      } else {
+                        cfg.responseValidator =
+                            (q, r) -> {
+                              if (original instanceof ModbusException checked) {
+                                throw checked;
+                              }
+                              throw (RuntimeException) original;
+                            };
+                      }
+                    },
+                    VALID_READ);
+            try (var ignored = client.open()) {
+              ModbusMalformedResponseException failure =
+                  assertInstanceOf(
+                      ModbusMalformedResponseException.class, readFailure(client, async));
+              if (original instanceof ModbusMalformedResponseException) {
+                assertSame(original, failure);
+              } else {
+                assertSame(original, failure.getCause());
+              }
+              assertNoRtuTimeouts(client);
+            }
           }
         }
       }
@@ -140,7 +208,7 @@ class ModbusResponseValidationTest {
       ModbusClient standard =
           createClient(rtu, cfg -> cfg.responseSerializer = new WideRegisterCodec(), wideResponse);
       try (var ignored = standard.open()) {
-        assertInstanceOf(ModbusException.class, readFailure(standard, true));
+        assertInstanceOf(ModbusMalformedResponseException.class, readFailure(standard, true));
       }
       for (boolean async : new boolean[] {false, true}) {
         var codec = new WideRegisterCodec();
@@ -201,7 +269,7 @@ class ModbusResponseValidationTest {
               new byte[] {(byte) 0x83, 2},
               VALID_READ);
       try (var ignored = client.open()) {
-        assertInstanceOf(ModbusException.class, readFailure(client, true));
+        assertInstanceOf(ModbusMalformedResponseException.class, readFailure(client, true));
         ModbusResponseException exception =
             assertInstanceOf(ModbusResponseException.class, readFailure(client, true));
         assertEquals(2, exception.getExceptionCode());

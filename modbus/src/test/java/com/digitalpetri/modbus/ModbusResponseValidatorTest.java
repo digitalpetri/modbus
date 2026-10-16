@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.digitalpetri.modbus.ModbusResponseValidator.DefaultResponseValidator;
-import com.digitalpetri.modbus.exceptions.ModbusException;
+import com.digitalpetri.modbus.exceptions.ModbusMalformedResponseException;
 import com.digitalpetri.modbus.pdu.MaskWriteRegisterRequest;
 import com.digitalpetri.modbus.pdu.MaskWriteRegisterResponse;
 import com.digitalpetri.modbus.pdu.ModbusRequestPdu;
@@ -51,7 +51,7 @@ class ModbusResponseValidatorTest {
         byte[] differentValue = value.clone();
         differentValue[value.length - 1]++;
         assertThrows(
-            ModbusException.class,
+            ModbusMalformedResponseException.class,
             () ->
                 validator.validate(
                     new WriteSingleRegisterRequest(10, value),
@@ -145,8 +145,9 @@ class ModbusResponseValidatorTest {
       throws Exception {
     validator.validate(request, valid);
     for (ModbusResponsePdu invalid : List.of(shortResponse, longResponse)) {
-      ModbusException e =
-          assertThrows(ModbusException.class, () -> validator.validate(request, invalid));
+      ModbusMalformedResponseException e =
+          assertThrows(
+              ModbusMalformedResponseException.class, () -> validator.validate(request, invalid));
       assertTrue(e.getMessage().contains("byte count"));
     }
   }
@@ -156,8 +157,9 @@ class ModbusResponseValidatorTest {
       throws Exception {
     validator.validate(request, valid);
     for (ModbusResponsePdu invalid : invalidResponses) {
-      ModbusException e =
-          assertThrows(ModbusException.class, () -> validator.validate(request, invalid));
+      ModbusMalformedResponseException e =
+          assertThrows(
+              ModbusMalformedResponseException.class, () -> validator.validate(request, invalid));
       assertTrue(e.getMessage().contains("expected"));
     }
   }
