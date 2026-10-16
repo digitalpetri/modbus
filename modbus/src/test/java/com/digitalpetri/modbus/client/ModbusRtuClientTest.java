@@ -932,12 +932,15 @@ public class ModbusRtuClientTest {
     broadcastWrite.complete(null);
     x.get(1, TimeUnit.SECONDS);
 
-    // Pushing A's deadline back must not wrap around into an immediate timeout.
+    // Pushing A's deadline back must not wrap around into an immediate timeout. The exact value
+    // is Long.MAX_VALUE less any time the test spent before the delay started, so only check it
+    // wasn't wrapped.
     Runnable turnaroundElapsed = scheduler.nextTimeout();
     ScheduledTimeout extendedA = scheduler.nextScheduledTimeout();
-    assertEquals(Long.MAX_VALUE, extendedA.delayNanos());
+    assertTrue(extendedA.delayNanos() > Long.MAX_VALUE / 2);
 
-    // Nor may the timeout of a request submitted during the delay.
+    // Nor may the timeout of a request submitted during the delay. Long.MAX_VALUE plus the rest of
+    // the delay always saturates, whatever the elapsed time.
     CompletableFuture<ReadHoldingRegistersResponse> b = readAsync(client, 100);
     ScheduledTimeout timeoutB = scheduler.nextScheduledTimeout();
     assertEquals(Long.MAX_VALUE, timeoutB.delayNanos());
