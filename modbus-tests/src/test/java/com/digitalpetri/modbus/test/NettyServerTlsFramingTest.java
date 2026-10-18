@@ -147,6 +147,8 @@ class NettyServerTlsFramingTest {
     Integer serverPort = port.get(5, TimeUnit.SECONDS);
     assertNotNull(serverPort);
     socket = (SSLSocket) context.getSocketFactory().createSocket("127.0.0.1", serverPort);
+    // Send each write immediately; with Nagle, a write can wait for the server's delayed ACK.
+    socket.setTcpNoDelay(true);
     socket.setSoTimeout(2000);
     socket.startHandshake();
   }

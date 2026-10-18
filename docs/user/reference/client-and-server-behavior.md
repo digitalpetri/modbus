@@ -192,10 +192,16 @@ Each TCP connection has its own parser and silence measurement. Bytes received o
 or a connection that closed partway through a request, do not affect another connection. Stopping
 a server discards any incomplete frame.
 
-A request delayed in the network by at least the timeout is also discarded. This can happen when a
-client writes one request in several TCP segments and one is retransmitted, or on high-latency
-links. The client then times out, and its next request is answered. On such links, set a longer
-`partialFrameTimeout`.
+A request delayed by at least the timeout between two of its TCP segments is also discarded. The
+client then times out, and its next request is answered. Three situations can cause such a delay:
+
+- A client writes one request in several `write()` calls without `TCP_NODELAY`. Nagle's algorithm
+  holds the later segment until the server acknowledges the first, and the server's operating
+  system can delay that acknowledgement by up to about 200 ms.
+- A segment is lost and retransmitted.
+- The link has high latency.
+
+Enable `TCP_NODELAY` on such clients, or set a longer `partialFrameTimeout`.
 
 The serial default follows the Modbus serial line specification's end-of-frame delay. A process
 receives serial bytes in chunks, and some USB serial adapters deliver them at intervals longer

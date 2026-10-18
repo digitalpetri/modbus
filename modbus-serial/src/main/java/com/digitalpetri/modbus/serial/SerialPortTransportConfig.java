@@ -362,9 +362,6 @@ public record SerialPortTransportConfig(
       if (executor == null) {
         executor = Modbus.sharedExecutor();
       }
-      if (partialFrameTimeout == null) {
-        partialFrameTimeout = interFrameDelay(baudRate);
-      }
 
       return new SerialPortTransportConfig(
           serialPort,
@@ -379,7 +376,7 @@ public record SerialPortTransportConfig(
           rs485DelayBefore,
           rs485DelayAfter,
           executor,
-          partialFrameTimeout);
+          partialFrameTimeout != null ? partialFrameTimeout : interFrameDelay(baudRate));
     }
 
     /**

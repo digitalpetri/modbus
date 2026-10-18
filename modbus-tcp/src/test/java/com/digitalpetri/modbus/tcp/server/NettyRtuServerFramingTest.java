@@ -225,6 +225,8 @@ class NettyRtuServerFramingTest {
 
   private Socket connect() throws Exception {
     var socket = new Socket("127.0.0.1", port);
+    // Send each write immediately; with Nagle, a write can wait for the server's delayed ACK.
+    socket.setTcpNoDelay(true);
     socket.setSoTimeout(2000);
     sockets.add(socket);
     return socket;

@@ -24,6 +24,16 @@ class SerialPortTransportConfigTest {
   }
 
   @Test
+  void reusedBuilderDerivesDefaultFromCurrentBaudRate() {
+    var builder = new SerialPortTransportConfig.Builder().setSerialPort("test");
+
+    assertEquals(
+        Duration.ofNanos(1_750_000), builder.setBaudRate(115200).build().partialFrameTimeout());
+    assertEquals(
+        Duration.ofNanos(32_083_334), builder.setBaudRate(1200).build().partialFrameTimeout());
+  }
+
+  @Test
   void explicitPartialFrameTimeoutReplacesDefault() {
     SerialPortTransportConfig config =
         SerialPortTransportConfig.create(
