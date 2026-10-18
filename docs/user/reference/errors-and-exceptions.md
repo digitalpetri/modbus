@@ -91,6 +91,8 @@ Raw TCP calls return the response PDU bytes without these typed checks.
 | Function code without default serializer support | Request decode fails before dispatch and enters the transport error path: the Netty TCP transport closes the client channel; serial drops the frame. No exception response is sent |
 | Other handler/codec exception on Netty TCP | Log error and close the client channel |
 | RTU parse error over TCP | Log, reset parser, and close the client channel |
+| RTU parse error over serial | Discard the frame's bytes, and any that follow, until the line has been silent for `partialFrameTimeout`; send no response |
+| More received serial bytes than the parser buffers, or another failure handling received serial bytes | Log a warning, discard the buffered bytes, and keep receiving |
 
 ## Diagnostic handling
 

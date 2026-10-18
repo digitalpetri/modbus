@@ -3,6 +3,8 @@ package com.digitalpetri.modbus.serial.server;
 import com.digitalpetri.modbus.ModbusRtuFrame;
 import com.digitalpetri.modbus.ModbusRtuRequestFrameParser;
 import com.digitalpetri.modbus.ModbusRtuRequestFrameParser.Accumulated;
+import com.digitalpetri.modbus.ModbusRtuRequestFrameParser.Idle;
+import com.digitalpetri.modbus.ModbusRtuRequestFrameParser.ParseError;
 import com.digitalpetri.modbus.ModbusRtuRequestFrameParser.ParserState;
 import com.digitalpetri.modbus.exceptions.ModbusConnectException;
 import com.digitalpetri.modbus.exceptions.ModbusException;
@@ -20,6 +22,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,9 +43,21 @@ public class SerialPortServerTransport implements ModbusRtuServerTransport {
   private volatile SerialPort serialPort;
 
   private final SerialPortTransportConfig config;
+  private final LongSupplier nanoTime;
 
   public SerialPortServerTransport(SerialPortTransportConfig config) {
+    this(config, System::nanoTime);
+  }
+
+  /**
+   * Create a transport that measures partial frame silence with {@code nanoTime}.
+   *
+   * @param config the transport configuration.
+   * @param nanoTime the source of monotonic time, in nanoseconds.
+   */
+  SerialPortServerTransport(SerialPortTransportConfig config, LongSupplier nanoTime) {
     this.config = config;
+    this.nanoTime = nanoTime;
 
     executionQueue = new ExecutionQueue(config.executor());
   }
@@ -104,9 +119,10 @@ public class SerialPortServerTransport implements ModbusRtuServerTransport {
     if (sp.isOpen()) {
       return CompletableFuture.completedFuture(null);
     } else {
-      if (sp.openPort()) {
-        frameParser.reset();
+      // Reset before opening; reopening restarts a listener added by an earlier bind().
+      frameParser.reset();
 
+      if (sp.openPort()) {
         sp.addDataListener(new ModbusRtuDataListener());
 
         return CompletableFuture.completedFuture(null);
@@ -149,10 +165,21 @@ public class SerialPortServerTransport implements ModbusRtuServerTransport {
     this.frameReceiver.set(frameReceiver);
   }
 
+  /**
+   * Receives request frames from the serial port.
+   *
+   * <p>When bytes arrive after at least the configured partial frame timeout of silence, the
+   * incomplete frame, or the bytes of a frame that failed to parse, are discarded, and the new
+   * bytes start a new frame.
+   */
   private class ModbusRtuDataListener implements SerialPortDataListener {
 
     /** Bit mask indicating what events we're interested in. */
     private static final int LISTENING_EVENTS = SerialPort.LISTENING_EVENT_DATA_RECEIVED;
+
+    private final long partialFrameTimeoutNanos = config.partialFrameTimeout().toNanos();
+
+    private long lastReceivedNanos;
 
     @Override
     public int getListeningEvents() {
@@ -162,12 +189,30 @@ public class SerialPortServerTransport implements ModbusRtuServerTransport {
     @Override
     public void serialEvent(SerialPortEvent event) {
       if ((event.getEventType() & LISTENING_EVENTS) == LISTENING_EVENTS) {
-        onDataReceived(event);
+        try {
+          onDataReceived(event);
+        } catch (RuntimeException e) {
+          // jSerialComm stops delivering events after a listener throws.
+          logger.warn("Discarding received data that failed to process: {}", e.getMessage(), e);
+          frameParser.reset();
+        }
       }
     }
 
     private void onDataReceived(SerialPortEvent event) {
       byte[] receivedData = event.getReceivedData();
+
+      long now = nanoTime.getAsLong();
+      ParserState previous = frameParser.getState();
+      if (!(previous instanceof Idle) && now - lastReceivedNanos >= partialFrameTimeoutNanos) {
+        if (previous instanceof ParseError e) {
+          logger.debug("Discarding an unparseable request frame after silence: {}", e.message());
+        } else {
+          logger.debug("Discarding an incomplete request frame after silence");
+        }
+        frameParser.reset();
+      }
+      lastReceivedNanos = now;
 
       ParserState state = frameParser.parse(receivedData);
 

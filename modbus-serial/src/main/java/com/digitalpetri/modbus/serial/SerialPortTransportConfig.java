@@ -2,12 +2,15 @@ package com.digitalpetri.modbus.serial;
 
 import com.digitalpetri.modbus.Modbus;
 import com.digitalpetri.modbus.serial.client.SerialPortClientTransport;
+import com.digitalpetri.modbus.serial.server.SerialPortServerTransport;
 import com.fazecast.jSerialComm.SerialPort;
+import java.time.Duration;
+import java.util.Objects;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;
 
 /**
- * Configuration for a {@link SerialPortClientTransport}.
+ * Configuration for a {@link SerialPortClientTransport} or {@link SerialPortServerTransport}.
  *
  * @param serialPort the OS/system-dependent serial port descriptor.
  * @param baudRate the desired baud rate to operate at.
@@ -27,6 +30,8 @@ import java.util.function.Consumer;
  *     disabling transmit mode. Effective only on Linux.
  * @param executor the {@link ExecutorService} to use when delivering frame received callbacks and,
  *     for a {@link SerialPortClientTransport}, when writing frames to the serial port.
+ * @param partialFrameTimeout how long an incomplete request frame waits for its next byte before a
+ *     {@link SerialPortServerTransport} discards it. See {@link Builder#partialFrameTimeout}.
  * @see SerialPortTransportConfig#create(Consumer)
  */
 public record SerialPortTransportConfig(
@@ -41,7 +46,15 @@ public record SerialPortTransportConfig(
     boolean rs485RxDuringTx,
     int rs485DelayBefore,
     int rs485DelayAfter,
-    ExecutorService executor) {
+    ExecutorService executor,
+    Duration partialFrameTimeout) {
+
+  public SerialPortTransportConfig {
+    Objects.requireNonNull(partialFrameTimeout, "partialFrameTimeout must not be null");
+    if (partialFrameTimeout.isNegative() || partialFrameTimeout.isZero()) {
+      throw new IllegalArgumentException("partialFrameTimeout must be positive");
+    }
+  }
 
   /**
    * Create a new {@link SerialPortTransportConfig}, using the callback to configure the builder as
@@ -153,6 +166,22 @@ public record SerialPortTransportConfig(
      * <p>Defaults to {@link Modbus#sharedExecutor()} if not set explicitly.
      */
     public ExecutorService executor;
+
+    /**
+     * How long an incomplete request frame waits for its next byte before a {@link
+     * SerialPortServerTransport} discards it. The client transport ignores this setting.
+     *
+     * <p>The server measures the silence from the last bytes it received; new bytes restart the
+     * measurement. When bytes arrive after at least this much silence, the server discards the
+     * incomplete frame and parses the new bytes as the start of a new request.
+     *
+     * <p>Defaults to 3.5 character times at {@link #baudRate}, counting 11 bits per character, or
+     * 1.75 ms when the baud rate is above 19200, as the Modbus serial line specification defines
+     * the end of a frame. Some USB serial adapters deliver received bytes in bursts, at intervals
+     * that can be longer than this. With such an adapter, set a longer timeout so that the server
+     * does not discard frames that were contiguous on the line. Must be positive.
+     */
+    public Duration partialFrameTimeout;
 
     /**
      * Set the OS/system-dependent serial port descriptor.
@@ -309,6 +338,19 @@ public record SerialPortTransportConfig(
     }
 
     /**
+     * Set how long an incomplete request frame waits for its next byte before a {@link
+     * SerialPortServerTransport} discards it.
+     *
+     * @param partialFrameTimeout the partial frame timeout; must be positive.
+     * @return this {@link Builder}.
+     * @see #partialFrameTimeout
+     */
+    public Builder setPartialFrameTimeout(Duration partialFrameTimeout) {
+      this.partialFrameTimeout = partialFrameTimeout;
+      return this;
+    }
+
+    /**
      * Build a new {@link SerialPortTransportConfig} from the current state of this builder.
      *
      * @return a new {@link SerialPortTransportConfig}.
@@ -333,7 +375,24 @@ public record SerialPortTransportConfig(
           rs485RxDuringTx,
           rs485DelayBefore,
           rs485DelayAfter,
-          executor);
+          executor,
+          partialFrameTimeout != null ? partialFrameTimeout : interFrameDelay(baudRate));
+    }
+
+    /**
+     * Get the Modbus serial line inter-frame delay: 3.5 character times of 11 bits at {@code
+     * baudRate}, or 1.75 ms above 19200 baud.
+     */
+    private static Duration interFrameDelay(int baudRate) {
+      if (baudRate <= 0) {
+        throw new IllegalArgumentException("baudRate must be positive");
+      }
+      if (baudRate > 19200) {
+        return Duration.ofNanos(1_750_000);
+      }
+      // 3.5 characters of 11 bits take 38.5 seconds at 1 baud; round up to whole nanoseconds.
+      long nanosAtOneBaud = 38_500_000_000L;
+      return Duration.ofNanos((nanosAtOneBaud + baudRate - 1) / baudRate);
     }
   }
 }

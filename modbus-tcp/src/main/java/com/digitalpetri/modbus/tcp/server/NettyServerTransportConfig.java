@@ -6,6 +6,7 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.EventLoopGroup;
 import io.netty.handler.ssl.SslContextBuilder;
+import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -31,6 +32,8 @@ import javax.net.ssl.TrustManagerFactory;
  * @param keyManagerFactory the key manager factory to use if TLS is enabled.
  * @param trustManagerFactory the trust manager factory to use if TLS is enabled.
  * @param sslContextCustomizer the callback that customizes TLS context construction.
+ * @param partialFrameTimeout how long an incomplete request frame waits for its next byte before
+ *     the transport discards it. See {@link Builder#partialFrameTimeout}.
  */
 public record NettyServerTransportConfig(
     String bindAddress,
@@ -42,16 +45,23 @@ public record NettyServerTransportConfig(
     boolean tlsEnabled,
     Optional<KeyManagerFactory> keyManagerFactory,
     Optional<TrustManagerFactory> trustManagerFactory,
-    Consumer<SslContextBuilder> sslContextCustomizer) {
+    Consumer<SslContextBuilder> sslContextCustomizer,
+    Duration partialFrameTimeout) {
 
   private static final Consumer<SslContextBuilder> DEFAULT_SSL_CONTEXT_CUSTOMIZER = b -> {};
 
+  private static final Duration DEFAULT_PARTIAL_FRAME_TIMEOUT = Duration.ofSeconds(1);
+
   public NettyServerTransportConfig {
     Objects.requireNonNull(sslContextCustomizer, "sslContextCustomizer must not be null");
+    Objects.requireNonNull(partialFrameTimeout, "partialFrameTimeout must not be null");
+    if (partialFrameTimeout.isNegative() || partialFrameTimeout.isZero()) {
+      throw new IllegalArgumentException("partialFrameTimeout must be positive");
+    }
   }
 
   /**
-   * Create a configuration with default TLS context construction.
+   * Create a configuration with default TLS context construction and partial frame timeout.
    *
    * @param bindAddress the address to bind to.
    * @param port the transport port.
@@ -83,7 +93,8 @@ public record NettyServerTransportConfig(
         tlsEnabled,
         keyManagerFactory,
         trustManagerFactory,
-        DEFAULT_SSL_CONTEXT_CUSTOMIZER);
+        DEFAULT_SSL_CONTEXT_CUSTOMIZER,
+        DEFAULT_PARTIAL_FRAME_TIMEOUT);
   }
 
   /**
@@ -137,6 +148,22 @@ public record NettyServerTransportConfig(
      * removed.
      */
     public Consumer<SslContextBuilder> sslContextCustomizer = DEFAULT_SSL_CONTEXT_CUSTOMIZER;
+
+    /**
+     * How long an incomplete request frame waits for its next byte before the transport discards
+     * it.
+     *
+     * <p>Each connection measures the silence from the last bytes it received; new bytes restart
+     * the measurement. When bytes arrive after at least this much silence, the transport discards
+     * the incomplete frame and parses the new bytes as the start of a new request, so a client can
+     * recover on the same connection. Must be positive. Defaults to 1 second.
+     *
+     * <p>A shorter timeout recovers sooner, but it also discards a request whose TCP segments
+     * arrive further apart than the timeout. A client that writes one request in several writes
+     * without {@code TCP_NODELAY} can produce gaps of up to about 200 ms, because Nagle's algorithm
+     * waits for the server's delayed acknowledgement.
+     */
+    public Duration partialFrameTimeout = DEFAULT_PARTIAL_FRAME_TIMEOUT;
 
     /**
      * Set the address to bind to.
@@ -249,6 +276,19 @@ public record NettyServerTransportConfig(
       return this;
     }
 
+    /**
+     * Set how long an incomplete request frame waits for its next byte before the transport
+     * discards it.
+     *
+     * @param partialFrameTimeout the partial frame timeout; must be positive.
+     * @return this {@link Builder}.
+     * @see #partialFrameTimeout
+     */
+    public Builder setPartialFrameTimeout(Duration partialFrameTimeout) {
+      this.partialFrameTimeout = partialFrameTimeout;
+      return this;
+    }
+
     public NettyServerTransportConfig build() {
       if (port == -1) {
         port = tlsEnabled ? 802 : 502;
@@ -270,7 +310,8 @@ public record NettyServerTransportConfig(
           tlsEnabled,
           Optional.ofNullable(keyManagerFactory),
           Optional.ofNullable(trustManagerFactory),
-          sslContextCustomizer);
+          sslContextCustomizer,
+          partialFrameTimeout);
     }
   }
 }

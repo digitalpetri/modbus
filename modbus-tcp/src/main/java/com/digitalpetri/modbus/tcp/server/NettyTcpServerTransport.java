@@ -26,6 +26,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,9 +46,21 @@ public class NettyTcpServerTransport implements ModbusTcpServerTransport {
 
   private final ExecutionQueue executionQueue;
   private final NettyServerTransportConfig config;
+  private final LongSupplier nanoTime;
 
   public NettyTcpServerTransport(NettyServerTransportConfig config) {
+    this(config, System::nanoTime);
+  }
+
+  /**
+   * Create a transport that measures partial frame silence with {@code nanoTime}.
+   *
+   * @param config the transport configuration.
+   * @param nanoTime the source of monotonic time, in nanoseconds.
+   */
+  NettyTcpServerTransport(NettyServerTransportConfig config, LongSupplier nanoTime) {
     this.config = config;
+    this.nanoTime = nanoTime;
 
     executionQueue = new ExecutionQueue(config.executor(), 1);
   }
@@ -91,8 +104,10 @@ public class NettyTcpServerTransport implements ModbusTcpServerTransport {
                   }
                 }
 
+                // ModbusTcpCodec encodes responses; requests arrive already decoded.
                 channel
                     .pipeline()
+                    .addLast(new ModbusTcpRequestDecoder(config.partialFrameTimeout(), nanoTime))
                     .addLast(new ModbusTcpCodec())
                     .addLast(new ModbusTcpFrameHandler());
 

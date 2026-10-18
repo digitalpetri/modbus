@@ -163,6 +163,53 @@ The built-in TCP and RTU-over-TCP server transports serialize service work throu
 `ExecutionQueue` per server transport. Long-running service calls delay later requests, including
 requests received from other TCP client channels.
 
+## Server partial frames
+
+The built-in server transports discard an incomplete request frame after a period of silence, so
+a client that stops partway through a request can send a complete request on the same connection
+or serial line and get a response.
+
+| Transport | Default silence | Setting |
+| --- | --- | --- |
+| Modbus TCP, with or without TLS | 1 second | `NettyServerTransportConfig.partialFrameTimeout` |
+| RTU over TCP, with or without TLS | 1 second | `NettyServerTransportConfig.partialFrameTimeout` |
+| Serial RTU | 3.5 character times of 11 bits at the configured baud rate, or 1.75 ms above 19200 baud | `SerialPortTransportConfig.partialFrameTimeout` |
+
+Silence is measured from the last bytes received, and each new chunk of bytes restarts it. When
+bytes arrive after at least the configured silence, the transport discards the incomplete frame
+and parses the new bytes as the start of a new request. A request split into chunks with shorter
+gaps is assembled as usual. The discard happens when the next bytes arrive, so the transports
+schedule no timers.
+
+The Modbus TCP server answers each of several complete requests received in one chunk. When a
+chunk completes an RTU request frame, the RTU server transports drop any bytes that follow the
+frame in that chunk.
+
+The serial server also discards the bytes of a frame it can't parse, for example a request with a
+function code the parser doesn't support, once the line has been silent for the same time.
+
+Each TCP connection has its own parser and silence measurement. Bytes received on one connection,
+or a connection that closed partway through a request, do not affect another connection. Stopping
+a server discards any incomplete frame.
+
+A shorter TCP timeout recovers sooner, but a request delayed by at least the timeout between two of
+its TCP segments is also discarded. The client then times out, and its next request is answered.
+Three situations can cause such a delay:
+
+- A client writes one request in several `write()` calls without `TCP_NODELAY`. Nagle's algorithm
+  holds the later segment until the server acknowledges the first, and the server's operating
+  system can delay that acknowledgement by up to about 200 ms.
+- A segment is lost and retransmitted.
+- The link has high latency.
+
+The 1 second default allows for these delays. Before setting a timeout shorter than about 200 ms,
+make sure clients enable `TCP_NODELAY` and send each request in one write.
+
+The serial default follows the Modbus serial line specification's end-of-frame delay. A process
+receives serial bytes in chunks, and some USB serial adapters deliver them at intervals longer
+than the default even when the frame was contiguous on the line. If a serial server misses requests
+from a client that sends complete frames, set a longer `partialFrameTimeout`.
+
 ## Service dispatch
 
 | Service type | Exact behavior |
