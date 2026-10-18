@@ -10,10 +10,10 @@ import org.junit.jupiter.api.Test;
 class NettyServerTransportConfigTest {
 
   @Test
-  void partialFrameTimeoutDefaultsTo100Millis() {
+  void partialFrameTimeoutDefaultsToOneSecond() {
     NettyServerTransportConfig config = NettyServerTransportConfig.create(b -> {});
 
-    assertEquals(Duration.ofMillis(100), config.partialFrameTimeout());
+    assertEquals(Duration.ofSeconds(1), config.partialFrameTimeout());
   }
 
   @Test
@@ -31,7 +31,7 @@ class NettyServerTransportConfigTest {
             Optional.empty(),
             Optional.empty());
 
-    assertEquals(Duration.ofMillis(100), config.partialFrameTimeout());
+    assertEquals(Duration.ofSeconds(1), config.partialFrameTimeout());
   }
 
   @Test

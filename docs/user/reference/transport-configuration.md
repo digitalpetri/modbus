@@ -63,7 +63,7 @@ same customizer; see [Shared resources](lifecycle-concurrency-and-resources.md#s
 | `setKeyManagerFactory` | `KeyManagerFactory` | None | Required when the first TLS client channel initializes |
 | `setTrustManagerFactory` | `TrustManagerFactory` | None | Required when the first TLS client channel initializes |
 | `setSslContextCustomizer` | `Consumer<SslContextBuilder>` | No-op | Configures TLS context construction after transport defaults; see [TLS context customization](#tls-context-customization) |
-| `setPartialFrameTimeout` | `Duration` | 100 ms | Silence after which a connection discards an incomplete request frame; must be positive. See [Server partial frames](client-and-server-behavior.md#server-partial-frames) |
+| `setPartialFrameTimeout` | `Duration` | 1 second | Silence after which a connection discards an incomplete request frame; must be positive. See [Server partial frames](client-and-server-behavior.md#server-partial-frames) |
 
 Unlike the client config builder, the server config builder stores missing TLS manager factories
 as empty optionals. A TLS-enabled server can bind without both because accepted-channel pipeline

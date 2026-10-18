@@ -171,8 +171,8 @@ or serial line and get a response.
 
 | Transport | Default silence | Setting |
 | --- | --- | --- |
-| Modbus TCP, with or without TLS | 100 ms | `NettyServerTransportConfig.partialFrameTimeout` |
-| RTU over TCP, with or without TLS | 100 ms | `NettyServerTransportConfig.partialFrameTimeout` |
+| Modbus TCP, with or without TLS | 1 second | `NettyServerTransportConfig.partialFrameTimeout` |
+| RTU over TCP, with or without TLS | 1 second | `NettyServerTransportConfig.partialFrameTimeout` |
 | Serial RTU | 3.5 character times of 11 bits at the configured baud rate, or 1.75 ms above 19200 baud | `SerialPortTransportConfig.partialFrameTimeout` |
 
 Silence is measured from the last bytes received, and each new chunk of bytes restarts it. When
@@ -192,8 +192,9 @@ Each TCP connection has its own parser and silence measurement. Bytes received o
 or a connection that closed partway through a request, do not affect another connection. Stopping
 a server discards any incomplete frame.
 
-A request delayed by at least the timeout between two of its TCP segments is also discarded. The
-client then times out, and its next request is answered. Three situations can cause such a delay:
+A shorter TCP timeout recovers sooner, but a request delayed by at least the timeout between two of
+its TCP segments is also discarded. The client then times out, and its next request is answered.
+Three situations can cause such a delay:
 
 - A client writes one request in several `write()` calls without `TCP_NODELAY`. Nagle's algorithm
   holds the later segment until the server acknowledges the first, and the server's operating
@@ -201,7 +202,8 @@ client then times out, and its next request is answered. Three situations can ca
 - A segment is lost and retransmitted.
 - The link has high latency.
 
-Enable `TCP_NODELAY` on such clients, or set a longer `partialFrameTimeout`.
+The 1 second default allows for these delays. Before setting a timeout shorter than about 200 ms,
+make sure clients enable `TCP_NODELAY` and send each request in one write.
 
 The serial default follows the Modbus serial line specification's end-of-frame delay. A process
 receives serial bytes in chunks, and some USB serial adapters deliver them at intervals longer

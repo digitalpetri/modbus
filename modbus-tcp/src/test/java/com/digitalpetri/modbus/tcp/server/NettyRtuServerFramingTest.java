@@ -156,7 +156,7 @@ class NettyRtuServerFramingTest {
   }
 
   @Test
-  void defaultTimeoutRecoversWithSystemTime() throws Exception {
+  void recoversWithSystemTime() throws Exception {
     startServer(new NettyRtuServerTransport(config()));
     Socket socket = connect();
 
@@ -177,6 +177,7 @@ class NettyRtuServerFramingTest {
         b ->
             b.setBindAddress("127.0.0.1")
                 .setPort(0)
+                .setPartialFrameTimeout(TIMEOUT)
                 .setExecutor(executor)
                 .setEventLoopGroup(eventLoop)
                 .setPipelineCustomizer(

@@ -50,7 +50,7 @@ public record NettyServerTransportConfig(
 
   private static final Consumer<SslContextBuilder> DEFAULT_SSL_CONTEXT_CUSTOMIZER = b -> {};
 
-  private static final Duration DEFAULT_PARTIAL_FRAME_TIMEOUT = Duration.ofMillis(100);
+  private static final Duration DEFAULT_PARTIAL_FRAME_TIMEOUT = Duration.ofSeconds(1);
 
   public NettyServerTransportConfig {
     Objects.requireNonNull(sslContextCustomizer, "sslContextCustomizer must not be null");
@@ -156,7 +156,12 @@ public record NettyServerTransportConfig(
      * <p>Each connection measures the silence from the last bytes it received; new bytes restart
      * the measurement. When bytes arrive after at least this much silence, the transport discards
      * the incomplete frame and parses the new bytes as the start of a new request, so a client can
-     * recover on the same connection. Must be positive. Defaults to 100 ms.
+     * recover on the same connection. Must be positive. Defaults to 1 second.
+     *
+     * <p>A shorter timeout recovers sooner, but it also discards a request whose TCP segments
+     * arrive further apart than the timeout. A client that writes one request in several writes
+     * without {@code TCP_NODELAY} can produce gaps of up to about 200 ms, because Nagle's algorithm
+     * waits for the server's delayed acknowledgement.
      */
     public Duration partialFrameTimeout = DEFAULT_PARTIAL_FRAME_TIMEOUT;
 

@@ -168,7 +168,7 @@ class NettyTcpServerFramingTest {
   }
 
   @Test
-  void defaultTimeoutRecoversWithSystemTime() throws Exception {
+  void recoversWithSystemTime() throws Exception {
     startServer(new NettyTcpServerTransport(config()));
     Socket socket = connect();
     byte[] request = request(0x2A);
@@ -190,6 +190,7 @@ class NettyTcpServerFramingTest {
         b ->
             b.setBindAddress("127.0.0.1")
                 .setPort(0)
+                .setPartialFrameTimeout(TIMEOUT)
                 .setExecutor(executor)
                 .setEventLoopGroup(eventLoop)
                 .setBootstrapCustomizer(
