@@ -21,7 +21,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
-import java.time.Duration;
 import java.util.HexFormat;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -35,9 +34,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
 /**
- * Partial request frame recovery over TLS with a partial frame timeout of 100 ms: a request split
- * by 20 ms of silence is answered, and a partial request followed by 300 ms of silence is discarded
- * so the next complete request on the same connection is answered.
+ * Partial request frame recovery over TLS with the default partial frame timeout of 1 second: a
+ * request split by 20 ms of silence is answered, and a partial request followed by 1.5 seconds of
+ * silence is discarded so the next complete request on the same connection is answered.
  */
 @Timeout(30)
 class NettyServerTlsFramingTest {
@@ -75,7 +74,7 @@ class NettyServerTlsFramingTest {
     assertResponse(hex("002a000000050103020000"));
 
     write(hex("002b00000006010300000001"), 0, 6);
-    Thread.sleep(300);
+    Thread.sleep(1500);
     write(hex("002c00000006010300000001"), 0, 12);
     assertResponse(hex("002c000000050103020000"));
     assertSilent();
@@ -94,7 +93,7 @@ class NettyServerTlsFramingTest {
     assertResponse(hex("0103020000b844"));
 
     write(request, 0, 4);
-    Thread.sleep(300);
+    Thread.sleep(1500);
     write(request, 0, 8);
     assertResponse(hex("0103020000b844"));
     assertSilent();
@@ -110,7 +109,6 @@ class NettyServerTlsFramingTest {
         b ->
             b.setBindAddress("127.0.0.1")
                 .setPort(0)
-                .setPartialFrameTimeout(Duration.ofMillis(100))
                 .setTlsEnabled(true)
                 .setKeyManagerFactory(keyManagerFactory)
                 .setTrustManagerFactory(trustManagerFactory)

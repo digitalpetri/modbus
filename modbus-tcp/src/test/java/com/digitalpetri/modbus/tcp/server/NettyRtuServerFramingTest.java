@@ -73,7 +73,8 @@ class NettyRtuServerFramingTest {
 
   @Test
   void requestSplitByLessSilenceThanTimeoutIsAnswered() throws Exception {
-    startServer(new NettyRtuServerTransport(config(), nanoTime));
+    startServer(
+        new NettyRtuServerTransport(config().setPartialFrameTimeout(TIMEOUT).build(), nanoTime));
     Socket socket = connect();
 
     send(socket, Arrays.copyOfRange(READ_0, 0, 4));
@@ -85,7 +86,8 @@ class NettyRtuServerFramingTest {
 
   @Test
   void partialRequestIsDiscardedAfterTimeoutAndNextRequestIsAnswered() throws Exception {
-    startServer(new NettyRtuServerTransport(config(), nanoTime));
+    startServer(
+        new NettyRtuServerTransport(config().setPartialFrameTimeout(TIMEOUT).build(), nanoTime));
     Socket socket = connect();
 
     send(socket, Arrays.copyOfRange(READ_0, 0, 4));
@@ -98,7 +100,8 @@ class NettyRtuServerFramingTest {
 
   @Test
   void silenceIsMeasuredFromLastReceivedBytes() throws Exception {
-    startServer(new NettyRtuServerTransport(config(), nanoTime));
+    startServer(
+        new NettyRtuServerTransport(config().setPartialFrameTimeout(TIMEOUT).build(), nanoTime));
     Socket socket = connect();
 
     send(socket, Arrays.copyOfRange(READ_1, 0, 3));
@@ -112,7 +115,8 @@ class NettyRtuServerFramingTest {
 
   @Test
   void partialRequestDoesNotAffectNextConnection() throws Exception {
-    startServer(new NettyRtuServerTransport(config(), nanoTime));
+    startServer(
+        new NettyRtuServerTransport(config().setPartialFrameTimeout(TIMEOUT).build(), nanoTime));
     Socket a = connect();
     send(a, Arrays.copyOfRange(READ_0, 0, 4));
     a.close();
@@ -125,7 +129,8 @@ class NettyRtuServerFramingTest {
 
   @Test
   void rejectedConnectionDoesNotAffectActiveConnection() throws Exception {
-    startServer(new NettyRtuServerTransport(config(), nanoTime));
+    startServer(
+        new NettyRtuServerTransport(config().setPartialFrameTimeout(TIMEOUT).build(), nanoTime));
     Socket a = connect();
     send(a, Arrays.copyOfRange(READ_0, 0, 4));
 
@@ -141,7 +146,8 @@ class NettyRtuServerFramingTest {
 
   @Test
   void restartedServerDoesNotKeepPartialRequest() throws Exception {
-    startServer(new NettyRtuServerTransport(config(), nanoTime));
+    startServer(
+        new NettyRtuServerTransport(config().setPartialFrameTimeout(TIMEOUT).build(), nanoTime));
     Socket a = connect();
     send(a, Arrays.copyOfRange(READ_0, 0, 4));
 
@@ -155,9 +161,10 @@ class NettyRtuServerFramingTest {
     assertResponse(b, READ_1_RESPONSE);
   }
 
+  /** Uses the default timeout of 1 second, with gaps far from it on either side. */
   @Test
-  void recoversWithSystemTime() throws Exception {
-    startServer(new NettyRtuServerTransport(config()));
+  void defaultTimeoutRecoversWithSystemTime() throws Exception {
+    startServer(new NettyRtuServerTransport(config().build()));
     Socket socket = connect();
 
     socket.getOutputStream().write(READ_0, 0, 4);
@@ -166,41 +173,39 @@ class NettyRtuServerFramingTest {
     assertResponse(socket, READ_0_RESPONSE);
 
     socket.getOutputStream().write(READ_0, 0, 4);
-    Thread.sleep(300);
+    Thread.sleep(1500);
     socket.getOutputStream().write(READ_1);
     assertResponse(socket, READ_1_RESPONSE);
     assertSilent(socket);
   }
 
-  private NettyServerTransportConfig config() {
-    return NettyServerTransportConfig.create(
-        b ->
-            b.setBindAddress("127.0.0.1")
-                .setPort(0)
-                .setPartialFrameTimeout(TIMEOUT)
-                .setExecutor(executor)
-                .setEventLoopGroup(eventLoop)
-                .setPipelineCustomizer(
-                    pipeline ->
-                        pipeline.addLast(
-                            new ChannelInboundHandlerAdapter() {
-                              @Override
-                              public void channelInactive(ChannelHandlerContext ctx) {
-                                closedChannels.release();
-                                ctx.fireChannelInactive();
-                              }
-                            }))
-                .setBootstrapCustomizer(
-                    bootstrap ->
-                        bootstrap.handler(
-                            new ChannelInboundHandlerAdapter() {
-                              @Override
-                              public void channelActive(ChannelHandlerContext ctx) {
-                                boundPorts.add(
-                                    ((InetSocketAddress) ctx.channel().localAddress()).getPort());
-                                ctx.fireChannelActive();
-                              }
-                            })));
+  private NettyServerTransportConfig.Builder config() {
+    return new NettyServerTransportConfig.Builder()
+        .setBindAddress("127.0.0.1")
+        .setPort(0)
+        .setExecutor(executor)
+        .setEventLoopGroup(eventLoop)
+        .setPipelineCustomizer(
+            pipeline ->
+                pipeline.addLast(
+                    new ChannelInboundHandlerAdapter() {
+                      @Override
+                      public void channelInactive(ChannelHandlerContext ctx) {
+                        closedChannels.release();
+                        ctx.fireChannelInactive();
+                      }
+                    }))
+        .setBootstrapCustomizer(
+            bootstrap ->
+                bootstrap.handler(
+                    new ChannelInboundHandlerAdapter() {
+                      @Override
+                      public void channelActive(ChannelHandlerContext ctx) {
+                        boundPorts.add(
+                            ((InetSocketAddress) ctx.channel().localAddress()).getPort());
+                        ctx.fireChannelActive();
+                      }
+                    }));
   }
 
   private void startServer(NettyRtuServerTransport transport) throws Exception {

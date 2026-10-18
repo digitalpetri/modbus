@@ -59,7 +59,8 @@ class NettyTcpServerFramingTest {
 
   @Test
   void requestSplitByLessSilenceThanTimeoutIsAnswered() throws Exception {
-    startServer(new NettyTcpServerTransport(config(), nanoTime));
+    startServer(
+        new NettyTcpServerTransport(config().setPartialFrameTimeout(TIMEOUT).build(), nanoTime));
     Socket socket = connect();
     byte[] request = request(0x2A);
 
@@ -72,7 +73,8 @@ class NettyTcpServerFramingTest {
 
   @Test
   void partialRequestIsDiscardedAfterTimeoutAndNextRequestIsAnswered() throws Exception {
-    startServer(new NettyTcpServerTransport(config(), nanoTime));
+    startServer(
+        new NettyTcpServerTransport(config().setPartialFrameTimeout(TIMEOUT).build(), nanoTime));
     Socket socket = connect();
 
     send(socket, Arrays.copyOfRange(request(0x2A), 0, 6));
@@ -85,7 +87,8 @@ class NettyTcpServerFramingTest {
 
   @Test
   void silenceIsMeasuredFromLastReceivedBytes() throws Exception {
-    startServer(new NettyTcpServerTransport(config(), nanoTime));
+    startServer(
+        new NettyTcpServerTransport(config().setPartialFrameTimeout(TIMEOUT).build(), nanoTime));
     Socket socket = connect();
     byte[] request = request(0x2A);
 
@@ -100,7 +103,8 @@ class NettyTcpServerFramingTest {
 
   @Test
   void coalescedRequestsAreAnswered() throws Exception {
-    startServer(new NettyTcpServerTransport(config(), nanoTime));
+    startServer(
+        new NettyTcpServerTransport(config().setPartialFrameTimeout(TIMEOUT).build(), nanoTime));
     Socket socket = connect();
 
     send(socket, concat(request(1), request(2)));
@@ -117,7 +121,8 @@ class NettyTcpServerFramingTest {
 
   @Test
   void connectionsFrameRequestsIndependently() throws Exception {
-    startServer(new NettyTcpServerTransport(config(), nanoTime));
+    startServer(
+        new NettyTcpServerTransport(config().setPartialFrameTimeout(TIMEOUT).build(), nanoTime));
     Socket a = connect();
     Socket b = connect();
 
@@ -142,7 +147,8 @@ class NettyTcpServerFramingTest {
 
   @Test
   void partialRequestDoesNotAffectNextConnection() throws Exception {
-    startServer(new NettyTcpServerTransport(config(), nanoTime));
+    startServer(
+        new NettyTcpServerTransport(config().setPartialFrameTimeout(TIMEOUT).build(), nanoTime));
     Socket a = connect();
     send(a, Arrays.copyOfRange(request(1), 0, 6));
     a.close();
@@ -154,7 +160,8 @@ class NettyTcpServerFramingTest {
 
   @Test
   void restartedServerDoesNotKeepPartialRequest() throws Exception {
-    startServer(new NettyTcpServerTransport(config(), nanoTime));
+    startServer(
+        new NettyTcpServerTransport(config().setPartialFrameTimeout(TIMEOUT).build(), nanoTime));
     Socket a = connect();
     send(a, Arrays.copyOfRange(request(1), 0, 6));
 
@@ -167,9 +174,10 @@ class NettyTcpServerFramingTest {
     assertResponse(b, 2);
   }
 
+  /** Uses the default timeout of 1 second, with gaps far from it on either side. */
   @Test
-  void recoversWithSystemTime() throws Exception {
-    startServer(new NettyTcpServerTransport(config()));
+  void defaultTimeoutRecoversWithSystemTime() throws Exception {
+    startServer(new NettyTcpServerTransport(config().build()));
     Socket socket = connect();
     byte[] request = request(0x2A);
 
@@ -179,31 +187,29 @@ class NettyTcpServerFramingTest {
     assertResponse(socket, 0x2A);
 
     socket.getOutputStream().write(request(0x2B), 0, 6);
-    Thread.sleep(300);
+    Thread.sleep(1500);
     socket.getOutputStream().write(request(0x2C));
     assertResponse(socket, 0x2C);
     assertSilent(socket);
   }
 
-  private NettyServerTransportConfig config() {
-    return NettyServerTransportConfig.create(
-        b ->
-            b.setBindAddress("127.0.0.1")
-                .setPort(0)
-                .setPartialFrameTimeout(TIMEOUT)
-                .setExecutor(executor)
-                .setEventLoopGroup(eventLoop)
-                .setBootstrapCustomizer(
-                    bootstrap ->
-                        bootstrap.handler(
-                            new ChannelInboundHandlerAdapter() {
-                              @Override
-                              public void channelActive(ChannelHandlerContext ctx) {
-                                boundPorts.add(
-                                    ((InetSocketAddress) ctx.channel().localAddress()).getPort());
-                                ctx.fireChannelActive();
-                              }
-                            })));
+  private NettyServerTransportConfig.Builder config() {
+    return new NettyServerTransportConfig.Builder()
+        .setBindAddress("127.0.0.1")
+        .setPort(0)
+        .setExecutor(executor)
+        .setEventLoopGroup(eventLoop)
+        .setBootstrapCustomizer(
+            bootstrap ->
+                bootstrap.handler(
+                    new ChannelInboundHandlerAdapter() {
+                      @Override
+                      public void channelActive(ChannelHandlerContext ctx) {
+                        boundPorts.add(
+                            ((InetSocketAddress) ctx.channel().localAddress()).getPort());
+                        ctx.fireChannelActive();
+                      }
+                    }));
   }
 
   private void startServer(NettyTcpServerTransport transport) throws Exception {
