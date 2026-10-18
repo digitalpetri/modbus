@@ -63,6 +63,7 @@ same customizer; see [Shared resources](lifecycle-concurrency-and-resources.md#s
 | `setKeyManagerFactory` | `KeyManagerFactory` | None | Required when the first TLS client channel initializes |
 | `setTrustManagerFactory` | `TrustManagerFactory` | None | Required when the first TLS client channel initializes |
 | `setSslContextCustomizer` | `Consumer<SslContextBuilder>` | No-op | Configures TLS context construction after transport defaults; see [TLS context customization](#tls-context-customization) |
+| `setPartialFrameTimeout` | `Duration` | 100 ms | Silence after which a connection discards an incomplete request frame; must be positive. See [Server partial frames](client-and-server-behavior.md#server-partial-frames) |
 
 Unlike the client config builder, the server config builder stores missing TLS manager factories
 as empty optionals. A TLS-enabled server can bind without both because accepted-channel pipeline
@@ -154,6 +155,7 @@ configuration does not introduce context sharing or session-cache reuse across c
 | `setRs485DelayBefore` | `int` microseconds | 0 | Delay after transmit enable; effective only on Linux |
 | `setRs485DelayAfter` | `int` microseconds | 0 | Delay before transmit disable; effective only on Linux |
 | `setExecutor` | `ExecutorService` | `Modbus.sharedExecutor()` | Delivers parsed frame callbacks; the client transport also writes frames on it |
+| `setPartialFrameTimeout` | `Duration` | 3.5 character times of 11 bits at the baud rate, or 1.75 ms above 19200 baud | Server only. Silence after which the server discards an incomplete request frame; must be positive. See [Server partial frames](client-and-server-behavior.md#server-partial-frames) |
 
 The port object is created lazily. `connect()`/`bind()` opens it and installs a data listener;
 `disconnect()`/`unbind()` closes it. After `disconnect()`, the client transport discards the port

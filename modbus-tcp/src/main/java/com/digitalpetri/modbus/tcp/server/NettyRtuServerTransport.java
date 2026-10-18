@@ -3,6 +3,7 @@ package com.digitalpetri.modbus.tcp.server;
 import com.digitalpetri.modbus.ModbusRtuFrame;
 import com.digitalpetri.modbus.ModbusRtuRequestFrameParser;
 import com.digitalpetri.modbus.ModbusRtuRequestFrameParser.Accumulated;
+import com.digitalpetri.modbus.ModbusRtuRequestFrameParser.Idle;
 import com.digitalpetri.modbus.ModbusRtuRequestFrameParser.ParseError;
 import com.digitalpetri.modbus.ModbusRtuRequestFrameParser.ParserState;
 import com.digitalpetri.modbus.exceptions.UnknownUnitIdException;
@@ -30,6 +31,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -43,7 +45,6 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
 
   private final AtomicReference<FrameReceiver<ModbusRtuRequestContext, ModbusRtuFrame>>
       frameReceiver = new AtomicReference<>();
-  private final ModbusRtuRequestFrameParser frameParser = new ModbusRtuRequestFrameParser();
 
   private final AtomicReference<ServerSocketChannel> serverChannel = new AtomicReference<>();
 
@@ -51,9 +52,21 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
 
   private final ExecutionQueue executionQueue;
   private final NettyServerTransportConfig config;
+  private final LongSupplier nanoTime;
 
   public NettyRtuServerTransport(NettyServerTransportConfig config) {
+    this(config, System::nanoTime);
+  }
+
+  /**
+   * Create a transport that measures partial frame silence with {@code nanoTime}.
+   *
+   * @param config the transport configuration.
+   * @param nanoTime the source of monotonic time, in nanoseconds.
+   */
+  NettyRtuServerTransport(NettyServerTransportConfig config, LongSupplier nanoTime) {
     this.config = config;
+    this.nanoTime = nanoTime;
 
     executionQueue = new ExecutionQueue(config.executor(), 1);
   }
@@ -158,12 +171,33 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
     this.frameReceiver.set(frameReceiver);
   }
 
+  /**
+   * Receives request frames for one connection.
+   *
+   * <p>Each connection has its own parser. When bytes arrive after at least the configured partial
+   * frame timeout of silence, the incomplete frame is discarded and the new bytes start a new
+   * frame.
+   */
   private class ModbusRtuServerFrameReceiver extends SimpleChannelInboundHandler<ByteBuf> {
+
+    private final ModbusRtuRequestFrameParser frameParser = new ModbusRtuRequestFrameParser();
+    private final long partialFrameTimeoutNanos = config.partialFrameTimeout().toNanos();
+
+    private long lastReceivedNanos;
 
     @Override
     protected void channelRead0(ChannelHandlerContext ctx, ByteBuf buffer) {
       byte[] data = new byte[buffer.readableBytes()];
       buffer.readBytes(data);
+
+      long now = nanoTime.getAsLong();
+      if (!(frameParser.getState() instanceof Idle)
+          && now - lastReceivedNanos >= partialFrameTimeoutNanos) {
+
+        logger.debug("Discarding an incomplete request frame after silence");
+        frameParser.reset();
+      }
+      lastReceivedNanos = now;
 
       ParserState state = frameParser.parse(data);
 

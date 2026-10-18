@@ -3,8 +3,6 @@ package com.digitalpetri.modbus.serial.server;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import com.digitalpetri.modbus.ModbusRtuFrame;
 import com.digitalpetri.modbus.exceptions.ModbusResponseException;
@@ -17,13 +15,8 @@ import com.digitalpetri.modbus.server.ModbusRequestContext.ModbusRtuRequestConte
 import com.digitalpetri.modbus.server.ModbusRtuServer;
 import com.digitalpetri.modbus.server.ProcessImage;
 import com.digitalpetri.modbus.server.ReadWriteModbusServices;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
 import java.util.Map;
 import java.util.Optional;
@@ -44,58 +37,18 @@ import org.junit.jupiter.api.condition.OS;
 @Timeout(20)
 class SerialPortServerBroadcastTest {
 
-  private static final String PTY_HELPER =
-      """
-      import os, pty, select, sys, time, tty
-      master, slave = pty.openpty()
-      tty.setraw(slave)
-      print(os.ttyname(slave), flush=True)
-      for line in sys.stdin:
-          command, argument = line.strip().split()
-          if command == 'W':
-              data = bytes.fromhex(argument)
-              while data:
-                  data = data[os.write(master, data):]
-              print('OK', flush=True)
-          elif command == 'R':
-              count = int(argument)
-              data = b''
-              deadline = time.monotonic() + (5 if count else 0.15)
-              while time.monotonic() < deadline:
-                  if not select.select([master], [], [], max(0, deadline - time.monotonic()))[0]:
-                      break
-                  data += os.read(master, max(1, count - len(data)) if count else 256)
-                  if count and len(data) >= count:
-                      break
-              print(data.hex(), flush=True)
-      """;
-
   private final ExecutorService executor = Executors.newSingleThreadExecutor();
   private final BlockingQueue<Integer> processed = new LinkedBlockingQueue<>();
-  private Process helper;
-  private BufferedReader helperOut;
-  private PrintWriter helperIn;
+  private PseudoTerminal pty;
   private TestTransport transport;
 
   @BeforeEach
   void setUp() throws Exception {
-    try {
-      helper =
-          new ProcessBuilder("python3", "-u", "-c", PTY_HELPER).redirectErrorStream(true).start();
-    } catch (IOException e) {
-      assumeTrue(false, "python3 not available: " + e.getMessage());
-    }
-    helperOut =
-        new BufferedReader(new InputStreamReader(helper.getInputStream(), StandardCharsets.UTF_8));
-    helperIn =
-        new PrintWriter(
-            new OutputStreamWriter(helper.getOutputStream(), StandardCharsets.UTF_8), true);
-    String path = helperOut.readLine();
-    assertNotNull(path, "helper did not open a pseudo-terminal");
-    assertTrue(path.startsWith("/dev/pts/"), path);
+    pty = PseudoTerminal.open();
     transport =
         new TestTransport(
-            SerialPortTransportConfig.create(b -> b.setSerialPort(path).setExecutor(executor)));
+            SerialPortTransportConfig.create(
+                b -> b.setSerialPort(pty.path()).setExecutor(executor)));
   }
 
   @AfterEach
@@ -106,12 +59,8 @@ class SerialPortServerBroadcastTest {
       }
     } finally {
       executor.shutdownNow();
-      if (helper != null) {
-        helper.destroy();
-        if (!helper.waitFor(5, TimeUnit.SECONDS)) {
-          helper.destroyForcibly();
-          assertTrue(helper.waitFor(5, TimeUnit.SECONDS), "helper did not stop");
-        }
+      if (pty != null) {
+        pty.close();
       }
     }
   }
@@ -188,16 +137,12 @@ class SerialPortServerBroadcastTest {
   }
 
   private void send(String frame) throws Exception {
-    helperIn.println("W " + frame);
-    assertEquals("OK", helperOut.readLine());
+    pty.write(hex(frame));
     assertNotNull(processed.poll(5, TimeUnit.SECONDS), "request was not processed");
   }
 
   private byte[] read(int count) throws IOException {
-    helperIn.println("R " + count);
-    String response = helperOut.readLine();
-    assertNotNull(response, "helper exited before reading a response");
-    return hex(response);
+    return pty.read(count);
   }
 
   private void assertSilent() throws IOException {
