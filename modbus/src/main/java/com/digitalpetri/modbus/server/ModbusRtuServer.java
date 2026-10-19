@@ -135,11 +135,12 @@ public class ModbusRtuServer implements ModbusServer {
       int fc = fcb + 0x80;
       int ec = e.getExceptionCode();
 
-      ByteBuffer pdu = ByteBuffer.allocate(2).put((byte) fc).put((byte) ec);
+      ByteBuffer pdu = ByteBuffer.allocate(2).put((byte) fc).put((byte) ec).flip();
 
       ByteBuffer crc = calculateCrc16(unitId, pdu);
+      crc.flip();
 
-      return new ModbusRtuFrame(unitId, pdu.flip(), crc.flip());
+      return new ModbusRtuFrame(unitId, pdu, crc);
     }
   }
 

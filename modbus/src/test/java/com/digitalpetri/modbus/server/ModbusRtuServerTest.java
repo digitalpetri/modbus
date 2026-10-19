@@ -16,6 +16,8 @@ import com.digitalpetri.modbus.exceptions.UnknownUnitIdException;
 import com.digitalpetri.modbus.pdu.MaskWriteRegisterRequest;
 import com.digitalpetri.modbus.pdu.ModbusPdu;
 import com.digitalpetri.modbus.pdu.ModbusRequestPdu;
+import com.digitalpetri.modbus.pdu.ReadHoldingRegistersRequest;
+import com.digitalpetri.modbus.pdu.ReadHoldingRegistersResponse;
 import com.digitalpetri.modbus.pdu.WriteMultipleCoilsRequest;
 import com.digitalpetri.modbus.pdu.WriteMultipleRegistersRequest;
 import com.digitalpetri.modbus.pdu.WriteSingleCoilRequest;
@@ -152,6 +154,26 @@ class ModbusRtuServerTest {
     assertArrayEquals(new byte[] {6, 0, 10, 0x12, 0x34}, bytes(response.pdu()));
     assertArrayEquals(new byte[] {(byte) 0x86, 2}, bytes(transport.handle(1, request).pdu()));
     assertThrows(UnknownUnitIdException.class, () -> transport.handle(2, request));
+  }
+
+  @Test
+  void exceptionResponseCrcCoversUnitIdAndPdu() throws Exception {
+    var services =
+        new ModbusServices() {
+          @Override
+          public ReadHoldingRegistersResponse readHoldingRegisters(
+              ModbusRequestContext context, int unitId, ReadHoldingRegistersRequest request)
+              throws ModbusResponseException {
+            throw new ModbusResponseException(
+                request.getFunctionCode(), ExceptionCode.ILLEGAL_DATA_ADDRESS.getCode());
+          }
+        };
+
+    ModbusRtuFrame response = start(services).handle(1, new ReadHoldingRegistersRequest(0, 1));
+
+    assertEquals(1, response.unitId());
+    assertArrayEquals(new byte[] {(byte) 0x83, 0x02}, bytes(response.pdu()));
+    assertArrayEquals(new byte[] {(byte) 0xC0, (byte) 0xF1}, bytes(response.crc()));
   }
 
   @Test
