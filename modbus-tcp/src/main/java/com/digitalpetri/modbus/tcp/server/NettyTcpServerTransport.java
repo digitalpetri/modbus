@@ -13,9 +13,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
@@ -33,6 +31,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Modbus/TCP transport; a {@link ModbusTcpServerTransport} that sends and receives {@link
  * ModbusTcpFrame}s over TCP.
+ *
+ * <p>Unbinding completes after the listening socket is released.
  */
 public class NettyTcpServerTransport implements ModbusTcpServerTransport {
 
@@ -41,8 +41,9 @@ public class NettyTcpServerTransport implements ModbusTcpServerTransport {
   private final AtomicReference<FrameReceiver<ModbusTcpRequestContext, ModbusTcpFrame>>
       frameReceiver = new AtomicReference<>();
 
-  private final AtomicReference<ServerSocketChannel> serverChannel = new AtomicReference<>();
+  private final AtomicReference<ListeningSocketChannel> serverChannel = new AtomicReference<>();
   private final List<Channel> clientChannels = new CopyOnWriteArrayList<>();
+  private CompletableFuture<Void> unbindFuture = CompletableFuture.completedFuture(null);
 
   private final ExecutionQueue executionQueue;
   private final NettyServerTransportConfig config;
@@ -77,7 +78,7 @@ public class NettyTcpServerTransport implements ModbusTcpServerTransport {
     var bootstrap = new ServerBootstrap();
 
     bootstrap
-        .channel(NioServerSocketChannel.class)
+        .channelFactory(ListeningSocketChannel::new)
         .childHandler(
             new ChannelInitializer<SocketChannel>() {
               @Override
@@ -127,7 +128,7 @@ public class NettyTcpServerTransport implements ModbusTcpServerTransport {
             (ChannelFutureListener)
                 channelFuture -> {
                   if (channelFuture.isSuccess()) {
-                    serverChannel.set((ServerSocketChannel) channelFuture.channel());
+                    serverChannel.set((ListeningSocketChannel) channelFuture.channel());
 
                     future.complete(null);
                   } else {
@@ -139,29 +140,32 @@ public class NettyTcpServerTransport implements ModbusTcpServerTransport {
   }
 
   @Override
-  public CompletableFuture<Void> unbind() {
-    ServerSocketChannel channel = serverChannel.getAndSet(null);
+  public synchronized CompletableFuture<Void> unbind() {
+    ListeningSocketChannel channel = serverChannel.getAndSet(null);
 
     if (channel != null) {
       var future = new CompletableFuture<Void>();
+      // Install the shared completion before close can reenter unbind() through a handler.
+      unbindFuture = future;
       channel
-          .close()
-          .addListener(
-              (ChannelFutureListener)
-                  cf -> {
-                    clientChannels.forEach(Channel::close);
-                    clientChannels.clear();
-
-                    if (cf.isSuccess()) {
-                      future.complete(null);
-                    } else {
-                      future.completeExceptionally(cf.cause());
-                    }
-                  });
-      return future;
-    } else {
-      return CompletableFuture.completedFuture(null);
+          .closeSocket()
+          .whenComplete(
+              (ignored, error) -> {
+                clientChannels.forEach(Channel::close);
+                clientChannels.clear();
+              })
+          .whenComplete(
+              (ignored, error) -> {
+                if (error == null) {
+                  future.complete(null);
+                } else {
+                  future.completeExceptionally(error);
+                }
+              });
+      return future.copy();
     }
+    // Callers may cancel or complete their own future without affecting release or client cleanup.
+    return unbindFuture.copy();
   }
 
   private class ModbusTcpFrameHandler extends SimpleChannelInboundHandler<ModbusTcpFrame> {

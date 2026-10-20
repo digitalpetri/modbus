@@ -19,9 +19,7 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.ssl.ClientAuth;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.ssl.SslContextBuilder;
@@ -38,6 +36,8 @@ import org.slf4j.LoggerFactory;
 /**
  * Modbus RTU/TCP server transport; a {@link ModbusRtuServerTransport} that sends and receives
  * {@link ModbusRtuFrame}s over TCP.
+ *
+ * <p>Unbinding completes after the listening socket is released.
  */
 public class NettyRtuServerTransport implements ModbusRtuServerTransport {
 
@@ -46,9 +46,10 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
   private final AtomicReference<FrameReceiver<ModbusRtuRequestContext, ModbusRtuFrame>>
       frameReceiver = new AtomicReference<>();
 
-  private final AtomicReference<ServerSocketChannel> serverChannel = new AtomicReference<>();
+  private final AtomicReference<ListeningSocketChannel> serverChannel = new AtomicReference<>();
 
   private final AtomicReference<Channel> clientChannel = new AtomicReference<>();
+  private CompletableFuture<Void> unbindFuture = CompletableFuture.completedFuture(null);
 
   private final ExecutionQueue executionQueue;
   private final NettyServerTransportConfig config;
@@ -78,7 +79,7 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
     var bootstrap = new ServerBootstrap();
 
     bootstrap
-        .channel(NioServerSocketChannel.class)
+        .channelFactory(ListeningSocketChannel::new)
         .childHandler(
             new ChannelInitializer<SocketChannel>() {
               @Override
@@ -127,7 +128,7 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
             (ChannelFutureListener)
                 channelFuture -> {
                   if (channelFuture.isSuccess()) {
-                    serverChannel.set((ServerSocketChannel) channelFuture.channel());
+                    serverChannel.set((ListeningSocketChannel) channelFuture.channel());
 
                     future.complete(null);
                   } else {
@@ -139,31 +140,34 @@ public class NettyRtuServerTransport implements ModbusRtuServerTransport {
   }
 
   @Override
-  public CompletionStage<Void> unbind() {
-    ServerSocketChannel channel = serverChannel.getAndSet(null);
+  public synchronized CompletionStage<Void> unbind() {
+    ListeningSocketChannel channel = serverChannel.getAndSet(null);
 
     if (channel != null) {
       var future = new CompletableFuture<Void>();
+      // Install the shared completion before close can reenter unbind() through a handler.
+      unbindFuture = future;
       channel
-          .close()
-          .addListener(
-              (ChannelFutureListener)
-                  cf -> {
-                    Channel ch = clientChannel.getAndSet(null);
-                    if (ch != null) {
-                      ch.close();
-                    }
-
-                    if (cf.isSuccess()) {
-                      future.complete(null);
-                    } else {
-                      future.completeExceptionally(cf.cause());
-                    }
-                  });
-      return future;
-    } else {
-      return CompletableFuture.completedFuture(null);
+          .closeSocket()
+          .whenComplete(
+              (ignored, error) -> {
+                Channel ch = clientChannel.getAndSet(null);
+                if (ch != null) {
+                  ch.close();
+                }
+              })
+          .whenComplete(
+              (ignored, error) -> {
+                if (error == null) {
+                  future.complete(null);
+                } else {
+                  future.completeExceptionally(error);
+                }
+              });
+      return future.copy();
     }
+    // Callers may cancel or complete their own future without affecting release or client cleanup.
+    return unbindFuture.copy();
   }
 
   @Override
