@@ -63,13 +63,15 @@ public record ModbusClientConfig(
   /**
    * Create a configuration using standard request-relative response validation.
    *
-   * <p>This overload preserves the constructor used before the response validator was configurable.
-   *
    * @param requestTimeout the timeout duration for requests.
    * @param timeoutScheduler the request timeout and broadcast delay scheduler.
    * @param requestSerializer the request serializer.
    * @param responseSerializer the response serializer.
    * @param broadcastTurnaroundDelay the RTU broadcast turnaround delay.
+   * @throws NullPointerException if {@code requestTimeout} or {@code broadcastTurnaroundDelay} is
+   *     {@code null}.
+   * @throws IllegalArgumentException if {@code requestTimeout} or {@code broadcastTurnaroundDelay}
+   *     is negative or longer than {@link Long#MAX_VALUE} nanoseconds.
    */
   public ModbusClientConfig(
       Duration requestTimeout,
