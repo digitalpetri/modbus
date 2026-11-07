@@ -8,7 +8,7 @@
 | Build layout | Maven multi-module project |
 | Published group ID | `com.digitalpetri.modbus` |
 
-The dependency examples below pin release `2.1.6`. Check
+The dependency examples below pin release `2.2.0`. Check
 [Maven Central](https://central.sonatype.com/search?q=g%3Acom.digitalpetri.modbus) for the latest
 published version.
 
@@ -36,14 +36,14 @@ Maven:
 <dependency>
   <groupId>com.digitalpetri.modbus</groupId>
   <artifactId>modbus-tcp</artifactId>
-  <version>2.1.6</version>
+  <version>2.2.0</version>
 </dependency>
 ```
 
 Gradle:
 
 ```groovy
-implementation("com.digitalpetri.modbus:modbus-tcp:2.1.6")
+implementation("com.digitalpetri.modbus:modbus-tcp:2.2.0")
 ```
 
 ### Modbus RTU over serial
@@ -54,14 +54,14 @@ Maven:
 <dependency>
   <groupId>com.digitalpetri.modbus</groupId>
   <artifactId>modbus-serial</artifactId>
-  <version>2.1.6</version>
+  <version>2.2.0</version>
 </dependency>
 ```
 
 Gradle:
 
 ```groovy
-implementation("com.digitalpetri.modbus:modbus-serial:2.1.6")
+implementation("com.digitalpetri.modbus:modbus-serial:2.2.0")
 ```
 
 The library logs through SLF4J. Applications should provide the SLF4J implementation appropriate
