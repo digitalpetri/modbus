@@ -22,6 +22,28 @@ jobs:
           distribution: 'temurin'
           overwrite-settings: false
 
+      # Central can't replace a published version, so deploy only what the tag names.
+      - name: Check release version
+        shell: bash
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          version="$(mvn -B -q -N -DforceStdout help:evaluate -Dexpression=project.version)"
+          echo "Release tag: ${TAG}"
+          echo "Project version: ${version}"
+
+          if [[ "${version}" == *-SNAPSHOT ]]; then
+            echo "::error::Refusing to release SNAPSHOT version ${version}."
+            exit 1
+          fi
+
+          if [[ "${TAG}" != "v${version}" ]]; then
+            echo "::error::Tag ${TAG} doesn't match project version ${version}. Expected v${version}."
+            exit 1
+          fi
+
       - name: Install GPG secret key
         run: |
           cat <(echo -e "${{ secrets.OSSRH_GPG_SECRET_KEY }}") | gpg --batch --import
