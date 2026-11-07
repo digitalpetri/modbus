@@ -2,7 +2,8 @@ name: Maven Release
 
 on:
   release:
-    types: [ created ]
+    # Not `created`: GitHub doesn't send it when a draft release is published.
+    types: [ published ]
 
 jobs:
   publish:
