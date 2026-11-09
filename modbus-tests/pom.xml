@@ -91,8 +91,8 @@
                 <additionalClasspathDependency>
                   <groupId>io.netty</groupId>
                   <artifactId>netty-tcnative-boringssl-static</artifactId>
-                  <!-- Matches the tcnative version used by Netty 4.1.139.Final. -->
-                  <version>2.0.84.Final</version>
+                  <!-- Matches the tcnative version used by Netty 4.1.140.Final. -->
+                  <version>2.0.85.Final</version>
                 </additionalClasspathDependency>
               </additionalClasspathDependencies>
             </configuration>
