@@ -18,6 +18,8 @@
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <!-- Matches the tcnative version used by Netty 4.1.139.Final. The netty-4.2 profile overrides it. -->
+    <tcnative.version>2.0.84.Final</tcnative.version>
   </properties>
 
   <dependencies>
@@ -91,8 +93,7 @@
                 <additionalClasspathDependency>
                   <groupId>io.netty</groupId>
                   <artifactId>netty-tcnative-boringssl-static</artifactId>
-                  <!-- Matches the tcnative version used by Netty 4.1.139.Final. -->
-                  <version>2.0.84.Final</version>
+                  <version>${tcnative.version}</version>
                 </additionalClasspathDependency>
               </additionalClasspathDependencies>
             </configuration>
@@ -140,5 +141,30 @@
       </plugin>
     </plugins>
   </build>
+
+  <profiles>
+    <profile>
+      <!--
+        Run these tests against Netty 4.2 while the library modules stay compiled against Netty 4.1.
+        This catches binary incompatibilities that compiling against 4.2 would hide.
+      -->
+      <id>netty-4.2</id>
+      <properties>
+        <!-- Matches the tcnative version used by Netty 4.2.20.Final. -->
+        <tcnative.version>2.0.85.Final</tcnative.version>
+      </properties>
+      <dependencyManagement>
+        <dependencies>
+          <dependency>
+            <groupId>io.netty</groupId>
+            <artifactId>netty-bom</artifactId>
+            <version>4.2.20.Final</version>
+            <type>pom</type>
+            <scope>import</scope>
+          </dependency>
+        </dependencies>
+      </dependencyManagement>
+    </profile>
+  </profiles>
 
 </project>
