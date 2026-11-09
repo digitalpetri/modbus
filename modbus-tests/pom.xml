@@ -18,8 +18,8 @@
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <!-- Matches the tcnative version used by Netty 4.1.139.Final. The netty-4.2 profile overrides it. -->
-    <tcnative.version>2.0.84.Final</tcnative.version>
+    <!-- Matches the tcnative version used by Netty 4.1.140.Final. The netty-4.2 profile overrides it. -->
+    <tcnative.version>2.0.85.Final</tcnative.version>
   </properties>
 
   <dependencies>
