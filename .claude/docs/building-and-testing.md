@@ -1,5 +1,9 @@
 # Building and Testing
 
+Normal builds require Java 17 and Maven 3.9.0 or later. Publishing with the `release` or
+`deploy-snapshot` profile requires Maven 3.9.2 or later to meet the Central Publishing plugin's
+requirements.
+
 ## Build/Compile the Project
 
 To compile the project without running tests:
