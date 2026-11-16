@@ -54,7 +54,7 @@
     <slf4j.version>2.0.20</slf4j.version>
 
     <!-- Test Dependencies -->
-    <bouncycastle.version>1.86</bouncycastle.version>
+    <bouncycastle.version>1.87</bouncycastle.version>
     <junit.version>5.14.4</junit.version>
 
     <!-- Plugin Dependencies -->
