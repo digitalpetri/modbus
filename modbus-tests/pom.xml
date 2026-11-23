@@ -18,7 +18,7 @@
     <maven.compiler.source>17</maven.compiler.source>
     <maven.compiler.target>17</maven.compiler.target>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <!-- Matches the tcnative version used by Netty 4.1.140.Final. The netty-4.2 profile overrides it. -->
+    <!-- Matches the tcnative version used by Netty 4.1.141.Final. The netty-4.2 profile overrides it. -->
     <tcnative.version>2.0.85.Final</tcnative.version>
   </properties>
 
@@ -150,7 +150,7 @@
       -->
       <id>netty-4.2</id>
       <properties>
-        <!-- Matches the tcnative version used by Netty 4.2.20.Final. -->
+        <!-- Matches the tcnative version used by Netty 4.2.21.Final. -->
         <tcnative.version>2.0.85.Final</tcnative.version>
       </properties>
       <dependencyManagement>
@@ -158,7 +158,7 @@
           <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-bom</artifactId>
-            <version>4.2.20.Final</version>
+            <version>4.2.21.Final</version>
             <type>pom</type>
             <scope>import</scope>
           </dependency>
